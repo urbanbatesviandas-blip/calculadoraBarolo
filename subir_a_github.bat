@@ -1,46 +1,35 @@
-@echo off
-title Subir Proyecto a GitHub - Palacio Barolo
-cd /d "%~dp0"
-set PATH=%PATH%;C:\Program Files\Git\cmd;C:\Program Files\Git\bin
-
+﻿@echo off
+chcp 65001 >nul
+title Palacio Barolo - Subir a GitHub
 echo ========================================================
-echo   SUBIR PLATAFORMA WEB A GITHUB (Palacio Barolo)
+echo   🏛️ PALACIO BAROLO - SUBIR REPOSITORIO A GITHUB
 echo ========================================================
 echo.
-echo Repositorio destino:
-echo https://github.com/urbanbatesviandas-blip/calculadoraPalacio
-echo.
-echo --------------------------------------------------------
-echo OPCIONES DE AUTENTICACION:
-echo.
-echo 1. Si tenes un Personal Access Token (PAT):
-echo    Pegalo cuando te pida Password (los tokens empiezan con ghp_).
-echo.
-echo 2. O inicia sesion en el navegador cuando se abra la
-echo    ventana de GitHub.
-echo --------------------------------------------------------
-echo.
-echo Ejecutando: git push -u origin main...
-echo.
+set "PATH=C:\Program Files\Git\cmd;%PATH%"
+git config --global credential.helper manager
 
+echo 1. Comprobando estado local de Git...
+git status
+echo.
+echo 2. Subiendo rama main a GitHub...
 git push -u origin main
 
-if %ERRORLEVEL% EQU 0 (
+if %ERRORLEVEL% NEQ 0 (
     echo.
     echo ========================================================
-    echo   EXITO: El codigo fue subido correctamente a GitHub!
+    echo ⚠️  Si la subida falló, verificá lo siguiente:
+    echo ========================================================
+    echo 1. Asegurate de que el repositorio esté creado en tu cuenta:
+    echo    Entrá a: https://github.com/new
+    echo    Nombre del repositorio: calculadoraPalacio
+    echo.
+    echo 2. Si te pide contraseña, recordá que GitHub requiere
+    echo    un Personal Access Token (PAT) con permiso 'repo':
+    echo    https://github.com/settings/tokens
     echo ========================================================
 ) else (
     echo.
-    echo --------------------------------------------------------
-    echo NOTA SOBRE GITHUB:
-    echo GitHub ya no permite contrasenas comunes por linea de comandos.
-    echo Necesitas un Personal Access Token (PAT):
-    echo 1. Entra a: https://github.com/settings/tokens
-    echo 2. Toca "Generate new token (classic)"
-    echo 3. Marca la casilla "repo" y genera el token
-    echo 4. Copia el token (ghp_...) y usalo como contrasena.
-    echo --------------------------------------------------------
+    echo ✅ ¡Repositorio subido exitosamente a GitHub!
 )
 
 echo.
