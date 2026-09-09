@@ -1,10 +1,13 @@
 import React, { useMemo } from 'react'
 import { 
   X, CheckCircle, Clock, XCircle, AlertTriangle, Building2, Calendar, 
-  Users, DollarSign, ArrowUpRight, TrendingUp, Sparkles, Receipt, Calculator, PieChart, BookmarkCheck 
+  Users, DollarSign, ArrowUpRight, TrendingUp, Sparkles, Receipt, Calculator, PieChart, BookmarkCheck,
+  FileSpreadsheet, ShieldAlert
 } from 'lucide-react'
 import { Bar } from 'react-chartjs-2'
 import confetti from 'canvas-confetti'
+import { excelExportService } from '../services/excelExportService'
+import { canEditEvent, canChangeStatus } from '../services/authService'
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -17,8 +20,11 @@ import {
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend)
 
-export default function EventDrilldownModal({ event, onClose, onUpdateStatus, onEditInCalculator }) {
+export default function EventDrilldownModal({ event, onClose, onUpdateStatus, onEditInCalculator, currentUser }) {
   if (!event) return null
+
+  const userCanEdit = canEditEvent(currentUser)
+  const userCanChange = canChangeStatus(currentUser)
 
   const grossIncome = Number(event.gross_income) || 0
   const directCosts = Number(event.direct_costs) || 0
@@ -268,12 +274,23 @@ export default function EventDrilldownModal({ event, onClose, onUpdateStatus, on
             </div>
           </div>
 
-          <button
-            onClick={onClose}
-            className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-colors"
-          >
-            <X className="w-6 h-6" />
-          </button>
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={() => excelExportService.exportSingleEvent(event)}
+              className="flex items-center space-x-1.5 bg-emerald-700/80 hover:bg-emerald-600 text-white px-3 py-1.5 rounded-xl text-xs font-bold transition-all shadow-md active:scale-95"
+              title="Descargar Ficha Completa del Evento en Excel"
+            >
+              <FileSpreadsheet className="w-4 h-4 text-emerald-300" />
+              <span className="hidden sm:inline">Exportar Excel</span>
+            </button>
+
+            <button
+              onClick={onClose}
+              className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-colors"
+            >
+              <X className="w-6 h-6" />
+            </button>
+          </div>
         </div>
 
         {/* Modal Scrollable Body */}
@@ -481,67 +498,90 @@ export default function EventDrilldownModal({ event, onClose, onUpdateStatus, on
         {/* Modal Footer with Actions */}
         <div className="bg-white border-t border-slate-200 p-4 px-6 flex flex-wrap items-center justify-between gap-3">
           
-          <button
-            onClick={() => onEditInCalculator(event)}
-            className="flex items-center space-x-2 px-4 py-2 rounded-xl text-sm font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors"
-          >
-            <Calculator className="w-4 h-4 text-barolo-navy" />
-            <span>Retocar en Calculadora Madre</span>
-          </button>
-
           <div className="flex flex-wrap items-center gap-2">
-            {event.status === 'cotizado' && (
-              <>
-                <button
-                  onClick={handleCancelQuote}
-                  className="flex items-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 transition-colors"
-                >
-                  <XCircle className="w-3.5 h-3.5" />
-                  <span>Marcar Cancelado</span>
-                </button>
-
-                <button
-                  onClick={() => onUpdateStatus && onUpdateStatus(event.id, 'reservado')}
-                  className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-sky-500 hover:bg-sky-400 text-white shadow-md shadow-sky-500/20 transition-all transform hover:scale-105"
-                  title="Bloquear fecha y pasar a Reservado"
-                >
-                  <BookmarkCheck className="w-3.5 h-3.5" />
-                  <span>🔵 Reservar Fecha</span>
-                </button>
-
-                <button
-                  onClick={handleConfirmQuote}
-                  className="flex items-center space-x-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-700/20 hover:from-emerald-500 hover:to-teal-500 transition-all transform hover:scale-105"
-                >
-                  <CheckCircle className="w-3.5 h-3.5" />
-                  <span>✅ CONFIRMAR Y PASAR A EVENTOS</span>
-                </button>
-              </>
+            {userCanEdit && (
+              <button
+                onClick={() => onEditInCalculator(event)}
+                className="flex items-center space-x-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors"
+              >
+                <Calculator className="w-4 h-4 text-barolo-navy" />
+                <span>Retocar en Calculadora</span>
+              </button>
             )}
 
-            {event.status === 'reservado' && (
-              <>
-                <button
-                  onClick={handleCancelQuote}
-                  className="flex items-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 transition-colors"
-                >
-                  <XCircle className="w-3.5 h-3.5" />
-                  <span>Marcar Cancelado</span>
-                </button>
+            <button
+              onClick={() => excelExportService.exportSingleEvent(event)}
+              className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold bg-emerald-50 text-emerald-800 border border-emerald-300 hover:bg-emerald-100 transition-colors"
+              title="Descargar Ficha en Excel"
+            >
+              <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+              <span>Ficha Excel (.xlsx)</span>
+            </button>
+          </div>
 
-                <button
-                  onClick={handleConfirmQuote}
-                  className="flex items-center space-x-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-700/20 hover:from-emerald-500 hover:to-teal-500 transition-all transform hover:scale-105"
-                >
-                  <CheckCircle className="w-3.5 h-3.5" />
-                  <span>✅ CONFIRMAR Y PASAR A EVENTOS</span>
-                </button>
+          <div className="flex flex-wrap items-center gap-2">
+            {userCanChange ? (
+              <>
+                {event.status === 'cotizado' && (
+                  <>
+                    <button
+                      onClick={handleCancelQuote}
+                      className="flex items-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 transition-colors"
+                    >
+                      <XCircle className="w-3.5 h-3.5" />
+                      <span>Marcar Cancelado</span>
+                    </button>
+
+                    <button
+                      onClick={() => onUpdateStatus && onUpdateStatus(event.id, 'reservado')}
+                      className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-sky-500 hover:bg-sky-400 text-white shadow-md shadow-sky-500/20 transition-all transform hover:scale-105"
+                      title="Bloquear fecha y pasar a Reservado"
+                    >
+                      <BookmarkCheck className="w-3.5 h-3.5" />
+                      <span>🔵 Reservar Fecha</span>
+                    </button>
+
+                    <button
+                      onClick={handleConfirmQuote}
+                      className="flex items-center space-x-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-700/20 hover:from-emerald-500 hover:to-teal-500 transition-all transform hover:scale-105"
+                    >
+                      <CheckCircle className="w-3.5 h-3.5" />
+                      <span>✅ CONFIRMAR Y PASAR A EVENTOS</span>
+                    </button>
+                  </>
+                )}
+
+                {event.status === 'reservado' && (
+                  <>
+                    <button
+                      onClick={handleCancelQuote}
+                      className="flex items-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 transition-colors"
+                    >
+                      <XCircle className="w-3.5 h-3.5" />
+                      <span>Marcar Cancelado</span>
+                    </button>
+
+                    <button
+                      onClick={handleConfirmQuote}
+                      className="flex items-center space-x-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-700/20 hover:from-emerald-500 hover:to-teal-500 transition-all transform hover:scale-105"
+                    >
+                      <CheckCircle className="w-3.5 h-3.5" />
+                      <span>✅ CONFIRMAR Y PASAR A EVENTOS</span>
+                    </button>
+                  </>
+                )}
               </>
+            ) : (
+              (event.status === 'cotizado' || event.status === 'reservado') && (
+                <span className="text-xs text-slate-400 italic bg-slate-100 px-3 py-1.5 rounded-xl border border-slate-200">
+                  Modo solo lectura: acciones reservadas para modificador/admin
+                </span>
+              )
             )}
 
             <button
               onClick={onClose}
-              className="px-4 py-2 rounded-xl text-sm font-medium text-slate-500 hover:bg-slate-100"
+              className="px-4 py-2 rounded-xl text-sm font-medium text-slate-500 hover:bg-slate-100 transition-colors"
             >
               Cerrar
             </button>

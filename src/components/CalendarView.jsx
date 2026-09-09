@@ -7,8 +7,9 @@ import { es } from 'date-fns/locale'
 import { 
   ChevronLeft, ChevronRight, Calendar as CalendarIcon, Filter, 
   MapPin, DollarSign, Users, TrendingUp, Sparkles, CheckCircle2, Clock, AlertCircle, XCircle, 
-  Calculator, ArrowRight, Eye, Check, List
+  Calculator, ArrowRight, Eye, Check, List, Scale 
 } from 'lucide-react'
+import { canCreateEvent, canEditEvent, canChangeStatus } from '../services/authService'
 
 export default function CalendarView({ 
   events = [], 
@@ -17,8 +18,15 @@ export default function CalendarView({
   onNewEventAtDate,
   onEditInCalculator,
   onUpdateStatus,
-  onClearTargetDate
+  onClearTargetDate,
+  currentUser,
+  comparisonEventIds = [],
+  onToggleComparison
 }) {
+  const userCanCreate = canCreateEvent(currentUser)
+  const userCanEdit = canEditEvent(currentUser)
+  const userCanChange = canChangeStatus(currentUser)
+
   const [currentMonth, setCurrentMonth] = useState(new Date(2026, 8, 1)) // Septiembre 2026
   const [selectedStatus, setSelectedStatus] = useState('all')
   const [selectedVenue, setSelectedVenue] = useState('all')
@@ -197,7 +205,7 @@ export default function CalendarView({
               {isHighlighted && <span className="text-[10px] uppercase tracking-wider ml-1">⭐ ¡NUEVO!</span>}
             </span>
 
-            {isCurrentMonth && (
+            {isCurrentMonth && userCanCreate && (
               <button
                 onClick={() => onNewEventAtDate(dateKey)}
                 className="opacity-0 hover:opacity-100 group-hover:opacity-100 text-slate-400 hover:text-barolo-navy text-xs px-1 rounded transition-opacity"
@@ -298,13 +306,15 @@ export default function CalendarView({
                     <CalendarIcon className="w-3.5 h-3.5 text-barolo-gold" />
                     <span>{dayLabel}</span>
                   </span>
-                  <button
-                    onClick={() => onNewEventAtDate(dateStr)}
-                    className="text-[11px] font-bold text-amber-800 bg-amber-100/70 hover:bg-amber-100 px-2 py-0.5 rounded-md transition-colors"
-                    title="Nueva cotización en este día"
-                  >
-                    + Cotizar día
-                  </button>
+                  {userCanCreate && (
+                    <button
+                      onClick={() => onNewEventAtDate(dateStr)}
+                      className="text-[11px] font-bold text-amber-800 bg-amber-100/70 hover:bg-amber-100 px-2 py-0.5 rounded-md transition-colors"
+                      title="Nueva cotización en este día"
+                    >
+                      + Cotizar día
+                    </button>
+                  )}
                 </div>
 
                 <div className="space-y-2">
@@ -312,12 +322,14 @@ export default function CalendarView({
                     const isContratado = ev.status === 'contratado'
                     const isReservado = ev.status === 'reservado'
                     const isCotizado = ev.status === 'cotizado'
+                    const isCompared = comparisonEventIds.includes(ev.id)
 
                     return (
                       <div
                         key={ev.id}
                         onClick={() => onSelectEvent(ev)}
                         className={`p-3 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 cursor-pointer transition-all hover:shadow-md ${
+                          isCompared ? 'ring-2 ring-purple-500 bg-purple-50/50' :
                           isContratado ? 'bg-emerald-50/70 border-emerald-300 hover:bg-emerald-50' :
                           isReservado ? 'bg-blue-50/70 border-blue-300 hover:bg-blue-50' :
                           isCotizado ? 'bg-amber-50/70 border-amber-300 hover:bg-amber-50' :
@@ -325,11 +337,21 @@ export default function CalendarView({
                         }`}
                       >
                         <div className="flex items-start space-x-2.5 min-w-0">
-                          <span className={`w-3 h-3 rounded-full mt-1 flex-shrink-0 ${
-                            isContratado ? 'bg-emerald-500' :
-                            isReservado ? 'bg-blue-500' :
-                            isCotizado ? 'bg-amber-500' : 'bg-rose-500'
-                          }`}></span>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              onToggleComparison && onToggleComparison(ev)
+                            }}
+                            className={`p-1.5 rounded-lg border transition-all mt-0.5 ${
+                              isCompared
+                                ? 'bg-purple-600 border-purple-700 text-white shadow-sm'
+                                : 'bg-white/90 hover:bg-purple-50 text-slate-400 hover:text-purple-600 border-slate-200'
+                            }`}
+                            title={isCompared ? "Quitar de comparativa" : "Comparar este evento"}
+                          >
+                            <Scale className="w-3 h-3" />
+                          </button>
+
                           <div className="min-w-0">
                             <div className="flex items-center space-x-2">
                               <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-white/90 border border-slate-200 text-slate-700">
@@ -650,6 +672,20 @@ export default function CalendarView({
                   <div>
                     <div className="flex items-center justify-between text-xs mb-1">
                       <div className="flex items-center space-x-1.5">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            onToggleComparison && onToggleComparison(q)
+                          }}
+                          className={`p-1 rounded-md transition-colors ${
+                            comparisonEventIds.includes(q.id)
+                              ? 'bg-purple-600 text-white shadow-sm'
+                              : 'text-slate-400 hover:text-purple-700 hover:bg-purple-100/60'
+                          }`}
+                          title={comparisonEventIds.includes(q.id) ? "Quitar de la comparativa" : "Comparar este evento"}
+                        >
+                          <Scale className="w-3 h-3" />
+                        </button>
                         <span className={`font-mono font-bold px-1.5 py-0.5 rounded text-[11px] ${
                           isReserved ? 'text-blue-800 bg-blue-100' : 'text-amber-800 bg-amber-100'
                         }`}>
@@ -700,16 +736,18 @@ export default function CalendarView({
                       <span>Ver</span>
                     </button>
 
-                    <button
-                      onClick={() => onEditInCalculator && onEditInCalculator(q)}
-                      className="bg-amber-500 hover:bg-amber-400 text-barolo-navy px-2.5 py-1.5 rounded-lg text-xs font-bold transition-colors flex items-center justify-center"
-                      title="Abrir en Calculadora Madre"
-                    >
-                      <Calculator className="w-3 h-3 mr-1" />
-                      <span>Retocar</span>
-                    </button>
+                    {userCanEdit && (
+                      <button
+                        onClick={() => onEditInCalculator && onEditInCalculator(q)}
+                        className="bg-amber-500 hover:bg-amber-400 text-barolo-navy px-2.5 py-1.5 rounded-lg text-xs font-bold transition-colors flex items-center justify-center"
+                        title="Abrir en Calculadora Madre"
+                      >
+                        <Calculator className="w-3 h-3 mr-1" />
+                        <span>Retocar</span>
+                      </button>
+                    )}
 
-                    {!isReserved && (
+                    {userCanChange && !isReserved && (
                       <button
                         onClick={() => onUpdateStatus && onUpdateStatus(q.id, 'reservado')}
                         className="bg-sky-500 hover:bg-sky-400 text-white px-2 py-1.5 rounded-lg text-xs font-bold transition-colors flex items-center justify-center"
@@ -720,13 +758,15 @@ export default function CalendarView({
                       </button>
                     )}
 
-                    <button
-                      onClick={() => onUpdateStatus && onUpdateStatus(q.id, 'contratado')}
-                      className="bg-emerald-600 hover:bg-emerald-500 text-white px-2.5 py-1.5 rounded-lg text-xs font-bold transition-colors flex items-center justify-center"
-                      title="Confirmar evento en firme (pasa a verde Contratado)"
-                    >
-                      <CheckCircle2 className="w-3 h-3" />
-                    </button>
+                    {userCanChange && (
+                      <button
+                        onClick={() => onUpdateStatus && onUpdateStatus(q.id, 'contratado')}
+                        className="bg-emerald-600 hover:bg-emerald-500 text-white px-2.5 py-1.5 rounded-lg text-xs font-bold transition-colors flex items-center justify-center"
+                        title="Confirmar evento en firme (pasa a verde Contratado)"
+                      >
+                        <CheckCircle2 className="w-3 h-3" />
+                      </button>
+                    )}
                   </div>
                 </div>
               )

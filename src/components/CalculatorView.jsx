@@ -4,8 +4,13 @@ import {
   Sparkles, DollarSign, Users, Calendar, MapPin, Building, AlertCircle, FileText, ArrowRight, BookmarkCheck 
 } from 'lucide-react'
 import confetti from 'canvas-confetti'
+import { canCreateEvent, canEditEvent, canChangeStatus } from '../services/authService'
 
-export default function CalculatorView({ initialEventData, onSaveEvent, onSwitchView }) {
+export default function CalculatorView({ initialEventData, onSaveEvent, onSwitchView, currentUser }) {
+  const userCanCreate = canCreateEvent(currentUser)
+  const userCanEdit = canEditEvent(currentUser)
+  const userCanChange = canChangeStatus(currentUser)
+
   // Estado general
   const [eventId, setEventId] = useState(initialEventData?.id || null)
   const [calcCode, setCalcCode] = useState(initialEventData?.calc_code || '')
@@ -422,32 +427,38 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
             <span>Limpiar</span>
           </button>
 
-          <button
-            onClick={handleSaveAsQuote}
-            className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl font-bold text-xs bg-amber-400 hover:bg-amber-300 text-barolo-navy shadow-md shadow-amber-400/20 transition-all"
-            title="Guardar como Cotización (en análisis)"
-          >
-            <FileText className="w-3.5 h-3.5" />
-            <span>📝 Cotización</span>
-          </button>
+          {(userCanCreate || userCanEdit) && (
+            <button
+              onClick={handleSaveAsQuote}
+              className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl font-bold text-xs bg-amber-400 hover:bg-amber-300 text-barolo-navy shadow-md shadow-amber-400/20 transition-all"
+              title="Guardar como Cotización (en análisis)"
+            >
+              <FileText className="w-3.5 h-3.5" />
+              <span>📝 Cotización</span>
+            </button>
+          )}
 
-          <button
-            onClick={handleSaveAsReserved}
-            className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl font-bold text-xs bg-sky-500 hover:bg-sky-400 text-white shadow-md shadow-sky-500/25 transition-all"
-            title="Guardar como Reservado (bloqueo de fecha)"
-          >
-            <BookmarkCheck className="w-3.5 h-3.5" />
-            <span>🔵 Reservado</span>
-          </button>
+          {userCanChange && (
+            <>
+              <button
+                onClick={handleSaveAsReserved}
+                className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl font-bold text-xs bg-sky-500 hover:bg-sky-400 text-white shadow-md shadow-sky-500/25 transition-all"
+                title="Guardar como Reservado (bloqueo de fecha)"
+              >
+                <BookmarkCheck className="w-3.5 h-3.5" />
+                <span>🔵 Reservado</span>
+              </button>
 
-          <button
-            onClick={handleConfirmAndSave}
-            className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl font-bold text-xs bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-600/20 transition-all"
-            title="Confirmar en firme como Evento Contratado"
-          >
-            <CheckCircle2 className="w-3.5 h-3.5" />
-            <span>💾 Confirmar Evento</span>
-          </button>
+              <button
+                onClick={handleConfirmAndSave}
+                className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl font-bold text-xs bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-600/20 transition-all"
+                title="Confirmar en firme como Evento Contratado"
+              >
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>💾 Confirmar Evento</span>
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -994,34 +1005,44 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
 
           {/* Action Buttons */}
           <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto justify-end">
-            
-            <button
-              onClick={handleSaveAsQuote}
-              className="flex items-center space-x-1.5 px-3.5 py-2.5 rounded-xl font-bold text-xs bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-barolo-navy shadow-lg shadow-amber-500/20 transition-all transform hover:scale-105"
-              title="Guardar propuesta comercial en estado Cotizado"
-            >
-              <FileText className="w-4 h-4" />
-              <span>📝 GUARDAR COTIZACIÓN</span>
-            </button>
+            {(userCanCreate || userCanEdit) && (
+              <button
+                onClick={handleSaveAsQuote}
+                className="flex items-center space-x-1.5 px-3.5 py-2.5 rounded-xl font-bold text-xs bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-barolo-navy shadow-lg shadow-amber-500/20 transition-all transform hover:scale-105"
+                title="Guardar propuesta comercial en estado Cotizado"
+              >
+                <FileText className="w-4 h-4" />
+                <span>📝 GUARDAR COTIZACIÓN</span>
+              </button>
+            )}
 
-            <button
-              onClick={handleSaveAsReserved}
-              className="flex items-center space-x-1.5 px-4 py-2.5 rounded-xl font-bold text-xs bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 text-white shadow-lg shadow-sky-600/30 transition-all transform hover:scale-105"
-              title="Guardar y bloquear fecha en estado Reservado"
-            >
-              <BookmarkCheck className="w-4 h-4" />
-              <span>🔵 RESERVAR FECHA</span>
-            </button>
+            {userCanChange && (
+              <>
+                <button
+                  onClick={handleSaveAsReserved}
+                  className="flex items-center space-x-1.5 px-4 py-2.5 rounded-xl font-bold text-xs bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 text-white shadow-lg shadow-sky-600/30 transition-all transform hover:scale-105"
+                  title="Guardar y bloquear fecha en estado Reservado"
+                >
+                  <BookmarkCheck className="w-4 h-4" />
+                  <span>🔵 RESERVAR FECHA</span>
+                </button>
 
-            <button
-              onClick={handleConfirmAndSave}
-              className="flex items-center space-x-1.5 px-4 py-2.5 rounded-xl font-bold text-xs bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white shadow-lg shadow-emerald-700/30 transition-all transform hover:scale-105"
-              title="Confirmar definitivamente y pasar a Evento Contratado"
-            >
-              <CheckCircle2 className="w-4 h-4" />
-              <span>💾 CONFIRMAR EVENTO</span>
-            </button>
+                <button
+                  onClick={handleConfirmAndSave}
+                  className="flex items-center space-x-1.5 px-4 py-2.5 rounded-xl font-bold text-xs bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white shadow-lg shadow-emerald-700/30 transition-all transform hover:scale-105"
+                  title="Confirmar definitivamente y pasar a Evento Contratado"
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>💾 CONFIRMAR EVENTO</span>
+                </button>
+              </>
+            )}
 
+            {!userCanCreate && !userCanEdit && !userCanChange && (
+              <span className="text-xs text-amber-300 font-semibold italic bg-white/10 px-3 py-1.5 rounded-xl border border-white/20">
+                Modo Solo Lectura: simulación activa, guardado deshabilitado.
+              </span>
+            )}
           </div>
 
         </div>

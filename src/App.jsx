@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import Navbar from './components/Navbar'
 import CalendarView from './components/CalendarView'
 import CalculatorView from './components/CalculatorView'
@@ -6,8 +6,13 @@ import DashboardView from './components/DashboardView'
 import EventsListView from './components/EventsListView'
 import EventDrilldownModal from './components/EventDrilldownModal'
 import SettingsModal from './components/SettingsModal'
+import LoginModal from './components/LoginModal'
+import EventComparisonModal from './components/EventComparisonModal'
 import { eventService } from './services/eventService'
 import { supabase, isSupabaseConfigured } from './services/supabaseClient'
+import { authService, canCreateEvent, canDeleteEvent } from './services/authService'
+import { excelExportService } from './services/excelExportService'
+import { Scale, X, FileSpreadsheet, ArrowRight } from 'lucide-react'
 
 export default function App() {
   const [currentView, setCurrentView] = useState('calendar') // 'calendar', 'calculator', 'dashboard', 'list'
@@ -17,6 +22,10 @@ export default function App() {
   const [calculatorEvent, setCalculatorEvent] = useState(null)
   const [calendarTargetDate, setCalendarTargetDate] = useState(null)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+  const [isLoginOpen, setIsLoginOpen] = useState(false)
+  const [isComparisonOpen, setIsComparisonOpen] = useState(false)
+  const [comparisonEventIds, setComparisonEventIds] = useState([])
+  const [currentUser, setCurrentUser] = useState(() => authService.getCurrentUser())
   const [toastMessage, setToastMessage] = useState(null)
   const [isSyncing, setIsSyncing] = useState(false)
 
@@ -66,6 +75,11 @@ export default function App() {
     window.addEventListener('visibilitychange', handleVisibilityChange)
     window.addEventListener('focus', handleVisibilityChange)
 
+    // Listener de cambios de autenticación
+    const unsubscribeAuth = authService.onAuthStateChanged((user) => {
+      setCurrentUser(user)
+    })
+
     // Suscripción Realtime para sincronizar automáticamente celular, PC y otros dispositivos
     let channel = null
     if (isSupabaseConfigured() && supabase) {
@@ -81,6 +95,7 @@ export default function App() {
     return () => {
       window.removeEventListener('visibilitychange', handleVisibilityChange)
       window.removeEventListener('focus', handleVisibilityChange)
+      if (unsubscribeAuth) unsubscribeAuth()
       if (channel && supabase) {
         supabase.removeChannel(channel)
       }
@@ -90,6 +105,53 @@ export default function App() {
   const showToast = (msg) => {
     setToastMessage(msg)
     setTimeout(() => setToastMessage(null), 3500)
+  }
+
+  // Alternar selección de eventos para la comparativa
+  const handleToggleComparison = (event) => {
+    setComparisonEventIds(prev => {
+      const exists = prev.includes(event.id)
+      if (exists) {
+        return prev.filter(id => id !== event.id)
+      } else {
+        if (prev.length >= 6) {
+          showToast('⚠️ Podés comparar hasta un máximo de 6 eventos a la vez.')
+          return prev
+        }
+        showToast(`⚖️ Agregado a la comparativa: ${event.name}`)
+        return [...prev, event.id]
+      }
+    })
+  }
+
+  const handleClearComparison = () => {
+    setComparisonEventIds([])
+    showToast('Comparativa vaciada.')
+  }
+
+  // Lista de eventos seleccionados para comparar
+  const comparisonEvents = useMemo(() => {
+    return events.filter(e => comparisonEventIds.includes(e.id))
+  }, [events, comparisonEventIds])
+
+  // Manejo de descargas Excel
+  const handleExportAllExcel = () => {
+    if (events.length === 0) {
+      showToast('⚠️ No hay eventos para exportar')
+      return
+    }
+    excelExportService.exportAllEvents(events)
+    showToast(`📥 Exportando los ${events.length} eventos a Excel...`)
+  }
+
+  const handleExportMonthExcel = () => {
+    if (events.length === 0) {
+      showToast('⚠️ No hay eventos para exportar')
+      return
+    }
+    const monthStr = calendarTargetDate ? calendarTargetDate.substring(0, 7) : '2026-09'
+    excelExportService.exportMonthEvents(events, monthStr)
+    showToast(`📥 Exportando planilla del mes ${monthStr} a Excel...`)
   }
 
   // Guardar evento desde la Calculadora
@@ -132,6 +194,8 @@ export default function App() {
     const res = await eventService.deleteEvent(eventId)
     if (res.success) {
       await loadEvents()
+      // Si estaba en comparativa, removerlo
+      setComparisonEventIds(prev => prev.filter(id => id !== eventId))
       showToast('Evento eliminado.')
     }
   }
@@ -152,7 +216,7 @@ export default function App() {
   const quotesCount = events.filter(e => e.status === 'cotizado').length
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col selection:bg-amber-200 selection:text-amber-900">
+    <div className="min-h-screen bg-slate-50 flex flex-col selection:bg-amber-200 selection:text-amber-900 pb-16">
       
       {/* Toast Notification */}
       {toastMessage && (
@@ -166,6 +230,10 @@ export default function App() {
         currentView={currentView}
         setCurrentView={setCurrentView}
         onOpenSettings={() => setIsSettingsOpen(true)}
+        onOpenLogin={() => setIsLoginOpen(true)}
+        onOpenComparison={() => setIsComparisonOpen(true)}
+        comparisonCount={comparisonEventIds.length}
+        currentUser={currentUser}
         onNewEvent={() => {
           setCalculatorEvent(null)
           setCurrentView('calculator')
@@ -174,6 +242,8 @@ export default function App() {
         quotesCount={quotesCount}
         onForceSync={handleForceSync}
         isSyncing={isSyncing}
+        onExportAllExcel={handleExportAllExcel}
+        onExportMonthExcel={handleExportMonthExcel}
       />
 
       {/* Main Content Area */}
@@ -194,6 +264,9 @@ export default function App() {
                 onEditInCalculator={handleEditInCalculator}
                 onUpdateStatus={handleUpdateStatus}
                 onClearTargetDate={() => setCalendarTargetDate(null)}
+                currentUser={currentUser}
+                comparisonEventIds={comparisonEventIds}
+                onToggleComparison={handleToggleComparison}
               />
             )}
 
@@ -202,6 +275,7 @@ export default function App() {
                 initialEventData={calculatorEvent}
                 onSaveEvent={handleSaveEvent}
                 onSwitchView={setCurrentView}
+                currentUser={currentUser}
               />
             )}
 
@@ -218,21 +292,104 @@ export default function App() {
                 onSelectEvent={(ev) => setSelectedEvent(ev)}
                 onEditInCalculator={handleEditInCalculator}
                 onDeleteEvent={handleDeleteEvent}
+                currentUser={currentUser}
+                comparisonEventIds={comparisonEventIds}
+                onToggleComparison={handleToggleComparison}
+                onOpenComparison={() => setIsComparisonOpen(true)}
               />
             )}
           </>
         )}
       </main>
 
+      {/* Barra Flotante de Comparativa Activa */}
+      {comparisonEvents.length > 0 && (
+        <aside aria-label="Bandeja de Comparativa de Eventos" className="fixed bottom-4 left-1/2 transform -translate-x-1/2 z-40 bg-barolo-navy/95 backdrop-blur-md text-white border border-amber-400/60 rounded-2xl shadow-2xl px-4 py-3 flex flex-wrap items-center justify-between gap-3 max-w-4xl w-[94%] animate-in slide-in-from-bottom-5">
+          <div className="flex items-center space-x-2.5 min-w-0">
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-purple-600 to-indigo-600 flex items-center justify-center flex-shrink-0">
+              <Scale className="w-4 h-4 text-white" />
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center space-x-2">
+                <span className="text-xs font-bold text-amber-300 uppercase tracking-wider">
+                  Comparativa de Eventos
+                </span>
+                <span className="bg-white/20 text-white font-mono text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                  {comparisonEvents.length} / 6
+                </span>
+              </div>
+              <div className="flex items-center space-x-1.5 overflow-x-auto max-w-xs sm:max-w-md py-1">
+                {comparisonEvents.map(e => (
+                  <span key={e.id} className="inline-flex items-center space-x-1 bg-white/10 hover:bg-white/20 text-[11px] px-2 py-0.5 rounded-lg font-medium text-slate-200">
+                    <span className="truncate max-w-[90px]">{e.name}</span>
+                    <button onClick={() => handleToggleComparison(e)} className="hover:text-rose-400" title="Quitar">
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center space-x-2 flex-shrink-0">
+            <button
+              onClick={() => setIsComparisonOpen(true)}
+              disabled={comparisonEvents.length < 2}
+              className="flex items-center space-x-1.5 bg-gradient-to-r from-amber-500 to-barolo-gold hover:from-amber-400 hover:to-amber-300 text-barolo-navy px-3.5 py-1.5 rounded-xl text-xs font-bold shadow-md transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <span>{comparisonEvents.length < 2 ? 'Elegí 2 o más' : 'Comparar ahora'}</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+
+            <button
+              onClick={() => excelExportService.exportComparison(comparisonEvents)}
+              disabled={comparisonEvents.length < 2}
+              className="flex items-center space-x-1 bg-emerald-700/80 hover:bg-emerald-600 text-white px-2.5 py-1.5 rounded-xl text-xs font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+              title="Descargar comparativa en Excel"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Excel</span>
+            </button>
+
+            <button
+              onClick={handleClearComparison}
+              className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-colors"
+              title="Limpiar selección"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </aside>
+      )}
+
       {/* Event Drilldown Modal (Rentabilidad x Evento) */}
       {selectedEvent && (
         <EventDrilldownModal
           event={selectedEvent}
+          currentUser={currentUser}
           onClose={() => setSelectedEvent(null)}
           onUpdateStatus={handleUpdateStatus}
           onEditInCalculator={handleEditInCalculator}
         />
       )}
+
+      {/* Login & User Management Modal */}
+      <LoginModal
+        isOpen={isLoginOpen}
+        onClose={() => setIsLoginOpen(false)}
+        onUserChange={(u) => {
+          setCurrentUser(u)
+          showToast(`👤 Perfil activo: ${u.displayName} (${u.roleBadge?.title || u.role})`)
+        }}
+      />
+
+      {/* Event Comparison Modal */}
+      <EventComparisonModal
+        isOpen={isComparisonOpen}
+        onClose={() => setIsComparisonOpen(false)}
+        events={comparisonEvents}
+        onRemoveEvent={(id) => handleToggleComparison({ id })}
+      />
 
       {/* Settings Modal (Supabase Cloud Config) */}
       {isSettingsOpen && (

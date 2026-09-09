@@ -1,10 +1,24 @@
 import React, { useState, useMemo } from 'react'
 import { 
   Search, Filter, Calendar, MapPin, DollarSign, Users, 
-  ArrowUpDown, ExternalLink, CheckCircle, Clock, AlertTriangle, XCircle, Trash2, Calculator 
+  ArrowUpDown, ExternalLink, CheckCircle, Clock, AlertTriangle, XCircle, Trash2, Calculator,
+  Scale, FileSpreadsheet, Check
 } from 'lucide-react'
+import { canEditEvent, canDeleteEvent } from '../services/authService'
+import { excelExportService } from '../services/excelExportService'
 
-export default function EventsListView({ events, onSelectEvent, onEditInCalculator, onDeleteEvent }) {
+export default function EventsListView({ 
+  events, 
+  onSelectEvent, 
+  onEditInCalculator, 
+  onDeleteEvent,
+  currentUser,
+  comparisonEventIds = [],
+  onToggleComparison,
+  onOpenComparison
+}) {
+  const userCanDelete = canDeleteEvent(currentUser)
+  const userCanEdit = canEditEvent(currentUser)
   const [searchTerm, setSearchTerm] = useState('')
   const [activeTab, setActiveTab] = useState('all') // 'all', 'contratado', 'reservado', 'cotizado', 'cancelado'
   const [venueFilter, setVenueFilter] = useState('all')
@@ -201,6 +215,28 @@ export default function EventsListView({ events, onSelectEvent, onEditInCalculat
               <option value="Cielos">EB + Cielos</option>
             </select>
           </div>
+
+          {/* Quick Actions: Export list & Open Comparison */}
+          <div className="flex items-center space-x-2">
+            {comparisonEventIds.length >= 2 && (
+              <button
+                onClick={onOpenComparison}
+                className="flex items-center space-x-1.5 bg-gradient-to-r from-purple-700 to-indigo-700 hover:from-purple-600 hover:to-indigo-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-md active:scale-95"
+              >
+                <Scale className="w-3.5 h-3.5" />
+                <span>Comparar ({comparisonEventIds.length})</span>
+              </button>
+            )}
+
+            <button
+              onClick={() => excelExportService.exportAllEvents(filteredEvents)}
+              className="flex items-center space-x-1.5 bg-emerald-800/80 hover:bg-emerald-700 text-emerald-100 border border-emerald-500/40 px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95"
+              title="Descargar en Excel los eventos filtrados actualmente"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-300" />
+              <span>Excel ({filteredEvents.length})</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -210,6 +246,10 @@ export default function EventsListView({ events, onSelectEvent, onEditInCalculat
           <table className="w-full text-left text-xs text-slate-700">
             <thead className="bg-barolo-navy text-white text-[11px] uppercase tracking-wider font-bold border-b border-barolo-gold/40">
               <tr>
+                <th className="py-3 px-3 text-center w-10 select-none" title="Seleccionar para Comparativa">
+                  <Scale className="w-3.5 h-3.5 mx-auto opacity-70" />
+                </th>
+
                 <th
                   onClick={() => handleSort('id')}
                   className={`py-3 px-4 cursor-pointer hover:bg-barolo-navy-dark transition-colors select-none ${sortField === 'id' ? 'text-amber-300' : ''}`}
@@ -306,13 +346,25 @@ export default function EventsListView({ events, onSelectEvent, onEditInCalculat
                 const gross = Number(ev.gross_income) || 0
                 const costs = Number(ev.total_costs) || (Number(ev.direct_costs) + Number(ev.indirect_costs))
                 const profit = Number(ev.barolo_profit) || 0
+                const isCompared = comparisonEventIds.includes(ev.id)
 
                 return (
                   <tr
                     key={ev.id}
-                    className="hover:bg-amber-50/40 transition-colors cursor-pointer"
+                    className={`hover:bg-amber-50/40 transition-colors cursor-pointer ${isCompared ? 'bg-purple-50/50' : ''}`}
                     onClick={() => onSelectEvent(ev)}
                   >
+                    {/* Checkbox Comparar */}
+                    <td className="py-3.5 px-3 text-center whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        checked={isCompared}
+                        onChange={() => onToggleComparison && onToggleComparison(ev)}
+                        className="w-4 h-4 text-purple-600 rounded border-slate-300 focus:ring-purple-400 cursor-pointer accent-purple-600"
+                        title={isCompared ? "Quitar de la comparativa" : "Seleccionar para comparar"}
+                      />
+                    </td>
+
                     <td className="py-3.5 px-4 font-mono font-bold text-slate-500 whitespace-nowrap">
                       {ev.calc_code || 'CALC-000'}
                     </td>
@@ -366,24 +418,38 @@ export default function EventsListView({ events, onSelectEvent, onEditInCalculat
                         >
                           <ExternalLink className="w-3.5 h-3.5" />
                         </button>
+
                         <button
-                          onClick={() => onEditInCalculator(ev)}
-                          className="p-1 text-slate-400 hover:text-barolo-gold-dark hover:bg-amber-50 rounded"
-                          title="Abrir en Calculadora"
+                          onClick={() => excelExportService.exportSingleEvent(ev)}
+                          className="p-1 text-slate-400 hover:text-emerald-700 hover:bg-emerald-50 rounded"
+                          title="Descargar Ficha en Excel"
                         >
-                          <Calculator className="w-3.5 h-3.5" />
+                          <FileSpreadsheet className="w-3.5 h-3.5" />
                         </button>
-                        <button
-                          onClick={() => {
-                            if (confirm(`¿Deseas eliminar '${ev.name}'?`)) {
-                              onDeleteEvent(ev.id)
-                            }
-                          }}
-                          className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded"
-                          title="Eliminar evento"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+
+                        {userCanEdit && (
+                          <button
+                            onClick={() => onEditInCalculator(ev)}
+                            className="p-1 text-slate-400 hover:text-barolo-gold-dark hover:bg-amber-50 rounded"
+                            title="Abrir en Calculadora"
+                          >
+                            <Calculator className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+
+                        {userCanDelete && (
+                          <button
+                            onClick={() => {
+                              if (confirm(`¿Deseas eliminar '${ev.name}'?`)) {
+                                onDeleteEvent(ev.id)
+                              }
+                            }}
+                            className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded"
+                            title="Eliminar evento"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
