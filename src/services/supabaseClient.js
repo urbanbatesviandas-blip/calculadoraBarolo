@@ -1,6 +1,9 @@
 import { createClient } from '@supabase/supabase-js'
 
-// Get credentials from env or localStorage
+const DEFAULT_URL = 'https://lzzeoqrwrepscujqbnzg.supabase.co'
+const DEFAULT_KEY = 'sb_publishable_ceRXMcmGppWFkbGuz3pXOg_yaoym6b6'
+
+// Get credentials from env or localStorage or project default
 const getSavedConfig = () => {
   const envUrl = import.meta.env.VITE_SUPABASE_URL
   const envKey = import.meta.env.VITE_SUPABASE_ANON_KEY
@@ -19,7 +22,7 @@ const getSavedConfig = () => {
     console.warn('LocalStorage not available', e)
   }
   
-  return { url: '', key: '', source: 'none' }
+  return { url: DEFAULT_URL, key: DEFAULT_KEY, source: 'default' }
 }
 
 let currentConfig = getSavedConfig()
