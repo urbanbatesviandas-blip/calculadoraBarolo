@@ -141,8 +141,8 @@ export const excelExportService = {
 
     // --- FILA 6: CABECERAS DE TABLA ---
     const headers = [
-      { header: 'Código', key: 'calc_code', width: 12, align: 'center' },
       { header: 'Nombre del Evento', key: 'name', width: 34, align: 'left' },
+      { header: 'Cliente', key: 'client_name', width: 22, align: 'left' },
       { header: 'Estado', key: 'status', width: 15, align: 'center' },
       { header: 'Fecha', key: 'event_date', width: 13, align: 'center' },
       { header: 'Salón', key: 'venue', width: 22, align: 'left' },
@@ -155,6 +155,7 @@ export const excelExportService = {
       { header: 'Costo Total ($)', key: 'total_costs', width: 18, align: 'right', numFmt: CURRENCY_FORMAT },
       { header: 'Ganancia Barolo ($)', key: 'barolo_profit', width: 19, align: 'right', numFmt: CURRENCY_FORMAT },
       { header: 'Margen (%)', key: 'margin_pct', width: 13, align: 'right', numFmt: PERCENT_FORMAT },
+      { header: 'Código ID', key: 'calc_code', width: 13, align: 'center' },
       { header: 'Medio de Pago', key: 'payment_method', width: 16, align: 'center' }
     ]
 
@@ -186,8 +187,8 @@ export const excelExportService = {
       const margin = gross > 0 ? (profit / gross) : 0
 
       row.values = [
-        e.calc_code || `CALC-${String(idx + 1).padStart(3, '0')}`,
         e.name || '',
+        e.client_name || 'Particular',
         statusUpper,
         e.event_date || '',
         e.venue || '',
@@ -200,6 +201,7 @@ export const excelExportService = {
         totalCost,
         profit,
         margin,
+        e.calc_code || `CALC-${String(idx + 1).padStart(3, '0')}`,
         e.payment_method || 'Transferencia'
       ]
 
@@ -374,21 +376,21 @@ export const excelExportService = {
 
     eventCols.forEach(col => {
       const cell = ws.getCell(5, col.colNumber)
-      cell.value = `EVENTO ${col.index}`
-      cell.font = { bold: true, size: 10, color: { argb: COLORS.goldPrimary } }
+      cell.value = col.event.name || `Evento ${col.index}`
+      cell.font = { bold: true, size: 10, color: { argb: COLORS.white } }
       cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.navyDark } }
-      cell.alignment = { vertical: 'middle', horizontal: 'center' }
+      cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true }
       cell.border = thinBorder
 
       const subHeader = ws.getCell(6, col.colNumber)
-      subHeader.value = `${col.event.calc_code || 'CALC'}: ${col.event.name || ''}`
-      subHeader.font = { bold: true, size: 10, color: { argb: COLORS.white } }
+      subHeader.value = `${col.event.client_name || 'Particular'} (${col.event.calc_code || 'CALC'})`
+      subHeader.font = { bold: false, size: 9, color: { argb: COLORS.goldLight } }
       subHeader.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.navyHeader } }
       subHeader.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true }
       subHeader.border = thinBorder
     })
-    ws.getRow(5).height = 20
-    ws.getRow(6).height = 28
+    ws.getRow(5).height = 24
+    ws.getRow(6).height = 24
 
     // Helper para insertar sección de tabla
     let curRow = 7
@@ -438,6 +440,9 @@ export const excelExportService = {
 
     // --- SECCIÓN 1: DATOS GENERALES ---
     addSectionHeader('📋 1. PARÁMETROS GENERALES DEL EVENTO', 'E2E8F0', COLORS.navyDark)
+    addRow('General', 'Nombre del Evento', e => e.name || '-', null, true)
+    addRow('General', 'Cliente / Organizador', e => e.client_name || 'Particular', null, true)
+    addRow('General', 'Código ID', e => e.calc_code || 'CALC')
     addRow('General', 'Estado Comercial', e => (e.status || '').toUpperCase(), null, true)
     addRow('General', 'Fecha del Evento', e => e.event_date || '-')
     addRow('General', 'Salón / Espacio', e => e.venue || '-')

@@ -300,10 +300,6 @@ export default function EventDrilldownModal({ event, onClose, onUpdateStatus, on
         <div className="bg-gradient-to-r from-barolo-navy to-barolo-navy-dark text-white p-6 border-b border-barolo-gold/40 flex items-start justify-between">
           <div>
             <div className="flex items-center space-x-2.5 mb-1.5">
-              <span className="bg-amber-400/20 text-amber-300 font-mono text-xs px-2.5 py-0.5 rounded-full border border-amber-400/40">
-                {event.calc_code || 'CALC-000'}
-              </span>
-              
               {event.status === 'contratado' && (
                 <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-xs px-2.5 py-0.5 rounded-full font-bold flex items-center">
                   <CheckCircle className="w-3.5 h-3.5 mr-1" /> Contratado
@@ -325,18 +321,21 @@ export default function EventDrilldownModal({ event, onClose, onUpdateStatus, on
                 </span>
               )}
 
-              <span className="text-xs text-slate-300">{event.event_type}</span>
+              <span className="text-xs text-slate-300 font-medium">• {event.event_type}</span>
+              <span className="text-slate-400 font-mono text-xs">#{event.calc_code || 'CALC-000'}</span>
             </div>
 
             <h2 className="text-2xl font-serif font-bold text-white tracking-wide">
               {event.name}
             </h2>
+            <div className="text-sm font-semibold text-amber-300 mt-1 flex items-center">
+              <span>👤 Cliente: {event.client_name || 'Particular'}</span>
+            </div>
 
             <div className="flex flex-wrap items-center gap-4 text-xs text-slate-300 mt-2">
               <span className="flex items-center"><Calendar className="w-3.5 h-3.5 mr-1 text-amber-300" /> {event.event_date}</span>
               <span className="flex items-center"><Building2 className="w-3.5 h-3.5 mr-1 text-amber-300" /> {event.venue}</span>
               <span className="flex items-center"><Users className="w-3.5 h-3.5 mr-1 text-amber-300" /> {attendees} personas</span>
-              <span className="flex items-center"><Receipt className="w-3.5 h-3.5 mr-1 text-amber-300" /> Cliente: {event.client_name}</span>
             </div>
           </div>
 

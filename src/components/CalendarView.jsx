@@ -354,21 +354,21 @@ export default function CalendarView({
 
                           <div className="min-w-0">
                             <div className="flex items-center space-x-2">
-                              <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-white/90 border border-slate-200 text-slate-700">
-                                {ev.calc_code || 'CALC'}
-                              </span>
-                              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase ${
-                                isContratado ? 'bg-emerald-200/70 text-emerald-900' :
-                                isReservado ? 'bg-blue-200/70 text-blue-900' :
-                                isCotizado ? 'bg-amber-200/70 text-amber-900' :
-                                'bg-rose-200/70 text-rose-900'
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${
+                                isContratado ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' :
+                                isReservado ? 'bg-blue-100 text-blue-800 border border-blue-300' :
+                                isCotizado ? 'bg-amber-100 text-amber-900 border border-amber-300' :
+                                'bg-rose-100 text-rose-800 border border-rose-300'
                               }`}>
                                 {ev.status}
                               </span>
+                              <span className="font-mono text-[10px] text-slate-400 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded">
+                                #{ev.calc_code || 'CALC'}
+                              </span>
                             </div>
                             <h4 className="font-bold text-slate-900 text-sm truncate mt-1">{ev.name}</h4>
-                            <p className="text-xs text-slate-500 truncate">
-                              {ev.client_name || 'Particular'} • {ev.venue} • {ev.attendees || 0} pax
+                            <p className="text-xs text-barolo-navy/80 font-semibold truncate mt-0.5">
+                              👤 {ev.client_name || 'Particular'} <span className="text-slate-400 font-normal">• {ev.venue} • {ev.attendees || 0} pax</span>
                             </p>
                           </div>
                         </div>
@@ -686,18 +686,16 @@ export default function CalendarView({
                         >
                           <Scale className="w-3 h-3" />
                         </button>
-                        <span className={`font-mono font-bold px-1.5 py-0.5 rounded text-[11px] ${
-                          isReserved ? 'text-blue-800 bg-blue-100' : 'text-amber-800 bg-amber-100'
-                        }`}>
-                          {q.calc_code || 'CALC'}
-                        </span>
-                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                          isReserved ? 'bg-blue-200/70 text-blue-900' : 'bg-amber-200/70 text-amber-900'
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                          isReserved ? 'bg-blue-100 text-blue-800 border border-blue-300' : 'bg-amber-100 text-amber-900 border border-amber-300'
                         }`}>
                           {isReserved ? '🔵 Reservado' : '🟡 Cotizado'}
                         </span>
+                        <span className="font-mono text-[10px] text-slate-400 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded">
+                          #{q.calc_code || 'CALC'}
+                        </span>
                       </div>
-                      <span className="font-semibold text-slate-600 flex items-center">
+                      <span className="font-semibold text-slate-600 flex items-center text-xs">
                         <CalendarIcon className="w-3 h-3 mr-1 text-slate-500" />
                         {q.event_date}
                       </span>
@@ -706,8 +704,8 @@ export default function CalendarView({
                     <h4 className="font-bold text-slate-900 text-sm truncate" title={q.name}>
                       {q.name}
                     </h4>
-                    <p className="text-xs text-slate-500 truncate">
-                      {q.client_name || 'Particular'} • {q.venue}
+                    <p className="text-xs text-barolo-navy/80 font-semibold truncate mt-0.5">
+                      👤 {q.client_name || 'Particular'} <span className="text-slate-400 font-normal">• {q.venue}</span>
                     </p>
 
                     <div className="mt-2.5 pt-2 border-t border-slate-200/60 flex items-center justify-between text-xs">

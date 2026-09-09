@@ -53,7 +53,11 @@ export default function EventComparisonModal({ events = [], onClose, onSelectEve
 
   // 2. Datos para el Gráfico Comparativo de Barras
   const chartData = useMemo(() => {
-    const labels = events.map(e => e.calc_code || e.name.substring(0, 15))
+    const labels = events.map(e => {
+      const client = e.client_name && e.client_name !== 'Particular' && e.client_name !== 'Cliente Barolo' ? ` (${e.client_name})` : ''
+      const full = `${e.name || 'Evento'}${client}`
+      return full.length > 22 ? full.substring(0, 20) + '…' : full
+    })
 
     return {
       labels,
@@ -92,6 +96,13 @@ export default function EventComparisonModal({ events = [], onClose, onSelectEve
       },
       tooltip: {
         callbacks: {
+          title: function(items) {
+            if (!items.length) return ''
+            const idx = items[0].dataIndex
+            const ev = events[idx]
+            if (!ev) return ''
+            return `${ev.name} • ${ev.client_name || 'Particular'} (${ev.calc_code || 'CALC'})`
+          },
           label: function(ctx) {
             const val = ctx.raw || 0
             return `${ctx.dataset.label}: $${val.toLocaleString('es-AR')}`
@@ -164,8 +175,11 @@ export default function EventComparisonModal({ events = [], onClose, onSelectEve
                 <Trophy className="w-4 h-4 text-amber-600" />
                 <span className="text-[11px] uppercase tracking-wider">Mayor Rentabilidad</span>
               </div>
-              <p className="font-bold text-slate-900 text-xs truncate" title={highlights.maxMargin.name}>
-                {highlights.maxMargin.calc_code} — {highlights.maxMargin.name}
+              <p className="font-bold text-slate-900 text-xs truncate" title={`${highlights.maxMargin.name} - ${highlights.maxMargin.client_name || 'Particular'}`}>
+                {highlights.maxMargin.name}
+              </p>
+              <p className="text-[11px] text-amber-800/80 font-medium truncate">
+                👤 {highlights.maxMargin.client_name || 'Particular'} <span className="text-slate-400 font-mono text-[10px]">({highlights.maxMargin.calc_code || 'CALC'})</span>
               </p>
               <span className="text-base font-extrabold text-amber-900 mt-1">
                 {highlights.maxMargin.margin_pct}% margen
@@ -177,8 +191,11 @@ export default function EventComparisonModal({ events = [], onClose, onSelectEve
                 <DollarSign className="w-4 h-4 text-blue-600" />
                 <span className="text-[11px] uppercase tracking-wider">Mayor Facturación</span>
               </div>
-              <p className="font-bold text-slate-900 text-xs truncate" title={highlights.maxIncome.name}>
-                {highlights.maxIncome.calc_code} — {highlights.maxIncome.name}
+              <p className="font-bold text-slate-900 text-xs truncate" title={`${highlights.maxIncome.name} - ${highlights.maxIncome.client_name || 'Particular'}`}>
+                {highlights.maxIncome.name}
+              </p>
+              <p className="text-[11px] text-blue-800/80 font-medium truncate">
+                👤 {highlights.maxIncome.client_name || 'Particular'} <span className="text-slate-400 font-mono text-[10px]">({highlights.maxIncome.calc_code || 'CALC'})</span>
               </p>
               <span className="text-base font-extrabold text-blue-900 mt-1">
                 ${(Number(highlights.maxIncome.gross_income) || 0).toLocaleString('es-AR')}
@@ -190,8 +207,11 @@ export default function EventComparisonModal({ events = [], onClose, onSelectEve
                 <TrendingUp className="w-4 h-4 text-emerald-600" />
                 <span className="text-[11px] uppercase tracking-wider">Mayor Ganancia Barolo</span>
               </div>
-              <p className="font-bold text-slate-900 text-xs truncate" title={highlights.maxProfit.name}>
-                {highlights.maxProfit.calc_code} — {highlights.maxProfit.name}
+              <p className="font-bold text-slate-900 text-xs truncate" title={`${highlights.maxProfit.name} - ${highlights.maxProfit.client_name || 'Particular'}`}>
+                {highlights.maxProfit.name}
+              </p>
+              <p className="text-[11px] text-emerald-800/80 font-medium truncate">
+                👤 {highlights.maxProfit.client_name || 'Particular'} <span className="text-slate-400 font-mono text-[10px]">({highlights.maxProfit.calc_code || 'CALC'})</span>
               </p>
               <span className="text-base font-extrabold text-emerald-900 mt-1">
                 ${(Number(highlights.maxProfit.barolo_profit) || 0).toLocaleString('es-AR')}
@@ -203,8 +223,11 @@ export default function EventComparisonModal({ events = [], onClose, onSelectEve
                 <Users className="w-4 h-4 text-purple-600" />
                 <span className="text-[11px] uppercase tracking-wider">Menor Costo x Pax</span>
               </div>
-              <p className="font-bold text-slate-900 text-xs truncate" title={highlights.minCostPerPax.name}>
-                {highlights.minCostPerPax.calc_code} — {highlights.minCostPerPax.name}
+              <p className="font-bold text-slate-900 text-xs truncate" title={`${highlights.minCostPerPax.name} - ${highlights.minCostPerPax.client_name || 'Particular'}`}>
+                {highlights.minCostPerPax.name}
+              </p>
+              <p className="text-[11px] text-purple-800/80 font-medium truncate">
+                👤 {highlights.minCostPerPax.client_name || 'Particular'} <span className="text-slate-400 font-mono text-[10px]">({highlights.minCostPerPax.calc_code || 'CALC'})</span>
               </p>
               <span className="text-base font-extrabold text-purple-900 mt-1">
                 ${highlights.minCostPerPax.attendees > 0 ? Math.round((Number(highlights.minCostPerPax.total_costs) || 0) / highlights.minCostPerPax.attendees).toLocaleString('es-AR') : 0} / pax
@@ -232,20 +255,28 @@ export default function EventComparisonModal({ events = [], onClose, onSelectEve
                       Variable Económica
                     </th>
                     {events.map(e => (
-                      <th key={e.id} className="p-3.5 font-bold min-w-[220px] max-w-[280px]">
+                      <th key={e.id} className="p-3.5 font-bold min-w-[230px] max-w-[300px]">
                         <div className="flex items-start justify-between">
-                          <div>
-                            <span className="font-mono text-[10px] bg-amber-400 text-barolo-navy px-1.5 py-0.5 rounded font-bold">
-                              {e.calc_code || 'CALC'}
-                            </span>
-                            <h5 className="font-bold text-white text-xs truncate mt-1" title={e.name}>
+                          <div className="min-w-0 pr-2">
+                            <h5 className="font-extrabold text-white text-sm truncate leading-snug" title={e.name}>
                               {e.name}
                             </h5>
+                            <p className="text-xs text-barolo-gold font-semibold truncate mt-0.5" title={e.client_name || 'Particular'}>
+                              👤 {e.client_name || 'Particular'}
+                            </p>
+                            <div className="mt-1 flex items-center gap-1.5">
+                              <span className="font-mono text-[9px] bg-white/10 text-slate-300 border border-white/20 px-1.5 py-0.5 rounded font-medium">
+                                #{e.calc_code || 'CALC'}
+                              </span>
+                              <span className="text-[10px] text-slate-300 truncate">
+                                • {e.event_type || 'Evento'}
+                              </span>
+                            </div>
                           </div>
                           {onRemoveEvent && events.length > 2 && (
                             <button
                               onClick={() => onRemoveEvent(e.id)}
-                              className="text-slate-400 hover:text-rose-300 p-1"
+                              className="text-slate-400 hover:text-rose-300 p-1 shrink-0 rounded hover:bg-white/10 transition-colors"
                               title="Quitar de la comparativa"
                             >
                               <X className="w-3.5 h-3.5" />
@@ -258,6 +289,16 @@ export default function EventComparisonModal({ events = [], onClose, onSelectEve
                 </thead>
 
                 <tbody className="divide-y divide-slate-100 text-xs text-slate-700">
+                  {/* Fila: Cliente */}
+                  <tr className="bg-amber-50/30">
+                    <td className="p-3 font-semibold text-slate-500 sticky left-0 bg-amber-50/70">Cliente / Organizador</td>
+                    {events.map(e => (
+                      <td key={e.id} className="p-3 font-bold text-slate-900">
+                        {e.client_name || 'Particular'}
+                      </td>
+                    ))}
+                  </tr>
+
                   {/* Fila: Estado */}
                   <tr className="bg-slate-50/50">
                     <td className="p-3 font-semibold text-slate-500 sticky left-0 bg-slate-50/90">Estado Comercial</td>

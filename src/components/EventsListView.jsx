@@ -251,20 +251,9 @@ export default function EventsListView({
                 </th>
 
                 <th
-                  onClick={() => handleSort('id')}
-                  className={`py-3 px-4 cursor-pointer hover:bg-barolo-navy-dark transition-colors select-none ${sortField === 'id' ? 'text-amber-300' : ''}`}
-                  title="Ordenar por Código/ID"
-                >
-                  <div className="flex items-center space-x-1">
-                    <span>Código</span>
-                    <span className="text-[10px]">{sortField === 'id' ? (sortOrder === 'asc' ? ' ▲' : ' ▼') : <ArrowUpDown className="w-3 h-3 opacity-30 inline" />}</span>
-                  </div>
-                </th>
-
-                <th
                   onClick={() => handleSort('name')}
                   className={`py-3 px-4 cursor-pointer hover:bg-barolo-navy-dark transition-colors select-none ${sortField === 'name' ? 'text-amber-300' : ''}`}
-                  title="Ordenar por Nombre de Evento"
+                  title="Ordenar por Nombre de Evento o Cliente"
                 >
                   <div className="flex items-center space-x-1">
                     <span>Evento / Cliente</span>
@@ -291,6 +280,17 @@ export default function EventsListView({
                   <div className="flex items-center space-x-1">
                     <span>Lugar</span>
                     <span className="text-[10px]">{sortField === 'venue' ? (sortOrder === 'asc' ? ' ▲' : ' ▼') : <ArrowUpDown className="w-3 h-3 opacity-30 inline" />}</span>
+                  </div>
+                </th>
+
+                <th
+                  onClick={() => handleSort('id')}
+                  className={`py-3 px-3 cursor-pointer hover:bg-barolo-navy-dark transition-colors select-none text-center ${sortField === 'id' ? 'text-amber-300' : ''}`}
+                  title="Ordenar por Código ID"
+                >
+                  <div className="flex items-center justify-center space-x-1">
+                    <span>ID</span>
+                    <span className="text-[10px]">{sortField === 'id' ? (sortOrder === 'asc' ? ' ▲' : ' ▼') : <ArrowUpDown className="w-3 h-3 opacity-30 inline" />}</span>
                   </div>
                 </th>
 
@@ -365,11 +365,9 @@ export default function EventsListView({
                       />
                     </td>
 
-                    <td className="py-3.5 px-4 font-mono font-bold text-slate-500 whitespace-nowrap">
-                      {ev.calc_code || 'CALC-000'}
-                    </td>
-                    <td className="py-3.5 px-4">
-                      <div className="font-bold text-slate-900 text-xs flex items-center gap-1.5 flex-wrap">
+                    {/* Col 2: Evento / Cliente */}
+                    <td className="py-3.5 px-4 min-w-[220px]">
+                      <div className="font-bold text-slate-900 text-sm flex items-center gap-1.5 flex-wrap">
                         <span>{ev.name}</span>
                         {(ev.has_sensitive_data || ev.sensitive_notes || ev.extra_expenses?.some(e => e.is_sensitive) || ev.extra_incomes?.some(i => i.is_sensitive)) && (
                           <span title="Contiene rubros confidenciales o notas privadas" className="inline-flex items-center text-amber-600 bg-amber-50 px-1 py-0.5 rounded border border-amber-200 text-[10px] font-semibold">
@@ -377,13 +375,27 @@ export default function EventsListView({
                           </span>
                         )}
                       </div>
-                      <div className="text-[11px] text-slate-400">{ev.client_name || 'Particular'} • {ev.event_type}</div>
+                      <div className="text-xs text-barolo-navy/80 font-semibold flex items-center gap-1 mt-0.5">
+                        <span>👤 {ev.client_name || 'Particular'}</span>
+                        <span className="text-slate-400 font-normal">• {ev.event_type}</span>
+                      </div>
                     </td>
+
+                    {/* Col 3: Fecha */}
                     <td className="py-3.5 px-4 whitespace-nowrap font-medium text-slate-600">
                       {ev.event_date}
                     </td>
+
+                    {/* Col 4: Salón / Espacio */}
                     <td className="py-3.5 px-4 whitespace-nowrap font-medium text-slate-600">
                       {ev.venue}
+                    </td>
+
+                    {/* Col 5: Código ID secundario */}
+                    <td className="py-3.5 px-3 text-center whitespace-nowrap">
+                      <span className="font-mono text-[11px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                        {ev.calc_code || 'CALC'}
+                      </span>
                     </td>
                     <td className="py-3.5 px-4 text-right font-bold text-slate-900 whitespace-nowrap">
                       ${gross.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
