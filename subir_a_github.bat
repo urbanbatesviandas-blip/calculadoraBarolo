@@ -1,4 +1,4 @@
-﻿@echo off
+@echo off
 chcp 65001 >nul
 title Palacio Barolo - Subir a GitHub
 echo ========================================================
@@ -21,7 +21,7 @@ if %ERRORLEVEL% NEQ 0 (
     echo ========================================================
     echo 1. Asegurate de que el repositorio esté creado en tu cuenta:
     echo    Entrá a: https://github.com/new
-    echo    Nombre del repositorio: calculadoraPalacio
+    echo    Nombre del repositorio: calculadoraBarolo
     echo.
     echo 2. Si te pide contraseña, recordá que GitHub requiere
     echo    un Personal Access Token (PAT) con permiso 'repo':
