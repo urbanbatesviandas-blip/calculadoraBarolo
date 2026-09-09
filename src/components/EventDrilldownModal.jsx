@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useMemo } from 'react'
 import { 
   X, CheckCircle, Clock, XCircle, AlertTriangle, Building2, Calendar, 
   Users, DollarSign, ArrowUpRight, TrendingUp, Sparkles, Receipt, Calculator, PieChart 
@@ -30,6 +30,88 @@ export default function EventDrilldownModal({ event, onClose, onUpdateStatus, on
   const attendees = Number(event.attendees) || 25
   const profitPerAttendee = attendees > 0 ? (baroloProfit / attendees) : 0
   const costPerAttendee = attendees > 0 ? (totalCosts / attendees) : 0
+
+  // 1. Desglose Detallado de Facturación Bruta
+  const incomeBreakdown = useMemo(() => {
+    if (event.ticket_qty > 0 && event.ticket_price > 0) {
+      const ticketsTotal = Number(event.ticket_qty) * Number(event.ticket_price)
+      const otherIncome = Math.max(0, grossIncome - ticketsTotal)
+      return [
+        { label: `Entradas (${event.ticket_qty} u.)`, amount: ticketsTotal, icon: '🎟️' },
+        ...(otherIncome > 0 ? [{ label: 'Canon / Alquiler Espacio', amount: otherIncome, icon: '🏛️' }] : []),
+      ]
+    } else {
+      const canonEspacio = Math.round(grossIncome * 0.75)
+      const serviciosExtras = grossIncome - canonEspacio
+      return [
+        { label: 'Alquiler Espacio Barolo', amount: canonEspacio, icon: '🏛️' },
+        { label: 'Servicios de Salón / Extras', amount: serviciosExtras, icon: '✨' }
+      ]
+    }
+  }, [event, grossIncome])
+
+  // 2. Desglose Detallado de Costos Directos
+  const directCostsBreakdown = useMemo(() => {
+    if (directCosts <= 0) return [{ label: 'Sin costos directos', amount: 0, icon: '✓' }]
+    
+    // Si el evento ya tiene guardados los rubros específicos, usarlos
+    if (event.cost_artistas !== undefined) {
+      return [
+        { label: 'Honorarios Artistas', amount: Number(event.cost_artistas) || 0, icon: '🎭' },
+        { label: 'Técnica & Sonido', amount: Number(event.cost_tecnica) || 0, icon: '🎛️' },
+        { label: 'Catering / Gastronomía', amount: Number(event.cost_catering) || 0, icon: '🍽️' },
+        { label: 'Mobiliario & Insumos', amount: (Number(event.cost_mobiliario) || 0) + (Number(event.cost_gastronomicos) || 0), icon: '🛋️' }
+      ].filter(i => i.amount > 0)
+    }
+
+    // Si viene de la base histórica general, aplicar proporciones estándar del Barolo
+    const artistas = Math.round(directCosts * 0.55)
+    const tecnica = Math.round(directCosts * 0.25)
+    const catering = Math.round(directCosts * 0.15)
+    const insumos = directCosts - artistas - tecnica - catering
+    return [
+      { label: 'Honorarios Artistas', amount: artistas, icon: '🎭' },
+      { label: 'Técnica & Sonido', amount: tecnica, icon: '🎛️' },
+      { label: 'Catering & Bebidas', amount: catering, icon: '🍽️' },
+      { label: 'Mobiliario & Insumos', amount: insumos, icon: '🛋️' }
+    ]
+  }, [directCosts, event])
+
+  // 3. Desglose Detallado de Costos Indirectos
+  const indirectCostsBreakdown = useMemo(() => {
+    if (indirectCosts <= 0) return [{ label: 'Sin costos indirectos', amount: 0, icon: '✓' }]
+    
+    if (event.cost_limpieza !== undefined) {
+      return [
+        { label: 'RRHH Salón & Seguridad', amount: Number(event.cost_rrhh) || 0, icon: '👔' },
+        { label: 'Limpieza Integral', amount: Number(event.cost_limpieza) || 0, icon: '🧹' },
+        { label: 'Seguros del Evento', amount: Number(event.cost_seguros) || 0, icon: '🛡️' },
+        { label: 'Operación & Varios', amount: Math.max(0, indirectCosts - (Number(event.cost_rrhh) || 0) - (Number(event.cost_limpieza) || 0) - (Number(event.cost_seguros) || 0)), icon: '📢' }
+      ].filter(i => i.amount > 0)
+    }
+
+    const limpieza = Math.round(indirectCosts * 0.25)
+    const seguros = Math.round(indirectCosts * 0.25)
+    const rrhh = Math.round(indirectCosts * 0.35)
+    const varios = indirectCosts - limpieza - seguros - rrhh
+    return [
+      { label: 'RRHH Salón & Seguridad', amount: rrhh, icon: '👔' },
+      { label: 'Limpieza Integral', amount: limpieza, icon: '🧹' },
+      { label: 'Seguros del Evento', amount: seguros, icon: '🛡️' },
+      { label: 'SADAIC / Varios', amount: varios, icon: '📢' }
+    ]
+  }, [indirectCosts, event])
+
+  // 4. Desglose Detallado de Ganancia Barolo
+  const baroloProfitBreakdown = useMemo(() => {
+    const terceros = Math.max(0, netProfit - baroloProfit)
+    return [
+      { label: 'Margen Operativo Bruto', amount: netProfit, icon: '📊' },
+      { label: `Parte Barolo (${event.agreement_type || '100%'})`, amount: baroloProfit, icon: '🏛️', highlight: true },
+      ...(terceros > 0 ? [{ label: 'Parte Productor / Terceros', amount: terceros, icon: '👤' }] : []),
+      { label: 'Ganancia x Asistente', amount: profitPerAttendee, icon: '🎟️' }
+    ]
+  }, [netProfit, baroloProfit, event, profitPerAttendee])
 
   // Configuración del Gráfico de Rentabilidad
   const chartData = {
@@ -194,41 +276,135 @@ export default function EventDrilldownModal({ event, onClose, onUpdateStatus, on
             </div>
           </div>
 
-          {/* Grid de Métricas Clave */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {/* Grid de 4 Tarjetas con Desglose Detallado Interno */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             
-            <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
-              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider block">Facturación Bruta</span>
-              <span className="text-lg font-bold text-barolo-navy">
-                ${grossIncome.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
-              </span>
-              <span className="text-[10px] text-slate-400 block mt-0.5">100% del ingreso</span>
+            {/* 1. Facturación Bruta */}
+            <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
+              <div>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Facturación Bruta</span>
+                  <span className="text-xs">💰</span>
+                </div>
+                <div className="text-2xl font-bold text-barolo-navy my-1">
+                  ${grossIncome.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
+                </div>
+
+                {/* Desglose de Facturación */}
+                <div className="mt-3 pt-2.5 border-t border-slate-100 space-y-1.5 text-[11px]">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Desglose de Ingresos:</span>
+                  {incomeBreakdown.map((item, idx) => (
+                    <div key={idx} className="flex items-center justify-between text-slate-700">
+                      <span className="truncate pr-1 flex items-center">
+                        <span className="mr-1 text-[10px]">{item.icon}</span> {item.label}
+                      </span>
+                      <span className="font-semibold text-slate-900 flex-shrink-0">
+                        ${item.amount.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="mt-3 pt-2 border-t border-slate-100 text-[10px] text-slate-400 font-medium">
+                100% del ingreso del evento
+              </div>
             </div>
 
-            <div className="bg-white border border-amber-200/80 rounded-2xl p-4 shadow-sm bg-amber-50/20">
-              <span className="text-xs font-semibold text-amber-800 uppercase tracking-wider block">Costos Directos</span>
-              <span className="text-lg font-bold text-amber-700">
-                ${directCosts.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
-              </span>
-              <span className="text-[10px] text-amber-600 block mt-0.5">Artistas, técnica, catering</span>
+            {/* 2. Costos Directos */}
+            <div className="bg-amber-50/20 border border-amber-200/90 rounded-2xl p-4 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
+              <div>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-amber-800 uppercase tracking-wider">Costos Directos</span>
+                  <span className="text-xs">🎭</span>
+                </div>
+                <div className="text-2xl font-bold text-amber-700 my-1">
+                  ${directCosts.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
+                </div>
+
+                {/* Desglose de Costos Directos */}
+                <div className="mt-3 pt-2.5 border-t border-amber-200/60 space-y-1.5 text-[11px]">
+                  <span className="text-[10px] font-bold text-amber-700 uppercase tracking-wider block mb-1">Rubros Directos:</span>
+                  {directCostsBreakdown.map((item, idx) => (
+                    <div key={idx} className="flex items-center justify-between text-amber-900">
+                      <span className="truncate pr-1 flex items-center">
+                        <span className="mr-1 text-[10px]">{item.icon}</span> {item.label}
+                      </span>
+                      <span className="font-semibold text-amber-950 flex-shrink-0">
+                        ${item.amount.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="mt-3 pt-2 border-t border-amber-200/60 text-[10px] text-amber-700 font-medium">
+                {grossIncome > 0 ? ((directCosts / grossIncome) * 100).toFixed(1) : 0}% de la facturación
+              </div>
             </div>
 
-            <div className="bg-white border border-rose-200/80 rounded-2xl p-4 shadow-sm bg-rose-50/20">
-              <span className="text-xs font-semibold text-rose-800 uppercase tracking-wider block">Costos Indirectos</span>
-              <span className="text-lg font-bold text-rose-700">
-                ${indirectCosts.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
-              </span>
-              <span className="text-[10px] text-rose-600 block mt-0.5">Limpieza, seguros, salón</span>
+            {/* 3. Costos Indirectos */}
+            <div className="bg-rose-50/20 border border-rose-200/90 rounded-2xl p-4 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
+              <div>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-rose-800 uppercase tracking-wider">Costos Indirectos</span>
+                  <span className="text-xs">🏢</span>
+                </div>
+                <div className="text-2xl font-bold text-rose-700 my-1">
+                  ${indirectCosts.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
+                </div>
+
+                {/* Desglose de Costos Indirectos */}
+                <div className="mt-3 pt-2.5 border-t border-rose-200/60 space-y-1.5 text-[11px]">
+                  <span className="text-[10px] font-bold text-rose-700 uppercase tracking-wider block mb-1">Operación & Salón:</span>
+                  {indirectCostsBreakdown.map((item, idx) => (
+                    <div key={idx} className="flex items-center justify-between text-rose-900">
+                      <span className="truncate pr-1 flex items-center">
+                        <span className="mr-1 text-[10px]">{item.icon}</span> {item.label}
+                      </span>
+                      <span className="font-semibold text-rose-950 flex-shrink-0">
+                        ${item.amount.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="mt-3 pt-2 border-t border-rose-200/60 text-[10px] text-rose-700 font-medium">
+                {grossIncome > 0 ? ((indirectCosts / grossIncome) * 100).toFixed(1) : 0}% de la facturación
+              </div>
             </div>
 
-            <div className="bg-emerald-50 border border-emerald-300 rounded-2xl p-4 shadow-sm">
-              <span className="text-xs font-semibold text-emerald-800 uppercase tracking-wider block">Ganancia Barolo</span>
-              <span className="text-xl font-bold text-emerald-900">
-                ${baroloProfit.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
-              </span>
-              <span className="text-[11px] font-bold text-emerald-700 block mt-0.5">
-                Margen: {marginPct.toFixed(1)}%
-              </span>
+            {/* 4. Ganancia Barolo */}
+            <div className="bg-emerald-50/50 border border-emerald-300 rounded-2xl p-4 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
+              <div>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-emerald-800 uppercase tracking-wider">Ganancia Barolo</span>
+                  <span className="text-xs">⭐</span>
+                </div>
+                <div className="text-2xl font-bold text-emerald-900 my-1">
+                  ${baroloProfit.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
+                </div>
+
+                {/* Desglose de Ganancia y Reparto */}
+                <div className="mt-3 pt-2.5 border-t border-emerald-200 space-y-1.5 text-[11px]">
+                  <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider block mb-1">Reparto & Margen:</span>
+                  {baroloProfitBreakdown.map((item, idx) => (
+                    <div key={idx} className="flex items-center justify-between text-emerald-900">
+                      <span className="truncate pr-1 flex items-center">
+                        <span className="mr-1 text-[10px]">{item.icon}</span> {item.label}
+                      </span>
+                      <span className={`font-semibold flex-shrink-0 ${item.highlight ? 'font-bold text-emerald-950' : 'text-emerald-800'}`}>
+                        ${item.amount.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="mt-3 pt-2 border-t border-emerald-200 text-[11px] font-bold text-emerald-800">
+                Margen Neto: {marginPct.toFixed(1)}%
+              </div>
             </div>
 
           </div>
