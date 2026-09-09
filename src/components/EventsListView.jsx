@@ -8,9 +8,20 @@ export default function EventsListView({ events, onSelectEvent, onEditInCalculat
   const [searchTerm, setSearchTerm] = useState('')
   const [activeTab, setActiveTab] = useState('all') // 'all', 'contratado', 'reservado', 'cotizado', 'cancelado'
   const [venueFilter, setVenueFilter] = useState('all')
-  const [sortBy, setSortBy] = useState('date_desc')
+  const [sortField, setSortField] = useState('date') // 'date', 'id', 'name', 'client', 'venue', 'income', 'costs', 'profit', 'status'
+  const [sortOrder, setSortOrder] = useState('desc') // 'asc', 'desc'
 
-  // Filtrar eventos
+  // Alternar ordenamiento por columna
+  const handleSort = (field) => {
+    if (sortField === field) {
+      setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortField(field)
+      setSortOrder(['date', 'income', 'costs', 'profit'].includes(field) ? 'desc' : 'asc')
+    }
+  }
+
+  // Filtrar y ordenar eventos
   const filteredEvents = useMemo(() => {
     return events.filter(ev => {
       // Tab filter
@@ -31,13 +42,34 @@ export default function EventsListView({ events, onSelectEvent, onEditInCalculat
 
       return true
     }).sort((a, b) => {
-      if (sortBy === 'date_desc') return (b.event_date || '').localeCompare(a.event_date || '')
-      if (sortBy === 'date_asc') return (a.event_date || '').localeCompare(b.event_date || '')
-      if (sortBy === 'income_desc') return (Number(b.gross_income) || 0) - (Number(a.gross_income) || 0)
-      if (sortBy === 'profit_desc') return (Number(b.barolo_profit) || 0) - (Number(a.barolo_profit) || 0)
-      return 0
+      let comparison = 0
+      if (sortField === 'date') {
+        comparison = (a.event_date || '').localeCompare(b.event_date || '')
+      } else if (sortField === 'id') {
+        const numA = parseInt((a.calc_code || '').replace(/\D/g, ''), 10) || 0
+        const numB = parseInt((b.calc_code || '').replace(/\D/g, ''), 10) || 0
+        comparison = numA - numB
+      } else if (sortField === 'name') {
+        comparison = (a.name || '').localeCompare(b.name || '', 'es', { sensitivity: 'base' })
+      } else if (sortField === 'client') {
+        comparison = (a.client_name || '').localeCompare(b.client_name || '', 'es', { sensitivity: 'base' })
+      } else if (sortField === 'venue') {
+        comparison = (a.venue || '').localeCompare(b.venue || '', 'es', { sensitivity: 'base' })
+      } else if (sortField === 'income') {
+        comparison = (Number(a.gross_income) || 0) - (Number(b.gross_income) || 0)
+      } else if (sortField === 'costs') {
+        const costA = Number(a.total_costs) || (Number(a.direct_costs) + Number(a.indirect_costs)) || 0
+        const costB = Number(b.total_costs) || (Number(b.direct_costs) + Number(b.indirect_costs)) || 0
+        comparison = costA - costB
+      } else if (sortField === 'profit') {
+        comparison = (Number(a.barolo_profit) || 0) - (Number(b.barolo_profit) || 0)
+      } else if (sortField === 'status') {
+        const statusMap = { cotizado: 1, reservado: 2, contratado: 3, cancelado: 4 }
+        comparison = (statusMap[a.status] || 5) - (statusMap[b.status] || 5)
+      }
+      return sortOrder === 'asc' ? comparison : -comparison
     })
-  }, [events, activeTab, venueFilter, searchTerm, sortBy])
+  }, [events, activeTab, venueFilter, searchTerm, sortField, sortOrder])
 
   const counts = useMemo(() => {
     return {
@@ -79,14 +111,29 @@ export default function EventsListView({ events, onSelectEvent, onEditInCalculat
 
             {/* Sort Select */}
             <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value)}
+              value={`${sortField}_${sortOrder}`}
+              onChange={(e) => {
+                const [field, order] = e.target.value.split('_')
+                setSortField(field)
+                setSortOrder(order)
+              }}
               className="text-xs bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 font-semibold text-slate-700 focus:ring-2 focus:ring-amber-400"
             >
-              <option value="date_desc">Más recientes primero</option>
-              <option value="date_asc">Más antiguos primero</option>
-              <option value="income_desc">Mayor facturación</option>
-              <option value="profit_desc">Mayor ganancia Barolo</option>
+              <option value="date_desc">📅 Fecha: Más recientes primero</option>
+              <option value="date_asc">📅 Fecha: Más antiguos primero</option>
+              <option value="id_asc">🔢 Código: CALC ascendente (001 → 999)</option>
+              <option value="id_desc">🔢 Código: CALC descendente (999 → 001)</option>
+              <option value="name_asc">🔤 Nombre Evento: A → Z</option>
+              <option value="name_desc">🔤 Nombre Evento: Z → A</option>
+              <option value="client_asc">👤 Cliente: A → Z</option>
+              <option value="client_desc">👤 Cliente: Z → A</option>
+              <option value="venue_asc">🏛️ Salón / Espacio: A → Z</option>
+              <option value="income_desc">💰 Mayor Facturación ($)</option>
+              <option value="income_asc">📉 Menor Facturación ($)</option>
+              <option value="profit_desc">⭐ Mayor Ganancia Barolo ($)</option>
+              <option value="profit_asc">⭐ Menor Ganancia Barolo ($)</option>
+              <option value="costs_desc">💸 Mayor Costo Total ($)</option>
+              <option value="status_asc">🚦 Estado: Cotizaciones primero</option>
             </select>
           </div>
         </div>
@@ -163,14 +210,94 @@ export default function EventsListView({ events, onSelectEvent, onEditInCalculat
           <table className="w-full text-left text-xs text-slate-700">
             <thead className="bg-barolo-navy text-white text-[11px] uppercase tracking-wider font-bold border-b border-barolo-gold/40">
               <tr>
-                <th className="py-3 px-4">Código</th>
-                <th className="py-3 px-4">Evento / Cliente</th>
-                <th className="py-3 px-4">Fecha</th>
-                <th className="py-3 px-4">Lugar</th>
-                <th className="py-3 px-4 text-right">Facturación ($)</th>
-                <th className="py-3 px-4 text-right">Costos ($)</th>
-                <th className="py-3 px-4 text-right">Ganancia Barolo ($)</th>
-                <th className="py-3 px-4 text-center">Estado</th>
+                <th
+                  onClick={() => handleSort('id')}
+                  className={`py-3 px-4 cursor-pointer hover:bg-barolo-navy-dark transition-colors select-none ${sortField === 'id' ? 'text-amber-300' : ''}`}
+                  title="Ordenar por Código/ID"
+                >
+                  <div className="flex items-center space-x-1">
+                    <span>Código</span>
+                    <span className="text-[10px]">{sortField === 'id' ? (sortOrder === 'asc' ? ' ▲' : ' ▼') : <ArrowUpDown className="w-3 h-3 opacity-30 inline" />}</span>
+                  </div>
+                </th>
+
+                <th
+                  onClick={() => handleSort('name')}
+                  className={`py-3 px-4 cursor-pointer hover:bg-barolo-navy-dark transition-colors select-none ${sortField === 'name' ? 'text-amber-300' : ''}`}
+                  title="Ordenar por Nombre de Evento"
+                >
+                  <div className="flex items-center space-x-1">
+                    <span>Evento / Cliente</span>
+                    <span className="text-[10px]">{sortField === 'name' ? (sortOrder === 'asc' ? ' ▲' : ' ▼') : <ArrowUpDown className="w-3 h-3 opacity-30 inline" />}</span>
+                  </div>
+                </th>
+
+                <th
+                  onClick={() => handleSort('date')}
+                  className={`py-3 px-4 cursor-pointer hover:bg-barolo-navy-dark transition-colors select-none ${sortField === 'date' ? 'text-amber-300' : ''}`}
+                  title="Ordenar por Fecha"
+                >
+                  <div className="flex items-center space-x-1">
+                    <span>Fecha</span>
+                    <span className="text-[10px]">{sortField === 'date' ? (sortOrder === 'asc' ? ' ▲' : ' ▼') : <ArrowUpDown className="w-3 h-3 opacity-30 inline" />}</span>
+                  </div>
+                </th>
+
+                <th
+                  onClick={() => handleSort('venue')}
+                  className={`py-3 px-4 cursor-pointer hover:bg-barolo-navy-dark transition-colors select-none ${sortField === 'venue' ? 'text-amber-300' : ''}`}
+                  title="Ordenar por Salón / Espacio"
+                >
+                  <div className="flex items-center space-x-1">
+                    <span>Lugar</span>
+                    <span className="text-[10px]">{sortField === 'venue' ? (sortOrder === 'asc' ? ' ▲' : ' ▼') : <ArrowUpDown className="w-3 h-3 opacity-30 inline" />}</span>
+                  </div>
+                </th>
+
+                <th
+                  onClick={() => handleSort('income')}
+                  className={`py-3 px-4 text-right cursor-pointer hover:bg-barolo-navy-dark transition-colors select-none ${sortField === 'income' ? 'text-amber-300' : ''}`}
+                  title="Ordenar por Facturación Bruta"
+                >
+                  <div className="flex items-center justify-end space-x-1">
+                    <span>Facturación ($)</span>
+                    <span className="text-[10px]">{sortField === 'income' ? (sortOrder === 'asc' ? ' ▲' : ' ▼') : <ArrowUpDown className="w-3 h-3 opacity-30 inline" />}</span>
+                  </div>
+                </th>
+
+                <th
+                  onClick={() => handleSort('costs')}
+                  className={`py-3 px-4 text-right cursor-pointer hover:bg-barolo-navy-dark transition-colors select-none ${sortField === 'costs' ? 'text-amber-300' : ''}`}
+                  title="Ordenar por Costos Totales"
+                >
+                  <div className="flex items-center justify-end space-x-1">
+                    <span>Costos ($)</span>
+                    <span className="text-[10px]">{sortField === 'costs' ? (sortOrder === 'asc' ? ' ▲' : ' ▼') : <ArrowUpDown className="w-3 h-3 opacity-30 inline" />}</span>
+                  </div>
+                </th>
+
+                <th
+                  onClick={() => handleSort('profit')}
+                  className={`py-3 px-4 text-right cursor-pointer hover:bg-barolo-navy-dark transition-colors select-none ${sortField === 'profit' ? 'text-amber-300' : ''}`}
+                  title="Ordenar por Ganancia Barolo"
+                >
+                  <div className="flex items-center justify-end space-x-1">
+                    <span>Ganancia Barolo ($)</span>
+                    <span className="text-[10px]">{sortField === 'profit' ? (sortOrder === 'asc' ? ' ▲' : ' ▼') : <ArrowUpDown className="w-3 h-3 opacity-30 inline" />}</span>
+                  </div>
+                </th>
+
+                <th
+                  onClick={() => handleSort('status')}
+                  className={`py-3 px-4 text-center cursor-pointer hover:bg-barolo-navy-dark transition-colors select-none ${sortField === 'status' ? 'text-amber-300' : ''}`}
+                  title="Ordenar por Estado"
+                >
+                  <div className="flex items-center justify-center space-x-1">
+                    <span>Estado</span>
+                    <span className="text-[10px]">{sortField === 'status' ? (sortOrder === 'asc' ? ' ▲' : ' ▼') : <ArrowUpDown className="w-3 h-3 opacity-30 inline" />}</span>
+                  </div>
+                </th>
+
                 <th className="py-3 px-4 text-center">Acciones</th>
               </tr>
             </thead>

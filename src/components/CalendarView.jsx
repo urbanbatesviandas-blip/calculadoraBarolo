@@ -23,6 +23,7 @@ export default function CalendarView({
   const [selectedStatus, setSelectedStatus] = useState('all')
   const [selectedVenue, setSelectedVenue] = useState('all')
   const [highlightDay, setHighlightDay] = useState(null)
+  const [quotesSort, setQuotesSort] = useState('date_desc')
 
   // Auto-navegar a la fecha de una cotización/evento recién guardado
   useEffect(() => {
@@ -86,8 +87,25 @@ export default function CalendarView({
   const activeQuotes = useMemo(() => {
     return events
       .filter(e => e.status === 'cotizado')
-      .sort((a, b) => (b.event_date || '').localeCompare(a.event_date || ''))
-  }, [events])
+      .sort((a, b) => {
+        if (quotesSort === 'date_desc') return (b.event_date || '').localeCompare(a.event_date || '')
+        if (quotesSort === 'date_asc') return (a.event_date || '').localeCompare(b.event_date || '')
+        if (quotesSort === 'id_asc') {
+          const nA = parseInt((a.calc_code || '').replace(/\D/g, ''), 10) || 0
+          const nB = parseInt((b.calc_code || '').replace(/\D/g, ''), 10) || 0
+          return nA - nB
+        }
+        if (quotesSort === 'id_desc') {
+          const nA = parseInt((a.calc_code || '').replace(/\D/g, ''), 10) || 0
+          const nB = parseInt((b.calc_code || '').replace(/\D/g, ''), 10) || 0
+          return nB - nA
+        }
+        if (quotesSort === 'name_asc') return (a.name || '').localeCompare(b.name || '', 'es')
+        if (quotesSort === 'name_desc') return (b.name || '').localeCompare(a.name || '', 'es')
+        if (quotesSort === 'income_desc') return (Number(b.gross_income) || 0) - (Number(a.gross_income) || 0)
+        return 0
+      })
+  }, [events, quotesSort])
 
   // Filtrado de eventos
   const filteredEvents = useMemo(() => {
@@ -409,7 +427,7 @@ export default function CalendarView({
       {/* SECCIÓN PIPELINE: COTIZACIONES ACTIVAS EN PROCESO */}
       {/* ========================================================================= */}
       <div className="bg-white rounded-2xl shadow-luxury border border-amber-300/80 p-5 space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-slate-100 pb-3">
           <div className="flex items-center space-x-2.5">
             <span className="w-3 h-3 rounded-full bg-amber-500 animate-ping"></span>
             <span className="w-3 h-3 rounded-full bg-amber-500 -ml-5.5"></span>
@@ -420,9 +438,23 @@ export default function CalendarView({
               {activeQuotes.length}
             </span>
           </div>
-          <p className="text-xs text-slate-500">
-            Hacé clic en <strong>"Ver en Calendario"</strong> para saltar directo a su mes y fecha, o <strong>"Retocar"</strong> para abrir la calculadora.
-          </p>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs text-slate-500 font-semibold">Ordenar por:</span>
+            <select
+              value={quotesSort}
+              onChange={(e) => setQuotesSort(e.target.value)}
+              className="text-xs bg-amber-50 border border-amber-300 rounded-xl px-2.5 py-1.5 font-bold text-amber-900 focus:outline-none focus:ring-2 focus:ring-amber-400"
+            >
+              <option value="date_desc">📅 Fecha (Más recientes)</option>
+              <option value="date_asc">📅 Fecha (Más antiguos)</option>
+              <option value="id_asc">🔢 Código (001 → 999)</option>
+              <option value="id_desc">🔢 Código (999 → 001)</option>
+              <option value="name_asc">🔤 Nombre (A → Z)</option>
+              <option value="name_desc">🔤 Nombre (Z → A)</option>
+              <option value="income_desc">💰 Mayor Facturación ($)</option>
+            </select>
+          </div>
         </div>
 
         {activeQuotes.length === 0 ? (
