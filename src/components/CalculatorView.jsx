@@ -20,6 +20,7 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
   const [origin, setOrigin] = useState(initialEventData?.origin || 'Externo')
   const [agreementType, setAgreementType] = useState(initialEventData?.agreement_type || '50% - 50%')
   const [attendees, setAttendees] = useState(initialEventData?.attendees || 25)
+  const [notes, setNotes] = useState(initialEventData?.notes || '')
 
   // Entradas (Ticketing)
   const [preventaQty, setPreventaQty] = useState(0)
@@ -71,6 +72,7 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
       setOrigin(initialEventData.origin || 'Externo')
       setAgreementType(initialEventData.agreement_type || '50% - 50%')
       setAttendees(Number(initialEventData.attendees) || 25)
+      setNotes(initialEventData.notes || '')
 
       // 1. Restaurar Entradas y Alquileres
       if (initialEventData.preventa_qty !== undefined || initialEventData.general_qty !== undefined) {
@@ -174,6 +176,7 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
       setOrigin('Externo')
       setAgreementType('50% - 50%')
       setAttendees(25)
+      setNotes('')
       setPreventaQty(0)
       setPreventaPrice(0)
       setGeneralQty(0)
@@ -283,6 +286,7 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
       setClientCuit('')
       setClientContact('')
       setAttendees(25)
+      setNotes('')
       setPreventaQty(0)
       setPreventaPrice(0)
       setGeneralQty(0)
@@ -355,7 +359,7 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
       margin_pct: marginPct,
       payment_method: 'Transferencia',
       invoice_type: 'Factura A',
-      notes: status === 'cotizado' ? 'Cotización guardada en el sistema.' : 'Evento confirmado y cerrado.'
+      notes: notes.trim() || (status === 'cotizado' ? 'Cotización guardada en el sistema.' : 'Evento confirmado y cerrado.')
     }
   }
 
@@ -871,6 +875,31 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
           <span className="font-bold text-barolo-navy text-sm">
             {attendees > 0 ? ((breakEvenTickets / attendees) * 100).toFixed(0) : 0}% de capacidad
           </span>
+        </div>
+      </div>
+
+      {/* Recuadro para Notas Comerciales e Información Adicional */}
+      <div className="bg-white rounded-2xl p-5 shadow-luxury border border-slate-200 space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 border-b border-slate-100 pb-2.5">
+          <div className="flex items-center space-x-2">
+            <FileText className="w-4 h-4 text-barolo-gold" />
+            <h3 className="font-serif font-bold text-barolo-navy text-sm uppercase tracking-wider">
+              Notas Comerciales & Información Adicional
+            </h3>
+          </div>
+          <span className="text-[11px] text-slate-400">
+            Requerimientos especiales, horarios de armado, detalles de catering, acuerdos de palabra, etc.
+          </span>
+        </div>
+
+        <div>
+          <textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="Escribí aquí cualquier información adicional relevante para este evento (ej: horario de prueba de sonido, requerimientos técnicos específicos, condiciones o seña pactada, restricciones del salón, acuerdos con el productor)..."
+            rows={3}
+            className="w-full bg-amber-50/40 border border-amber-300/80 rounded-xl p-3 text-xs text-slate-800 placeholder:text-slate-400 focus:bg-white focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20 focus:outline-none transition-all resize-y font-medium leading-relaxed"
+          />
         </div>
       </div>
 
