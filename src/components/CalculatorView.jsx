@@ -535,7 +535,7 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
           <div className="flex items-center space-x-2">
             <Calculator className="w-6 h-6 text-barolo-navy" />
             <h2 className="text-xl sm:text-2xl font-serif font-bold text-barolo-navy">
-              Calculadora Madre & Cotizador Integral (En Vivo)
+              Cotizador de Eventos & Rentabilidad (En Vivo)
             </h2>
           </div>
           <p className="text-xs text-slate-500 mt-1">

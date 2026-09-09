@@ -103,7 +103,7 @@ export default function EventsListView({
         <div className="flex flex-col md:flex-row items-center justify-between gap-4">
           <div>
             <h2 className="text-xl sm:text-2xl font-serif font-bold text-barolo-navy">
-              Pipeline Comercial & Registro de Eventos
+              Eventos & Historial Comercial
             </h2>
             <p className="text-xs text-slate-500 mt-0.5">
               Visualizá, buscá y administrá todos los presupuestos, cotizaciones y eventos oficiales del Barolo.
@@ -438,7 +438,7 @@ export default function EventsListView({
                           <button
                             onClick={() => onEditInCalculator(ev)}
                             className="p-1 text-slate-400 hover:text-barolo-gold-dark hover:bg-amber-50 rounded"
-                            title="Abrir en Calculadora"
+                            title="Abrir en Cotizador"
                           >
                             <Calculator className="w-3.5 h-3.5" />
                           </button>

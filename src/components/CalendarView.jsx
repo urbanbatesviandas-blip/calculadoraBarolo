@@ -740,7 +740,7 @@ export default function CalendarView({
                       <button
                         onClick={() => onEditInCalculator && onEditInCalculator(q)}
                         className="bg-amber-500 hover:bg-amber-400 text-barolo-navy px-2.5 py-1.5 rounded-lg text-xs font-bold transition-colors flex items-center justify-center"
-                        title="Abrir en Calculadora Madre"
+                        title="Abrir en Cotizador"
                       >
                         <Calculator className="w-3 h-3 mr-1" />
                         <span>Retocar</span>

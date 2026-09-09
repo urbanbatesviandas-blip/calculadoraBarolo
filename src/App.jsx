@@ -10,6 +10,7 @@ import EventComparisonModal from './components/EventComparisonModal'
 import CalculatorConfigView from './components/CalculatorConfigView'
 import UserManagementView from './components/UserManagementView'
 import LoginView from './components/LoginView'
+import AdminSidebar from './components/AdminSidebar'
 import { eventService } from './services/eventService'
 import { supabase, isSupabaseConfigured } from './services/supabaseClient'
 import { authService, canCreateEvent, canDeleteEvent } from './services/authService'
@@ -27,6 +28,7 @@ export default function App() {
   const [isComparisonOpen, setIsComparisonOpen] = useState(false)
   const [comparisonEventIds, setComparisonEventIds] = useState([])
   const [currentUser, setCurrentUser] = useState(() => authService.getCurrentUser())
+  const [isAdminSidebarOpen, setIsAdminSidebarOpen] = useState(false)
   const [toastMessage, setToastMessage] = useState(null)
   const [isSyncing, setIsSyncing] = useState(false)
 
@@ -254,6 +256,7 @@ export default function App() {
         isSyncing={isSyncing}
         onExportAllExcel={handleExportAllExcel}
         onExportMonthExcel={handleExportMonthExcel}
+        onToggleAdminSidebar={() => setIsAdminSidebarOpen(true)}
       />
 
       {/* Main Content Area */}
@@ -406,6 +409,15 @@ export default function App() {
         onClose={() => setIsComparisonOpen(false)}
         events={comparisonEvents}
         onRemoveEvent={(id) => handleToggleComparison({ id })}
+      />
+
+      {/* Admin Lateral Sidebar (Menú del Engranaje ⚙️) */}
+      <AdminSidebar
+        isOpen={isAdminSidebarOpen}
+        onClose={() => setIsAdminSidebarOpen(false)}
+        currentView={currentView}
+        onNavigate={(view) => setCurrentView(view)}
+        currentUser={currentUser}
       />
 
       {/* Settings Modal (Supabase Cloud Config) */}

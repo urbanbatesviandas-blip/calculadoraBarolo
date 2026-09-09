@@ -1,13 +1,14 @@
-import React, { useMemo } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { 
   X, CheckCircle, Clock, XCircle, AlertTriangle, Building2, Calendar, 
   Users, DollarSign, ArrowUpRight, TrendingUp, Sparkles, Receipt, Calculator, PieChart, BookmarkCheck,
-  FileSpreadsheet, ShieldAlert, Lock 
+  FileSpreadsheet, ShieldAlert, Lock, MessageSquare, Send, Trash2
 } from 'lucide-react'
 import { Bar } from 'react-chartjs-2'
 import confetti from 'canvas-confetti'
 import { excelExportService } from '../services/excelExportService'
-import { canEditEvent, canChangeStatus, canViewSensitiveData } from '../services/authService'
+import { canEditEvent, canChangeStatus, canViewSensitiveData, getRoleBadge, isAdmin } from '../services/authService'
+import { eventService, parseNotesAndComments } from '../services/eventService'
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -25,6 +26,57 @@ export default function EventDrilldownModal({ event, onClose, onUpdateStatus, on
 
   const userCanEdit = canEditEvent(currentUser)
   const userCanChange = canChangeStatus(currentUser)
+  const isUserAdmin = isAdmin(currentUser)
+
+  // Manejo de Notas y Comentarios colaborativos
+  const parsedData = useMemo(() => parseNotesAndComments(event.notes), [event.notes])
+  const cleanCommercialNotes = parsedData.notes
+  const [comments, setComments] = useState(parsedData.comments || [])
+  const [commentText, setCommentText] = useState('')
+  const [isSending, setIsSending] = useState(false)
+
+  useEffect(() => {
+    setComments(parsedData.comments || [])
+  }, [parsedData])
+
+  const handleSendComment = async (e) => {
+    if (e) e.preventDefault()
+    const text = commentText.trim()
+    if (!text) return
+
+    setIsSending(true)
+    const newComment = {
+      id: 'comm-' + Date.now(),
+      text,
+      author_id: currentUser?.id,
+      author_name: currentUser?.name || 'Usuario',
+      author_username: currentUser?.username,
+      author_role: currentUser?.role || 'cargador',
+      created_at: new Date().toISOString()
+    }
+
+    const updated = [...comments, newComment]
+    setComments(updated)
+    setCommentText('')
+
+    try {
+      await eventService.addComment(event.id, newComment)
+    } catch (err) {
+      console.error('Error guardando comentario:', err)
+    } finally {
+      setIsSending(false)
+    }
+  }
+
+  const handleDeleteComment = async (commentId) => {
+    const updated = comments.filter(c => c.id !== commentId)
+    setComments(updated)
+    try {
+      await eventService.deleteComment(event.id, commentId)
+    } catch (err) {
+      console.error('Error eliminando comentario:', err)
+    }
+  }
 
   const grossIncome = Number(event.gross_income) || 0
   const directCosts = Number(event.direct_costs) || 0
@@ -512,10 +564,10 @@ export default function EventDrilldownModal({ event, onClose, onUpdateStatus, on
           </div>
 
           {/* Notas / Observaciones */}
-          {event.notes && (
+          {cleanCommercialNotes && (
             <div className="bg-white border border-slate-200 rounded-2xl p-4 text-xs text-slate-600">
               <span className="font-bold text-slate-800 block mb-1">Notas Comerciales:</span>
-              <p className="whitespace-pre-wrap">{event.notes}</p>
+              <p className="whitespace-pre-wrap">{cleanCommercialNotes}</p>
             </div>
           )}
 
@@ -542,6 +594,90 @@ export default function EventDrilldownModal({ event, onClose, onUpdateStatus, on
             )
           )}
 
+          {/* 💬 Muro de Comentarios & Seguimiento de Equipo */}
+          <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center space-x-2">
+                <MessageSquare className="w-4 h-4 text-barolo-navy" />
+                <h3 className="font-bold text-sm text-slate-900">
+                  Comentarios & Seguimiento del Equipo
+                </h3>
+                <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full text-xs font-bold font-mono">
+                  {comments.length}
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-400 hidden sm:block">
+                Colaboración del equipo para este evento
+              </p>
+            </div>
+
+            {/* List of comments */}
+            <div className="space-y-2.5 max-h-60 overflow-y-auto pr-1">
+              {comments.length === 0 ? (
+                <div className="py-5 text-center text-slate-400 text-xs italic bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                  No hay comentarios aún. ¡Dejá una nota o consulta sobre este evento para el equipo!
+                </div>
+              ) : (
+                comments.map(c => {
+                  const roleMeta = getRoleBadge(c.author_role)
+                  const isAuthor = c.author_id === currentUser?.id || c.author_username === currentUser?.username
+                  const canDelete = isAuthor || isUserAdmin
+                  const dateStr = c.created_at 
+                    ? new Date(c.created_at).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+                    : ''
+
+                  return (
+                    <div key={c.id} className="bg-slate-50 border border-slate-200/80 rounded-xl p-3 text-xs space-y-1 group">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-2">
+                          <div className="w-5 h-5 rounded-full bg-barolo-navy text-amber-300 font-bold text-[10px] flex items-center justify-center">
+                            {c.author_name?.charAt(0)?.toUpperCase() || 'U'}
+                          </div>
+                          <span className="font-bold text-slate-900 text-xs">{c.author_name}</span>
+                          <span className={`text-[9px] px-1.5 py-0.2 rounded-full border ${roleMeta.badgeClass}`}>
+                            {roleMeta.icon} {roleMeta.title}
+                          </span>
+                          <span className="text-[10px] text-slate-400">{dateStr}</span>
+                        </div>
+
+                        {canDelete && (
+                          <button
+                            onClick={() => handleDeleteComment(c.id)}
+                            className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-rose-600 transition-opacity p-1 cursor-pointer"
+                            title="Eliminar comentario"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+
+                      <p className="text-slate-700 leading-relaxed pl-7 whitespace-pre-wrap">{c.text}</p>
+                    </div>
+                  )
+                })
+              )}
+            </div>
+
+            {/* Input to write new comment */}
+            <form onSubmit={handleSendComment} className="flex items-center gap-2 pt-2 border-t border-slate-100">
+              <input
+                type="text"
+                value={commentText}
+                onChange={(e) => setCommentText(e.target.value)}
+                placeholder="Escribí una nota o actualización sobre este evento..."
+                className="flex-1 bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-400 font-medium"
+              />
+              <button
+                type="submit"
+                disabled={!commentText.trim() || isSending}
+                className="bg-barolo-navy hover:bg-barolo-navy-light disabled:opacity-40 text-white font-bold text-xs px-4 py-2 rounded-xl transition-all shadow-sm flex items-center space-x-1.5 cursor-pointer active:scale-95 flex-shrink-0"
+              >
+                <Send className="w-3.5 h-3.5 text-amber-300" />
+                <span className="hidden sm:inline">Comentar</span>
+              </button>
+            </form>
+          </div>
+
         </div>
 
         {/* Modal Footer with Actions */}
@@ -551,10 +687,10 @@ export default function EventDrilldownModal({ event, onClose, onUpdateStatus, on
             {userCanEdit && (
               <button
                 onClick={() => onEditInCalculator(event)}
-                className="flex items-center space-x-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors"
+                className="flex items-center space-x-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors cursor-pointer"
               >
                 <Calculator className="w-4 h-4 text-barolo-navy" />
-                <span>Retocar en Calculadora</span>
+                <span>Retocar en Cotizador</span>
               </button>
             )}
 

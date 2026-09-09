@@ -1,16 +1,13 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { 
-  Calendar, Calculator, LayoutDashboard, ListFilter, Cloud, CloudOff, 
-  Settings, ShieldCheck, PlusCircle, RefreshCw, FileSpreadsheet, 
-  Scale, User, ChevronDown, Check, Sliders, Users, LogOut 
+  Calendar, Calculator, LayoutDashboard, ListFilter, PlusCircle, 
+  FileSpreadsheet, Scale, ChevronDown, Settings, LogOut, Sliders, Users 
 } from 'lucide-react'
-import { isSupabaseConfigured } from '../services/supabaseClient'
 import { canCreateEvent, isAdmin } from '../services/authService'
 
 export default function Navbar({ 
   currentView, 
   setCurrentView, 
-  onOpenSettings, 
   onOpenComparison,
   comparisonCount = 0,
   currentUser,
@@ -18,12 +15,10 @@ export default function Navbar({
   onNewEvent, 
   eventsCount, 
   quotesCount, 
-  onForceSync, 
-  isSyncing,
   onExportAllExcel,
-  onExportMonthExcel
+  onExportMonthExcel,
+  onToggleAdminSidebar
 }) {
-  const isOnline = isSupabaseConfigured()
   const [showExcelMenu, setShowExcelMenu] = useState(false)
   const [showUserMenu, setShowUserMenu] = useState(false)
   const excelMenuRef = useRef(null)
@@ -52,25 +47,42 @@ export default function Navbar({
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-20">
           
-          {/* Logo & Palacio Barolo Brand */}
-          <div className="flex items-center space-x-3 cursor-pointer select-none" onClick={() => setCurrentView('calendar')}>
-            <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-barolo-gold to-barolo-gold-dark flex items-center justify-center shadow-lg border border-amber-300/40 text-barolo-navy font-bold text-xl tracking-wider">
-              PB
-            </div>
-            <div>
-              <div className="flex items-center space-x-2">
-                <span className="font-serif font-bold text-base sm:text-lg tracking-wide uppercase text-amber-200">Palacio Barolo</span>
-                <span className="text-[10px] sm:text-xs bg-amber-400/20 text-amber-300 border border-amber-400/40 px-1.5 sm:px-2 py-0.5 rounded-full font-medium">Cloud v2.0</span>
+          {/* Left: Admin Gear Sidebar Trigger + Logo */}
+          <div className="flex items-center space-x-3 sm:space-x-4">
+            
+            {/* Engranaje lateral izquierdo (exclusivo Administrador) */}
+            {isUserAdmin && (
+              <button
+                onClick={onToggleAdminSidebar}
+                className="p-2.5 rounded-xl bg-barolo-navy-dark hover:bg-barolo-navy-light text-amber-300 border border-amber-400/40 hover:border-amber-400 transition-all shadow-md active:scale-95 cursor-pointer flex items-center justify-center group"
+                title="Abrir Menú de Administración (Usuarios y Plantilla)"
+              >
+                <Settings className="w-5 h-5 text-amber-300 group-hover:rotate-45 transition-transform duration-300" />
+              </button>
+            )}
+
+            {/* Logo & Palacio Barolo Brand */}
+            <div className="flex items-center space-x-3 cursor-pointer select-none" onClick={() => setCurrentView('calendar')}>
+              <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-barolo-gold to-barolo-gold-dark flex items-center justify-center shadow-lg border border-amber-300/40 text-barolo-navy font-bold text-xl tracking-wider">
+                PB
               </div>
-              <p className="text-[11px] sm:text-xs text-slate-300 tracking-wider hidden xs:block">Sistema Integral de Eventos & Rentabilidad</p>
+              <div>
+                <div className="flex items-center space-x-2">
+                  <span className="font-serif font-bold text-base sm:text-lg tracking-wide uppercase text-amber-200">Palacio Barolo</span>
+                </div>
+                <p className="text-[11px] sm:text-xs text-slate-300 tracking-wider hidden xs:block">Sistema de Eventos & Rentabilidad</p>
+              </div>
             </div>
+
           </div>
 
-          {/* Navigation Tabs */}
+          {/* Navigation Tabs: EXACTLY 4 TABS: Calendario | Cotizador | Eventos | Dashboard */}
           <nav className="hidden md:flex items-center space-x-1 bg-barolo-navy-dark/60 p-1.5 rounded-2xl border border-white/10 backdrop-blur-md">
+            
+            {/* 1. Calendario */}
             <button
               onClick={() => setCurrentView('calendar')}
-              className={`flex items-center space-x-2 px-3.5 py-2.5 rounded-xl font-medium text-sm transition-all duration-200 ${
+              className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl font-medium text-sm transition-all duration-200 cursor-pointer ${
                 currentView === 'calendar'
                   ? 'bg-gradient-to-r from-barolo-gold to-amber-500 text-barolo-navy font-bold shadow-md shadow-amber-500/20'
                   : 'text-slate-300 hover:text-white hover:bg-white/10'
@@ -80,21 +92,41 @@ export default function Navbar({
               <span>Calendario</span>
             </button>
 
+            {/* 2. Cotizador */}
             <button
               onClick={() => setCurrentView('calculator')}
-              className={`flex items-center space-x-2 px-3.5 py-2.5 rounded-xl font-medium text-sm transition-all duration-200 ${
+              className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl font-medium text-sm transition-all duration-200 cursor-pointer ${
                 currentView === 'calculator'
                   ? 'bg-gradient-to-r from-barolo-gold to-amber-500 text-barolo-navy font-bold shadow-md shadow-amber-500/20'
                   : 'text-slate-300 hover:text-white hover:bg-white/10'
               }`}
             >
               <Calculator className="w-4 h-4" />
-              <span>Calculadora Madre</span>
+              <span>Cotizador</span>
             </button>
 
+            {/* 3. Eventos */}
+            <button
+              onClick={() => setCurrentView('list')}
+              className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl font-medium text-sm transition-all duration-200 cursor-pointer ${
+                currentView === 'list'
+                  ? 'bg-gradient-to-r from-barolo-gold to-amber-500 text-barolo-navy font-bold shadow-md shadow-amber-500/20'
+                  : 'text-slate-300 hover:text-white hover:bg-white/10'
+              }`}
+            >
+              <ListFilter className="w-4 h-4" />
+              <span>Eventos</span>
+              {quotesCount > 0 && (
+                <span className="ml-1 px-1.5 py-0.5 text-xs bg-amber-400 text-barolo-navy font-bold rounded-full">
+                  {quotesCount}
+                </span>
+              )}
+            </button>
+
+            {/* 4. Dashboard */}
             <button
               onClick={() => setCurrentView('dashboard')}
-              className={`flex items-center space-x-2 px-3.5 py-2.5 rounded-xl font-medium text-sm transition-all duration-200 ${
+              className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl font-medium text-sm transition-all duration-200 cursor-pointer ${
                 currentView === 'dashboard'
                   ? 'bg-gradient-to-r from-barolo-gold to-amber-500 text-barolo-navy font-bold shadow-md shadow-amber-500/20'
                   : 'text-slate-300 hover:text-white hover:bg-white/10'
@@ -104,65 +136,19 @@ export default function Navbar({
               <span>Dashboard</span>
             </button>
 
-            <button
-              onClick={() => setCurrentView('list')}
-              className={`flex items-center space-x-2 px-3.5 py-2.5 rounded-xl font-medium text-sm transition-all duration-200 ${
-                currentView === 'list'
-                  ? 'bg-gradient-to-r from-barolo-gold to-amber-500 text-barolo-navy font-bold shadow-md shadow-amber-500/20'
-                  : 'text-slate-300 hover:text-white hover:bg-white/10'
-              }`}
-            >
-              <ListFilter className="w-4 h-4" />
-              <span>Pipeline & Registro</span>
-              {quotesCount > 0 && (
-                <span className="ml-1 px-1.5 py-0.5 text-xs bg-amber-400 text-barolo-navy font-bold rounded-full">
-                  {quotesCount}
-                </span>
-              )}
-            </button>
-
-            {isUserAdmin && (
-              <>
-                <button
-                  onClick={() => setCurrentView('calculator_config')}
-                  className={`flex items-center space-x-1.5 px-3 py-2.5 rounded-xl font-medium text-sm transition-all duration-200 ${
-                    currentView === 'calculator_config'
-                      ? 'bg-gradient-to-r from-barolo-gold to-amber-500 text-barolo-navy font-bold shadow-md shadow-amber-500/20'
-                      : 'text-amber-200 hover:text-white hover:bg-white/10'
-                  }`}
-                  title="Configuración de Plantilla Maestra de Calculadora"
-                >
-                  <Sliders className="w-4 h-4 text-amber-300" />
-                  <span>Plantilla</span>
-                </button>
-
-                <button
-                  onClick={() => setCurrentView('users')}
-                  className={`flex items-center space-x-1.5 px-3 py-2.5 rounded-xl font-medium text-sm transition-all duration-200 ${
-                    currentView === 'users'
-                      ? 'bg-gradient-to-r from-barolo-gold to-amber-500 text-barolo-navy font-bold shadow-md shadow-amber-500/20'
-                      : 'text-amber-200 hover:text-white hover:bg-white/10'
-                  }`}
-                  title="Gestión de Usuarios & Accesos (Solo Administrador)"
-                >
-                  <Users className="w-4 h-4 text-amber-300" />
-                  <span>Usuarios</span>
-                </button>
-              </>
-            )}
           </nav>
 
-          {/* Right Actions: Excel, Compare, User Menu, Sync & New Event */}
-          <div className="flex items-center space-x-1.5 sm:space-x-2">
+          {/* Right Actions: Excel, Compare, Nueva Cotización & User Profile */}
+          <div className="flex items-center space-x-2 sm:space-x-2.5">
             
             {/* Excel Export Dropdown */}
             <div className="relative" ref={excelMenuRef}>
               <button
                 onClick={() => setShowExcelMenu(!showExcelMenu)}
-                className="flex items-center space-x-1 bg-emerald-900/60 hover:bg-emerald-800 text-emerald-200 border border-emerald-500/50 px-2.5 py-2 rounded-xl text-xs font-bold transition-all shadow-md active:scale-95 cursor-pointer"
+                className="flex items-center space-x-1.5 bg-emerald-900/60 hover:bg-emerald-800 text-emerald-200 border border-emerald-500/50 px-2.5 sm:px-3 py-2 rounded-xl text-xs font-bold transition-all shadow-md active:scale-95 cursor-pointer"
                 title="Descargar datos en planilla de Excel (.xlsx)"
               >
-                <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
+                <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
                 <span className="hidden sm:inline">Excel</span>
                 <ChevronDown className="w-3 h-3 opacity-70" />
               </button>
@@ -178,14 +164,12 @@ export default function Navbar({
                       setShowExcelMenu(false)
                       if (onExportAllExcel) onExportAllExcel()
                     }}
-                    className="w-full text-left px-3.5 py-2 text-xs font-medium hover:bg-emerald-50 hover:text-emerald-900 flex items-center justify-between transition-colors"
+                    className="w-full text-left px-3.5 py-2 text-xs font-medium hover:bg-emerald-50 hover:text-emerald-900 flex items-center space-x-2 transition-colors cursor-pointer"
                   >
-                    <div className="flex items-center space-x-2">
-                      <span className="text-base">📊</span>
-                      <div>
-                        <p className="font-bold text-slate-900">Todos los Eventos</p>
-                        <p className="text-[10px] text-slate-500">Histórico completo ({eventsCount} eventos)</p>
-                      </div>
+                    <span className="text-base">📊</span>
+                    <div>
+                      <p className="font-bold text-slate-900">Todos los Eventos</p>
+                      <p className="text-[10px] text-slate-500">Histórico completo ({eventsCount} eventos)</p>
                     </div>
                   </button>
 
@@ -194,14 +178,12 @@ export default function Navbar({
                       setShowExcelMenu(false)
                       if (onExportMonthExcel) onExportMonthExcel()
                     }}
-                    className="w-full text-left px-3.5 py-2 text-xs font-medium hover:bg-emerald-50 hover:text-emerald-900 flex items-center justify-between transition-colors"
+                    className="w-full text-left px-3.5 py-2 text-xs font-medium hover:bg-emerald-50 hover:text-emerald-900 flex items-center space-x-2 transition-colors cursor-pointer"
                   >
-                    <div className="flex items-center space-x-2">
-                      <span className="text-base">📅</span>
-                      <div>
-                        <p className="font-bold text-slate-900">Mes Visible / Actual</p>
-                        <p className="text-[10px] text-slate-500">Con fila resumen de totales y promedios</p>
-                      </div>
+                    <span className="text-base">📅</span>
+                    <div>
+                      <p className="font-bold text-slate-900">Mes Visible / Actual</p>
+                      <p className="text-[10px] text-slate-500">Con fila de totales y promedios</p>
                     </div>
                   </button>
                 </div>
@@ -220,6 +202,18 @@ export default function Navbar({
                 <span className="bg-white text-purple-900 px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold">
                   {comparisonCount}
                 </span>
+              </button>
+            )}
+
+            {/* Quick New Event (only if role allows) */}
+            {userCanCreate && (
+              <button
+                onClick={onNewEvent}
+                className="flex items-center space-x-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white px-3 py-2 rounded-xl text-xs sm:text-sm font-semibold shadow-lg shadow-emerald-900/30 transition-all transform hover:scale-105 cursor-pointer"
+                title="Crear nueva cotización"
+              >
+                <PlusCircle className="w-4 h-4" />
+                <span className="hidden sm:inline">Nueva</span>
               </button>
             )}
 
@@ -292,87 +286,53 @@ export default function Navbar({
               )}
             </div>
 
-            {/* Sync Button */}
-            <button
-              onClick={onForceSync}
-              disabled={isSyncing}
-              className="flex items-center space-x-1.5 bg-barolo-navy-dark hover:bg-barolo-navy-light text-amber-300 border border-amber-400/40 px-2.5 py-2 rounded-xl text-xs font-bold transition-all shadow-md active:scale-95 disabled:opacity-50 cursor-pointer"
-              title="Sincronizar y actualizar con la Nube Supabase"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin text-amber-400' : 'text-amber-300'}`} />
-              <span className="hidden lg:inline">{isSyncing ? '...' : 'Sync'}</span>
-            </button>
-
-            {/* Quick New Event (only if role allows) */}
-            {userCanCreate && (
-              <button
-                onClick={onNewEvent}
-                className="flex items-center space-x-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white px-2.5 sm:px-3 py-2 rounded-xl text-xs sm:text-sm font-semibold shadow-lg shadow-emerald-900/30 transition-all transform hover:scale-105 cursor-pointer"
-              >
-                <PlusCircle className="w-4 h-4" />
-                <span className="hidden sm:inline">Nueva</span>
-              </button>
-            )}
-
-            {/* Supabase Status Pill */}
-            <button
-              onClick={onOpenSettings}
-              className={`flex items-center space-x-1 sm:space-x-1.5 px-2 sm:px-2.5 py-1.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
-                isOnline
-                  ? 'bg-emerald-950/70 border-emerald-500/60 text-emerald-300 hover:bg-emerald-900'
-                  : 'bg-amber-950/70 border-amber-500/60 text-amber-300 hover:bg-amber-900'
-              }`}
-              title="Configuración de Base de Datos y Supabase"
-            >
-              {isOnline ? (
-                <>
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                  <Cloud className="w-3.5 h-3.5" />
-                  <span className="hidden xl:inline">Nube</span>
-                </>
-              ) : (
-                <>
-                  <span className="w-2 h-2 rounded-full bg-amber-400"></span>
-                  <CloudOff className="w-3.5 h-3.5" />
-                  <span className="hidden xl:inline">Local</span>
-                </>
-              )}
-              <Settings className="w-3 h-3 ml-0.5 opacity-75 hover:opacity-100" />
-            </button>
           </div>
 
         </div>
       </div>
 
-      {/* Mobile Bar */}
+      {/* Mobile Bottom Bar */}
       <div className="md:hidden flex justify-around py-2 border-t border-white/10 bg-barolo-navy-dark overflow-x-auto">
-        <button onClick={() => setCurrentView('calendar')} className={`text-xs p-2 flex flex-col items-center ${currentView === 'calendar' ? 'text-amber-400 font-bold' : 'text-slate-300'}`}>
+        <button 
+          onClick={() => setCurrentView('calendar')} 
+          className={`text-xs p-2 flex flex-col items-center ${currentView === 'calendar' ? 'text-amber-400 font-bold' : 'text-slate-300'}`}
+        >
           <Calendar className="w-4 h-4 mb-1" />
           Calendario
         </button>
-        <button onClick={() => setCurrentView('calculator')} className={`text-xs p-2 flex flex-col items-center ${currentView === 'calculator' ? 'text-amber-400 font-bold' : 'text-slate-300'}`}>
+
+        <button 
+          onClick={() => setCurrentView('calculator')} 
+          className={`text-xs p-2 flex flex-col items-center ${currentView === 'calculator' ? 'text-amber-400 font-bold' : 'text-slate-300'}`}
+        >
           <Calculator className="w-4 h-4 mb-1" />
-          Calculadora
+          Cotizador
         </button>
-        <button onClick={() => setCurrentView('dashboard')} className={`text-xs p-2 flex flex-col items-center ${currentView === 'dashboard' ? 'text-amber-400 font-bold' : 'text-slate-300'}`}>
+
+        <button 
+          onClick={() => setCurrentView('list')} 
+          className={`text-xs p-2 flex flex-col items-center ${currentView === 'list' ? 'text-amber-400 font-bold' : 'text-slate-300'}`}
+        >
+          <ListFilter className="w-4 h-4 mb-1" />
+          Eventos
+        </button>
+
+        <button 
+          onClick={() => setCurrentView('dashboard')} 
+          className={`text-xs p-2 flex flex-col items-center ${currentView === 'dashboard' ? 'text-amber-400 font-bold' : 'text-slate-300'}`}
+        >
           <LayoutDashboard className="w-4 h-4 mb-1" />
           Dashboard
         </button>
-        <button onClick={() => setCurrentView('list')} className={`text-xs p-2 flex flex-col items-center ${currentView === 'list' ? 'text-amber-400 font-bold' : 'text-slate-300'}`}>
-          <ListFilter className="w-4 h-4 mb-1" />
-          Registro
-        </button>
+
         {isUserAdmin && (
-          <>
-            <button onClick={() => setCurrentView('calculator_config')} className={`text-xs p-2 flex flex-col items-center ${currentView === 'calculator_config' ? 'text-amber-400 font-bold' : 'text-amber-300'}`}>
-              <Sliders className="w-4 h-4 mb-1" />
-              Plantilla
-            </button>
-            <button onClick={() => setCurrentView('users')} className={`text-xs p-2 flex flex-col items-center ${currentView === 'users' ? 'text-amber-400 font-bold' : 'text-amber-300'}`}>
-              <Users className="w-4 h-4 mb-1" />
-              Usuarios
-            </button>
-          </>
+          <button 
+            onClick={onToggleAdminSidebar} 
+            className="text-xs p-2 flex flex-col items-center text-amber-300"
+          >
+            <Settings className="w-4 h-4 mb-1" />
+            Ajustes
+          </button>
         )}
       </div>
     </header>

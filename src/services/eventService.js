@@ -313,5 +313,59 @@ export const eventService = {
   resetToInitial() {
     localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(initialEvents))
     return initialEvents
+  },
+
+  // Agregar comentario al hilo del evento
+  async addComment(eventId, comment) {
+    const events = await this.getEvents()
+    const target = events.find(e => e.id === eventId || e.calc_code === eventId)
+    if (!target) return { success: false, error: 'Evento no encontrado' }
+
+    const { notes, comments } = parseNotesAndComments(target.notes)
+    const newComments = [...comments, comment]
+    const updatedNotes = serializeNotesAndComments(notes, newComments)
+
+    const updatedEvent = { ...target, notes: updatedNotes }
+    return await this.saveEvent(updatedEvent)
+  },
+
+  // Eliminar comentario
+  async deleteComment(eventId, commentId) {
+    const events = await this.getEvents()
+    const target = events.find(e => e.id === eventId || e.calc_code === eventId)
+    if (!target) return { success: false, error: 'Evento no encontrado' }
+
+    const { notes, comments } = parseNotesAndComments(target.notes)
+    const newComments = comments.filter(c => c.id !== commentId)
+    const updatedNotes = serializeNotesAndComments(notes, newComments)
+
+    const updatedEvent = { ...target, notes: updatedNotes }
+    return await this.saveEvent(updatedEvent)
   }
 }
+
+// Helpers para parsear y serializar notas y comentarios embebidos
+export function parseNotesAndComments(rawNotes) {
+  if (!rawNotes) return { notes: '', comments: [] }
+  const startTag = '<!-- PB_COMMENTS_START -->'
+  const endTag = '<!-- PB_COMMENTS_END -->'
+  if (rawNotes.includes(startTag) && rawNotes.includes(endTag)) {
+    const parts = rawNotes.split(startTag)
+    const notes = parts[0].trim()
+    const commentPart = parts[1].split(endTag)[0].trim()
+    try {
+      const comments = JSON.parse(commentPart)
+      return { notes, comments: Array.isArray(comments) ? comments : [] }
+    } catch (e) {
+      return { notes, comments: [] }
+    }
+  }
+  return { notes: rawNotes, comments: [] }
+}
+
+export function serializeNotesAndComments(notes, comments) {
+  const cleanNotes = (notes || '').trim()
+  if (!comments || comments.length === 0) return cleanNotes
+  return `${cleanNotes}\n\n<!-- PB_COMMENTS_START -->\n${JSON.stringify(comments)}\n<!-- PB_COMMENTS_END -->`
+}
+
