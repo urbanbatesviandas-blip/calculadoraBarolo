@@ -50,7 +50,7 @@ const MONTHS_LIST = [
 ]
 
 // Plantilla oficial precargada: LC-076 Jam de Dibujo (Edición Especial)
-export const OFFICIAL_LC076_DATA = {
+const OFFICIAL_LC076_DATA = {
   id: 'LC-076',
   calc_code: 'LC-076',
   name: 'Jam de Dibujo (Edición Especial)',
