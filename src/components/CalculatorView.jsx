@@ -389,13 +389,30 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
           </p>
         </div>
 
-        <div className="flex items-center space-x-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={handleReset}
-            className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors"
+            className="flex items-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors"
+            title="Limpiar campos"
           >
             <RotateCcw className="w-3.5 h-3.5" />
             <span>Limpiar</span>
+          </button>
+
+          <button
+            onClick={handleSaveAsQuote}
+            className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl font-bold text-xs bg-amber-400 hover:bg-amber-300 text-barolo-navy shadow-md shadow-amber-400/20 transition-all"
+          >
+            <FileText className="w-3.5 h-3.5" />
+            <span>📝 Guardar Cotización</span>
+          </button>
+
+          <button
+            onClick={handleConfirmAndSave}
+            className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl font-bold text-xs bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-600/20 transition-all"
+          >
+            <CheckCircle2 className="w-3.5 h-3.5" />
+            <span>💾 Confirmar Evento</span>
           </button>
         </div>
       </div>

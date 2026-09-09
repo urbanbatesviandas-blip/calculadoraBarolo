@@ -31,6 +31,7 @@ const saveLocalEvents = (events) => {
 export const eventService = {
   // Obtener todos los eventos
   async getEvents() {
+    const locals = getLocalEvents()
     if (isSupabaseConfigured()) {
       try {
         const { data, error } = await supabase
@@ -40,21 +41,29 @@ export const eventService = {
           
         if (error) {
           console.warn('Supabase query error, falling back to local:', error.message)
-          return getLocalEvents()
+          return locals
         }
         
         if (data && data.length > 0) {
-          return data
+          // Fusionar con eventos locales para que los creados recientemente nunca se pierdan
+          const localMap = new Map(locals.map(e => [e.id, e]))
+          data.forEach(remoteEv => {
+            localMap.set(remoteEv.id, remoteEv)
+          })
+          const merged = Array.from(localMap.values()).sort((a, b) => 
+            (b.event_date || '').localeCompare(a.event_date || '')
+          )
+          saveLocalEvents(merged)
+          return merged
         } else {
-          // Si Supabase está vacío, podemos migrar los locales
-          return getLocalEvents()
+          return locals
         }
       } catch (err) {
-        console.error('Supabase fetch failed:', err)
-        return getLocalEvents()
+        console.error('Supabase fetch failed, using local storage:', err)
+        return locals
       }
     }
-    return getLocalEvents()
+    return locals
   },
 
   // Guardar o actualizar un evento

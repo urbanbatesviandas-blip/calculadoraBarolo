@@ -14,6 +14,7 @@ export default function App() {
   const [loading, setLoading] = useState(true)
   const [selectedEvent, setSelectedEvent] = useState(null)
   const [calculatorEvent, setCalculatorEvent] = useState(null)
+  const [calendarTargetDate, setCalendarTargetDate] = useState(null)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [toastMessage, setToastMessage] = useState(null)
 
@@ -45,6 +46,9 @@ export default function App() {
     if (res.success) {
       await loadEvents()
       setCalculatorEvent(null)
+      if (eventData.event_date) {
+        setCalendarTargetDate(eventData.event_date)
+      }
       showToast(targetStatus === 'cotizado' ? '📝 ¡Cotización guardada con éxito!' : '💾 ¡Evento contratado confirmado!')
       setCurrentView('calendar')
     }
@@ -121,8 +125,12 @@ export default function App() {
             {currentView === 'calendar' && (
               <CalendarView
                 events={events}
+                targetDate={calendarTargetDate}
                 onSelectEvent={(ev) => setSelectedEvent(ev)}
                 onNewEventAtDate={handleNewEventAtDate}
+                onEditInCalculator={handleEditInCalculator}
+                onUpdateStatus={handleUpdateStatus}
+                onClearTargetDate={() => setCalendarTargetDate(null)}
               />
             )}
 

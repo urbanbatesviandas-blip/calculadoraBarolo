@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { 
   format, addMonths, subMonths, startOfMonth, endOfMonth, startOfWeek, endOfWeek, 
   isSameMonth, isSameDay, addDays, parseISO 
@@ -6,18 +6,88 @@ import {
 import { es } from 'date-fns/locale'
 import { 
   ChevronLeft, ChevronRight, Calendar as CalendarIcon, Filter, 
-  MapPin, DollarSign, Users, TrendingUp, Sparkles, CheckCircle2, Clock, AlertCircle, XCircle 
+  MapPin, DollarSign, Users, TrendingUp, Sparkles, CheckCircle2, Clock, AlertCircle, XCircle, 
+  Calculator, ArrowRight, Eye, Check
 } from 'lucide-react'
 
-export default function CalendarView({ events, onSelectEvent, onNewEventAtDate }) {
+export default function CalendarView({ 
+  events = [], 
+  targetDate = null, 
+  onSelectEvent, 
+  onNewEventAtDate,
+  onEditInCalculator,
+  onUpdateStatus,
+  onClearTargetDate
+}) {
   const [currentMonth, setCurrentMonth] = useState(new Date(2026, 8, 1)) // Septiembre 2026
   const [selectedStatus, setSelectedStatus] = useState('all')
   const [selectedVenue, setSelectedVenue] = useState('all')
+  const [highlightDay, setHighlightDay] = useState(null)
+
+  // Auto-navegar a la fecha de una cotización/evento recién guardado
+  useEffect(() => {
+    if (targetDate) {
+      const cleanDate = targetDate.substring(0, 10)
+      const parts = cleanDate.split('-')
+      if (parts.length === 3) {
+        const y = parseInt(parts[0], 10)
+        const m = parseInt(parts[1], 10) - 1
+        if (!isNaN(y) && !isNaN(m)) {
+          setCurrentMonth(new Date(y, m, 1))
+          setHighlightDay(cleanDate)
+          setSelectedStatus('all') // Resetear filtro de estado para asegurar visibilidad
+          setSelectedVenue('all')  // Resetear filtro de lugar para asegurar visibilidad
+          
+          const timer = setTimeout(() => {
+            setHighlightDay(null)
+            if (onClearTargetDate) onClearTargetDate()
+          }, 8000)
+          return () => clearTimeout(timer)
+        }
+      }
+    }
+  }, [targetDate])
+
+  // Saltar a fecha específica
+  const handleJumpToDate = (dateStr) => {
+    if (!dateStr) return
+    const cleanDate = dateStr.substring(0, 10)
+    const parts = cleanDate.split('-')
+    if (parts.length === 3) {
+      const y = parseInt(parts[0], 10)
+      const m = parseInt(parts[1], 10) - 1
+      if (!isNaN(y) && !isNaN(m)) {
+        setCurrentMonth(new Date(y, m, 1))
+        setHighlightDay(cleanDate)
+        setSelectedStatus('all')
+        setSelectedVenue('all')
+      }
+    }
+  }
 
   // Navegación de mes
   const nextMonth = () => setCurrentMonth(addMonths(currentMonth, 1))
   const prevMonth = () => setCurrentMonth(subMonths(currentMonth, 1))
-  const todayMonth = () => setCurrentMonth(new Date())
+  const todayMonth = () => setCurrentMonth(new Date(2026, 8, 1))
+
+  // Lista de meses que tienen eventos registrados
+  const availableMonths = useMemo(() => {
+    const map = new Map()
+    events.forEach(e => {
+      if (e.event_date && e.event_date.length >= 7) {
+        const ym = e.event_date.substring(0, 7)
+        map.set(ym, (map.get(ym) || 0) + 1)
+      }
+    })
+    return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0]))
+  }, [events])
+
+  // Cotizaciones activas en proceso (Pipeline)
+  const activeQuotes = useMemo(() => {
+    return events
+      .filter(e => e.status === 'cotizado')
+      .sort((a, b) => (b.event_date || '').localeCompare(a.event_date || ''))
+  }, [events])
 
   // Filtrado de eventos
   const filteredEvents = useMemo(() => {
@@ -83,23 +153,29 @@ export default function CalendarView({ events, onSelectEvent, onNewEventAtDate }
       const dayEvents = eventsByDate[dateKey] || []
       const isCurrentMonth = isSameMonth(dayItem, monthStart)
       const isToday = isSameDay(dayItem, new Date())
+      const isHighlighted = highlightDay === dateKey
 
       return (
         <div
           key={idx}
-          className={`min-h-[125px] border-b border-r border-slate-200 p-2 flex flex-col transition-colors ${
+          className={`min-h-[135px] border-b border-r border-slate-200 p-2 flex flex-col transition-all duration-300 ${
             !isCurrentMonth ? 'bg-slate-50/70 text-slate-400' : 'bg-white text-slate-800'
-          } ${isToday ? 'ring-2 ring-amber-400 ring-inset bg-amber-50/30' : ''}`}
+          } ${isToday ? 'ring-2 ring-amber-400 ring-inset bg-amber-50/30' : ''} ${
+            isHighlighted ? 'ring-4 ring-amber-500 ring-inset bg-amber-100/70 shadow-xl scale-[1.01] z-10' : ''
+          }`}
         >
           <div className="flex items-center justify-between mb-1">
             <span
-              className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-                isToday 
-                  ? 'bg-barolo-navy text-amber-300 font-bold' 
-                  : isCurrentMonth ? 'text-slate-700' : 'text-slate-400'
+              className={`text-xs font-semibold px-2 py-0.5 rounded-full flex items-center space-x-1 ${
+                isHighlighted
+                  ? 'bg-amber-600 text-white font-extrabold animate-pulse'
+                  : isToday 
+                    ? 'bg-barolo-navy text-amber-300 font-bold' 
+                    : isCurrentMonth ? 'text-slate-700' : 'text-slate-400'
               }`}
             >
-              {format(dayItem, 'd')}
+              <span>{format(dayItem, 'd')}</span>
+              {isHighlighted && <span className="text-[10px] uppercase tracking-wider ml-1">⭐ ¡NUEVO!</span>}
             </span>
 
             {isCurrentMonth && (
@@ -114,7 +190,7 @@ export default function CalendarView({ events, onSelectEvent, onNewEventAtDate }
           </div>
 
           {/* Event Pills */}
-          <div className="flex-1 space-y-1 overflow-y-auto max-h-[105px] pr-0.5">
+          <div className="flex-1 space-y-1 overflow-y-auto max-h-[110px] pr-0.5">
             {dayEvents.map(ev => {
               let badgeStyle = 'bg-slate-100 text-slate-700 border-slate-300'
               let dotColor = 'bg-slate-400'
@@ -126,7 +202,7 @@ export default function CalendarView({ events, onSelectEvent, onNewEventAtDate }
                 badgeStyle = 'bg-blue-50 text-blue-900 border-blue-300 hover:bg-blue-100 shadow-sm'
                 dotColor = 'bg-blue-500'
               } else if (ev.status === 'cotizado') {
-                badgeStyle = 'bg-amber-50 text-amber-900 border-amber-300 hover:bg-amber-100 shadow-sm'
+                badgeStyle = 'bg-amber-100 text-amber-950 border-amber-400 hover:bg-amber-200 shadow-md ring-1 ring-amber-400/50'
                 dotColor = 'bg-amber-500'
               } else if (ev.status === 'cancelado') {
                 badgeStyle = 'bg-rose-50 text-rose-800 border-rose-200 line-through opacity-75 hover:bg-rose-100'
@@ -142,7 +218,7 @@ export default function CalendarView({ events, onSelectEvent, onNewEventAtDate }
                 >
                   <span className={`w-2 h-2 rounded-full flex-shrink-0 ${dotColor}`}></span>
                   <span className="font-semibold truncate flex-1">{ev.name}</span>
-                  <span className="text-[10px] font-mono opacity-80 hidden sm:inline flex-shrink-0">
+                  <span className="text-[10px] font-mono opacity-90 hidden sm:inline flex-shrink-0">
                     ${(Number(ev.gross_income) / 1000).toFixed(0)}k
                   </span>
                 </div>
@@ -161,8 +237,8 @@ export default function CalendarView({ events, onSelectEvent, onNewEventAtDate }
       <div className="bg-white rounded-2xl shadow-luxury p-5 border border-slate-200/80">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           
-          {/* Controls: Prev, Next, Month Title */}
-          <div className="flex items-center space-x-3">
+          {/* Controls: Prev, Next, Month Title & Quick Month Dropdown */}
+          <div className="flex flex-wrap items-center gap-3">
             <div className="flex items-center bg-slate-100 rounded-xl p-1 border border-slate-200">
               <button
                 onClick={prevMonth}
@@ -189,6 +265,29 @@ export default function CalendarView({ events, onSelectEvent, onNewEventAtDate }
             <h2 className="text-xl sm:text-2xl font-serif font-bold text-barolo-navy capitalize">
               {format(currentMonth, 'MMMM yyyy', { locale: es })}
             </h2>
+
+            {/* Quick Month Dropdown */}
+            {availableMonths.length > 0 && (
+              <div className="flex items-center space-x-1.5">
+                <span className="text-[11px] text-slate-400 font-semibold hidden xl:inline">Ir a:</span>
+                <select
+                  value={format(currentMonth, 'yyyy-MM')}
+                  onChange={(e) => handleJumpToDate(`${e.target.value}-01`)}
+                  className="text-xs bg-amber-50/60 border border-amber-300 hover:border-amber-400 rounded-xl px-2.5 py-1.5 font-bold text-amber-900 focus:outline-none focus:ring-2 focus:ring-amber-400"
+                >
+                  {availableMonths.map(([ym, count]) => {
+                    const [y, m] = ym.split('-')
+                    const dateObj = new Date(parseInt(y, 10), parseInt(m, 10) - 1, 1)
+                    const label = format(dateObj, 'MMMM yyyy', { locale: es })
+                    return (
+                      <option key={ym} value={ym}>
+                        {label.charAt(0).toUpperCase() + label.slice(1)} ({count} {count === 1 ? 'evento' : 'eventos'})
+                      </option>
+                    )
+                  })}
+                </select>
+              </div>
+            )}
           </div>
 
           {/* Quick Month Metrics */}
@@ -304,6 +403,108 @@ export default function CalendarView({ events, onSelectEvent, onNewEventAtDate }
         <div className="grid grid-cols-7">
           {renderCalendarDays()}
         </div>
+      </div>
+
+      {/* ========================================================================= */}
+      {/* SECCIÓN PIPELINE: COTIZACIONES ACTIVAS EN PROCESO */}
+      {/* ========================================================================= */}
+      <div className="bg-white rounded-2xl shadow-luxury border border-amber-300/80 p-5 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+          <div className="flex items-center space-x-2.5">
+            <span className="w-3 h-3 rounded-full bg-amber-500 animate-ping"></span>
+            <span className="w-3 h-3 rounded-full bg-amber-500 -ml-5.5"></span>
+            <h3 className="font-serif font-bold text-barolo-navy text-base">
+              Cotizaciones en Proceso (Pipeline Activo)
+            </h3>
+            <span className="bg-amber-100 text-amber-900 border border-amber-300 px-2.5 py-0.5 rounded-full text-xs font-bold font-mono">
+              {activeQuotes.length}
+            </span>
+          </div>
+          <p className="text-xs text-slate-500">
+            Hacé clic en <strong>"Ver en Calendario"</strong> para saltar directo a su mes y fecha, o <strong>"Retocar"</strong> para abrir la calculadora.
+          </p>
+        </div>
+
+        {activeQuotes.length === 0 ? (
+          <div className="py-8 text-center text-xs text-slate-400">
+            No hay cotizaciones pendientes en este momento. Hacé clic en <strong>"+ Nueva Cotización"</strong> para crear una.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+            {activeQuotes.map((q) => {
+              const gross = Number(q.gross_income) || 0
+              const profit = Number(q.barolo_profit) || 0
+              return (
+                <div
+                  key={q.id}
+                  className="bg-amber-50/40 hover:bg-amber-50 border border-amber-200/90 rounded-xl p-3.5 flex flex-col justify-between space-y-3 transition-all hover:shadow-md"
+                >
+                  <div>
+                    <div className="flex items-center justify-between text-xs mb-1">
+                      <span className="font-mono font-bold text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded text-[11px]">
+                        {q.calc_code || 'CALC'}
+                      </span>
+                      <span className="font-semibold text-slate-600 flex items-center">
+                        <CalendarIcon className="w-3 h-3 mr-1 text-amber-600" />
+                        {q.event_date}
+                      </span>
+                    </div>
+
+                    <h4 className="font-bold text-slate-900 text-sm truncate" title={q.name}>
+                      {q.name}
+                    </h4>
+                    <p className="text-xs text-slate-500 truncate">
+                      {q.client_name || 'Particular'} • {q.venue}
+                    </p>
+
+                    <div className="mt-2.5 pt-2 border-t border-amber-200/60 flex items-center justify-between text-xs">
+                      <div>
+                        <span className="text-[10px] text-slate-400 block uppercase font-semibold">Facturación</span>
+                        <span className="font-bold text-slate-800">
+                          ${gross.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
+                        </span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-[10px] text-emerald-700 block uppercase font-semibold">Ganancia Barolo</span>
+                        <span className="font-bold text-emerald-700">
+                          ${profit.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center space-x-1.5 pt-2 border-t border-amber-200/60">
+                    <button
+                      onClick={() => handleJumpToDate(q.event_date)}
+                      className="flex-1 bg-white hover:bg-amber-100 text-amber-900 border border-amber-300 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-colors flex items-center justify-center space-x-1"
+                      title="Mover el calendario a esta fecha"
+                    >
+                      <CalendarIcon className="w-3 h-3" />
+                      <span>Ver en Calendario</span>
+                    </button>
+
+                    <button
+                      onClick={() => onEditInCalculator && onEditInCalculator(q)}
+                      className="bg-amber-500 hover:bg-amber-400 text-barolo-navy px-2.5 py-1.5 rounded-lg text-xs font-bold transition-colors flex items-center justify-center"
+                      title="Abrir en Calculadora Madre"
+                    >
+                      <Calculator className="w-3 h-3 mr-1" />
+                      <span>Retocar</span>
+                    </button>
+
+                    <button
+                      onClick={() => onUpdateStatus && onUpdateStatus(q.id, 'contratado')}
+                      className="bg-emerald-600 hover:bg-emerald-500 text-white px-2.5 py-1.5 rounded-lg text-xs font-bold transition-colors flex items-center justify-center"
+                      title="Confirmar evento (pasa a verde Contratado)"
+                    >
+                      <CheckCircle2 className="w-3 h-3" />
+                    </button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
       </div>
 
       {/* Quick Tips Footer */}
