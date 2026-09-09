@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Lock, User, Eye, EyeOff, ShieldCheck, AlertCircle, ArrowRight, Sparkles } from 'lucide-react'
+import { Lock, User, Eye, EyeOff, ShieldCheck, AlertCircle, ArrowRight } from 'lucide-react'
 import { authService } from '../services/authService'
 
 export default function LoginView({ onLoginSuccess }) {
@@ -36,12 +36,6 @@ export default function LoginView({ onLoginSuccess }) {
     }
   }
 
-  const fillAdmin = () => {
-    setIdentifier('admin')
-    setPassword('barolo')
-    setErrorMsg(null)
-  }
-
   return (
     <div className="min-h-screen bg-slate-950 flex flex-col justify-center items-center px-4 py-12 relative overflow-hidden font-sans">
       {/* Background Decorative Lighting */}
@@ -72,7 +66,7 @@ export default function LoginView({ onLoginSuccess }) {
               Ingreso al Sistema
             </h2>
             <p className="text-xs text-slate-400 mt-1">
-              Ingresá con el usuario y la contraseña asignada por la administración.
+              Ingresá con tu usuario y contraseña asignada por el Administrador.
             </p>
           </div>
 
@@ -99,7 +93,7 @@ export default function LoginView({ onLoginSuccess }) {
                   autoFocus
                   value={identifier}
                   onChange={(e) => setIdentifier(e.target.value)}
-                  placeholder="ej: admin o camila"
+                  placeholder="ej: admin o usuario"
                   className="w-full pl-10 pr-4 py-3 bg-slate-800/80 border border-slate-700 rounded-xl text-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-amber-400 transition-all placeholder:text-slate-500"
                 />
               </div>
@@ -124,7 +118,7 @@ export default function LoginView({ onLoginSuccess }) {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-200 transition-colors"
+                  className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -146,21 +140,6 @@ export default function LoginView({ onLoginSuccess }) {
               )}
             </button>
           </form>
-
-          {/* Master Admin Helper Box */}
-          <div className="mt-6 pt-5 border-t border-slate-800/80 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-400">
-            <div className="flex items-center space-x-1.5 text-slate-400">
-              <Sparkles className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
-              <span>Acceso inicial Admin: <code className="text-amber-300 font-mono">admin</code> / <code className="text-amber-300 font-mono">barolo</code></span>
-            </div>
-            <button
-              type="button"
-              onClick={fillAdmin}
-              className="text-[11px] text-amber-300 hover:text-amber-200 bg-amber-500/10 hover:bg-amber-500/20 px-2.5 py-1 rounded-lg border border-amber-500/30 font-semibold transition-all"
-            >
-              Autocompletar
-            </button>
-          </div>
 
         </div>
 
