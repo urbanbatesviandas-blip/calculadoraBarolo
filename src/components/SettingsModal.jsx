@@ -124,19 +124,32 @@ export default function SettingsModal({ onClose, onConfigSaved, onResetData }) {
 
           {/* Actions */}
           <div className="flex items-center justify-between pt-3 border-t border-slate-100">
-            <button
-              type="button"
-              onClick={() => {
-                if (confirm('¿Restablecer los datos locales a los 81 eventos iniciales del Barolo?')) {
-                  onResetData()
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={async () => {
+                  onConfigSaved()
                   onClose()
-                }
-              }}
-              className="text-xs text-slate-500 hover:text-slate-800 flex items-center space-x-1"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-              <span>Restablecer Datos Locales</span>
-            </button>
+                }}
+                className="text-xs text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-300 px-3 py-1.5 rounded-xl flex items-center space-x-1 font-semibold transition-colors"
+                title="Descargar eventos frescos de Supabase y actualizar este dispositivo"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Forzar Sync Nube</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (confirm('¿Restablecer los datos locales a los 81 eventos iniciales del Barolo?')) {
+                    onResetData()
+                    onClose()
+                  }
+                }}
+                className="text-[11px] text-slate-400 hover:text-slate-700 flex items-center space-x-1 underline"
+              >
+                <span>Reset Demo</span>
+              </button>
+            </div>
 
             <div className="flex items-center space-x-2">
               <button

@@ -28,11 +28,36 @@ const saveLocalEvents = (events) => {
   }
 }
 
+const isUuidString = (str) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str)
+
 export const eventService = {
-  // Obtener todos los eventos
+  // Sincronizar eventos locales creados fuera de línea hacia Supabase
+  async syncPendingLocalEvents(remoteEvents = []) {
+    if (!isSupabaseConfigured() || !supabase) return
+    const locals = getLocalEvents()
+    const remoteCodes = new Set(remoteEvents.map(e => e.calc_code).filter(Boolean))
+
+    const pending = locals.filter(e => {
+      // Si el ID es temporal local (evt-...) y su código no está en Supabase
+      const isLocalId = String(e.id).startsWith('evt-') && !isUuidString(e.id)
+      return isLocalId && (!e.calc_code || !remoteCodes.has(e.calc_code))
+    })
+
+    for (const localEv of pending) {
+      try {
+        const payload = { ...localEv }
+        delete payload.id // Permitir que Supabase genere el UUID
+        await supabase.from('events').upsert([payload], { onConflict: 'calc_code' })
+      } catch (err) {
+        console.warn('Error syncing pending local event to Supabase:', err)
+      }
+    }
+  },
+
+  // Obtener todos los eventos (con sincronización transparente)
   async getEvents() {
     const locals = getLocalEvents()
-    if (isSupabaseConfigured()) {
+    if (isSupabaseConfigured() && supabase) {
       try {
         const { data, error } = await supabase
           .from('events')
@@ -45,19 +70,24 @@ export const eventService = {
         }
         
         if (data && data.length > 0) {
-          // Usar datos de Supabase indexados por calc_code para evitar duplicados entre UUID y IDs locales
+          // Intentar subir borradores o eventos que pudieran haber quedado solo en este navegador
+          await this.syncPendingLocalEvents(data)
+
+          // Usar datos de Supabase como única fuente de verdad indexada por calc_code
           const codeMap = new Map()
           data.forEach(remoteEv => {
             const key = remoteEv.calc_code || remoteEv.id
             codeMap.set(key, remoteEv)
           })
-          // Preservar borradores temporales locales no sincronizados
+
+          // Si hay algún borrador estrictamente nuevo aún no subido
           locals.forEach(localEv => {
             const key = localEv.calc_code || localEv.id
             if (!codeMap.has(key) && String(localEv.id).startsWith('evt-temp')) {
               codeMap.set(key, localEv)
             }
           })
+
           const merged = Array.from(codeMap.values()).sort((a, b) => 
             (b.event_date || '').localeCompare(a.event_date || '')
           )
@@ -74,10 +104,33 @@ export const eventService = {
     return locals
   },
 
+  // Forzar resincronización pura desde Supabase (limpia cualquier caché local desfasada)
+  async forceSyncFromSupabase() {
+    if (!isSupabaseConfigured() || !supabase) {
+      return { success: false, error: 'Supabase no está conectado' }
+    }
+    try {
+      const { data, error } = await supabase
+        .from('events')
+        .select('*')
+        .order('event_date', { ascending: false })
+
+      if (error) throw error
+      if (data && data.length > 0) {
+        saveLocalEvents(data)
+        return { success: true, count: data.length, events: data }
+      }
+      return { success: false, error: 'No se encontraron datos en Supabase' }
+    } catch (e) {
+      console.error('Error in forceSyncFromSupabase:', e)
+      return { success: false, error: e.message }
+    }
+  },
+
   // Guardar o actualizar un evento
   async saveEvent(eventData) {
-    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(eventData.id)
-    const isNew = !eventData.id || String(eventData.id).startsWith('evt-temp')
+    const isUuid = isUuidString(eventData.id)
+    const isNew = !eventData.id || String(eventData.id).startsWith('evt-temp') || String(eventData.id).startsWith('evt-')
     
     // Generar código correlativo si no tiene
     if (!eventData.calc_code) {
@@ -89,19 +142,17 @@ export const eventService = {
       eventData.calc_code = `CALC-${String(maxNum + 1).padStart(3, '0')}`
     }
 
-    if (isSupabaseConfigured()) {
+    if (isSupabaseConfigured() && supabase) {
       try {
         const payload = { ...eventData }
         if (isNew || !isUuid) {
           delete payload.id // Dejar que Supabase use/genere el UUID
-          // Usar upsert basado en calc_code
           const { data, error } = await supabase
             .from('events')
             .upsert([payload], { onConflict: 'calc_code' })
             .select()
             .single()
           if (error) throw error
-          // Actualizar local
           const locals = getLocalEvents().filter(e => e.calc_code !== data.calc_code)
           saveLocalEvents([data, ...locals])
           return { success: true, event: data, source: 'supabase' }
@@ -133,7 +184,7 @@ export const eventService = {
         ...eventData,
         updated_at: new Date().toISOString()
       }
-      const idx = locals.findIndex(e => e.id === eventData.id)
+      const idx = locals.findIndex(e => e.id === eventData.id || (e.calc_code && e.calc_code === eventData.calc_code))
       if (idx !== -1) {
         locals[idx] = savedEvent
       } else {
@@ -144,43 +195,55 @@ export const eventService = {
     return { success: true, event: savedEvent, source: 'local' }
   },
 
-  // Cambiar estado de un evento (ej: Cotizado -> Contratado o Cancelado)
+  // Cambiar estado de un evento (ej: Cotizado -> Reservado -> Contratado o Cancelado)
   async updateStatus(eventId, newStatus, reason = null) {
-    if (isSupabaseConfigured()) {
+    const updatePayload = { 
+      status: newStatus, 
+      cancellation_reason: reason,
+      updated_at: new Date().toISOString()
+    }
+
+    if (isSupabaseConfigured() && supabase) {
       try {
-        const updatePayload = { 
-          status: newStatus, 
-          cancellation_reason: reason,
-          updated_at: new Date().toISOString()
-        }
         const locals = getLocalEvents()
         const localEv = locals.find(e => e.id === eventId || e.calc_code === eventId)
-        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(eventId)
+        const isUuid = isUuidString(eventId)
 
         let query = supabase.from('events').update(updatePayload)
         if (isUuid) {
           query = query.eq('id', eventId)
+        } else if (String(eventId).startsWith('CALC-')) {
+          query = query.eq('calc_code', eventId)
         } else if (localEv?.calc_code) {
           query = query.eq('calc_code', localEv.calc_code)
         } else {
-          query = query.eq('id', eventId)
+          const match = String(eventId).match(/evt-0*(\d+)/)
+          if (match) {
+            query = query.eq('calc_code', `CALC-${match[1].padStart(3, '0')}`)
+          } else {
+            query = query.eq('id', eventId)
+          }
         }
 
         const { data, error } = await query.select().single()
           
         if (!error && data) {
-          const updatedLocals = locals.map(e => (e.id === eventId || (data.calc_code && e.calc_code === data.calc_code)) ? data : e)
+          const updatedLocals = locals.map(e => 
+            (e.id === eventId || (data.calc_code && e.calc_code === data.calc_code)) ? data : e
+          )
           saveLocalEvents(updatedLocals)
           return { success: true, event: data, source: 'supabase' }
+        } else if (error) {
+          console.error('Supabase status update error:', error.message)
         }
       } catch (err) {
-        console.warn('Supabase status update failed:', err)
+        console.warn('Supabase status update exception:', err)
       }
     }
 
-    // Local
+    // Local fallback
     const locals = getLocalEvents()
-    const idx = locals.findIndex(e => e.id === eventId || (locals[e]?.calc_code === eventId))
+    const idx = locals.findIndex(e => e.id === eventId || e.calc_code === eventId)
     if (idx !== -1) {
       locals[idx].status = newStatus
       if (reason) locals[idx].cancellation_reason = reason
@@ -193,14 +256,33 @@ export const eventService = {
 
   // Eliminar evento
   async deleteEvent(eventId) {
-    if (isSupabaseConfigured()) {
+    if (isSupabaseConfigured() && supabase) {
       try {
-        await supabase.from('events').delete().eq('id', eventId)
+        const locals = getLocalEvents()
+        const localEv = locals.find(e => e.id === eventId || e.calc_code === eventId)
+        const isUuid = isUuidString(eventId)
+
+        let query = supabase.from('events').delete()
+        if (isUuid) {
+          query = query.eq('id', eventId)
+        } else if (String(eventId).startsWith('CALC-')) {
+          query = query.eq('calc_code', eventId)
+        } else if (localEv?.calc_code) {
+          query = query.eq('calc_code', localEv.calc_code)
+        } else {
+          const match = String(eventId).match(/evt-0*(\d+)/)
+          if (match) {
+            query = query.eq('calc_code', `CALC-${match[1].padStart(3, '0')}`)
+          } else {
+            query = query.eq('id', eventId)
+          }
+        }
+        await query
       } catch (err) {
         console.warn('Supabase delete failed', err)
       }
     }
-    const locals = getLocalEvents().filter(e => e.id !== eventId)
+    const locals = getLocalEvents().filter(e => e.id !== eventId && e.calc_code !== eventId)
     saveLocalEvents(locals)
     return { success: true }
   },

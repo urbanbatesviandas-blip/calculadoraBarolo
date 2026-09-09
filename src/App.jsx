@@ -18,6 +18,7 @@ export default function App() {
   const [calendarTargetDate, setCalendarTargetDate] = useState(null)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [toastMessage, setToastMessage] = useState(null)
+  const [isSyncing, setIsSyncing] = useState(false)
 
   // Cargar eventos al iniciar
   const loadEvents = async () => {
@@ -32,19 +33,55 @@ export default function App() {
     }
   }
 
+  // Forzar sincronización manual desde la Nube (limpiando caché local)
+  const handleForceSync = async () => {
+    setIsSyncing(true)
+    try {
+      const res = await eventService.forceSyncFromSupabase()
+      if (res.success) {
+        setEvents(res.events)
+        showToast(`☁️ ¡Sincronizado con Supabase! (${res.count} eventos al día)`)
+      } else {
+        await loadEvents()
+        showToast('☁️ Datos actualizados desde la Nube.')
+      }
+    } catch (err) {
+      console.error('Sync failed:', err)
+      showToast('⚠️ Error al sincronizar con la nube')
+    } finally {
+      setIsSyncing(false)
+    }
+  }
+
   useEffect(() => {
     loadEvents()
 
+    // Sincronizar automáticamente cuando el usuario regresa a la app en celular o PC
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        console.log('App resumed, reloading events...')
+        loadEvents()
+      }
+    }
+    window.addEventListener('visibilitychange', handleVisibilityChange)
+    window.addEventListener('focus', handleVisibilityChange)
+
     // Suscripción Realtime para sincronizar automáticamente celular, PC y otros dispositivos
+    let channel = null
     if (isSupabaseConfigured() && supabase) {
-      const channel = supabase
+      channel = supabase
         .channel('public:events_realtime')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'events' }, () => {
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'events' }, (payload) => {
+          console.log('⚡ Realtime update:', payload.eventType)
           loadEvents()
         })
         .subscribe()
+    }
 
-      return () => {
+    return () => {
+      window.removeEventListener('visibilitychange', handleVisibilityChange)
+      window.removeEventListener('focus', handleVisibilityChange)
+      if (channel && supabase) {
         supabase.removeChannel(channel)
       }
     }
@@ -135,6 +172,8 @@ export default function App() {
         }}
         eventsCount={events.length}
         quotesCount={quotesCount}
+        onForceSync={handleForceSync}
+        isSyncing={isSyncing}
       />
 
       {/* Main Content Area */}
