@@ -259,6 +259,24 @@ export const authService = {
   isAdmin(user) {
     if (!user) return false
     return user.role === 'admin'
+  },
+
+  canViewSensitiveData(itemOrEvent, user) {
+    if (!user) return false
+    // El administrador tiene visibilidad total de auditoría y dirección
+    if (user.role === 'admin') return true
+    if (!itemOrEvent) return true
+
+    // Coincidencia por autor específico del ítem
+    if (itemOrEvent.author_id && itemOrEvent.author_id === user.id) return true
+    if (itemOrEvent.author_email && user.email && itemOrEvent.author_email.toLowerCase() === user.email.toLowerCase()) return true
+
+    // Coincidencia por creador general del evento
+    if (itemOrEvent.created_by_user_id && itemOrEvent.created_by_user_id === user.id) return true
+    if (itemOrEvent.created_by_email && user.email && itemOrEvent.created_by_email.toLowerCase() === user.email.toLowerCase()) return true
+    if (typeof itemOrEvent.created_by === 'string' && user.email && itemOrEvent.created_by.toLowerCase() === user.email.toLowerCase()) return true
+
+    return false
   }
 }
 
@@ -269,5 +287,7 @@ export const canDeleteEvent = (user) => authService.canDeleteEvent(user)
 export const canChangeStatus = (user, targetStatus) => authService.canChangeStatus(user, targetStatus)
 export const canManageUsers = (user) => authService.canManageUsers(user)
 export const isAdmin = (user) => authService.isAdmin(user)
+export const canViewSensitiveData = (itemOrEvent, user) => authService.canViewSensitiveData(itemOrEvent, user)
+
 
 

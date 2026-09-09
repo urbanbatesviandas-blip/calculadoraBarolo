@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react'
 import { 
   Search, Filter, Calendar, MapPin, DollarSign, Users, 
   ArrowUpDown, ExternalLink, CheckCircle, Clock, AlertTriangle, XCircle, Trash2, Calculator,
-  Scale, FileSpreadsheet, Check
+  Scale, FileSpreadsheet, Check, Lock
 } from 'lucide-react'
 import { canEditEvent, canDeleteEvent } from '../services/authService'
 import { excelExportService } from '../services/excelExportService'
@@ -369,7 +369,14 @@ export default function EventsListView({
                       {ev.calc_code || 'CALC-000'}
                     </td>
                     <td className="py-3.5 px-4">
-                      <div className="font-bold text-slate-900 text-xs">{ev.name}</div>
+                      <div className="font-bold text-slate-900 text-xs flex items-center gap-1.5 flex-wrap">
+                        <span>{ev.name}</span>
+                        {(ev.has_sensitive_data || ev.sensitive_notes || ev.extra_expenses?.some(e => e.is_sensitive) || ev.extra_incomes?.some(i => i.is_sensitive)) && (
+                          <span title="Contiene rubros confidenciales o notas privadas" className="inline-flex items-center text-amber-600 bg-amber-50 px-1 py-0.5 rounded border border-amber-200 text-[10px] font-semibold">
+                            <Lock className="w-2.5 h-2.5 mr-0.5" /> Privado
+                          </span>
+                        )}
+                      </div>
                       <div className="text-[11px] text-slate-400">{ev.client_name || 'Particular'} • {ev.event_type}</div>
                     </td>
                     <td className="py-3.5 px-4 whitespace-nowrap font-medium text-slate-600">
@@ -420,7 +427,7 @@ export default function EventsListView({
                         </button>
 
                         <button
-                          onClick={() => excelExportService.exportSingleEvent(ev)}
+                          onClick={() => excelExportService.exportSingleEvent(ev, currentUser)}
                           className="p-1 text-slate-400 hover:text-emerald-700 hover:bg-emerald-50 rounded"
                           title="Descargar Ficha en Excel"
                         >

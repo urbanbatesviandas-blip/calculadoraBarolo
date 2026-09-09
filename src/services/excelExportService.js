@@ -1,6 +1,7 @@
 import * as XLSX from 'xlsx'
 import { format, parseISO } from 'date-fns'
 import { es } from 'date-fns/locale'
+import { canViewSensitiveData } from './authService'
 
 export const excelExportService = {
   // 1. Exportar listado de eventos a Excel
@@ -146,8 +147,8 @@ export const excelExportService = {
     this.exportMonthToExcel(events, monthStr)
   },
 
-  // 3. Exportar Ficha Completa de un Evento Individual
-  exportEventDetailToExcel(event) {
+  // 3. Exportar Ficha Completa de un Evento Individual (con protección de datos confidenciales)
+  exportEventDetailToExcel(event, currentUser) {
     if (!event) return
 
     const wb = XLSX.utils.book_new()
@@ -180,8 +181,17 @@ export const excelExportService = {
       { 'Propiedad': 'Motivo Cancelación', 'Detalle': event.cancellation_reason || '' }
     ]
 
+    // Si posee notas confidenciales
+    if (event.sensitive_notes) {
+      const canSeeNotes = canViewSensitiveData(event, currentUser)
+      summaryData.push({
+        'Propiedad': '🔒 Notas Confidenciales',
+        'Detalle': canSeeNotes ? event.sensitive_notes : '[Información confidencial - protegida]'
+      })
+    }
+
     const wsSummary = XLSX.utils.json_to_sheet(summaryData)
-    wsSummary['!cols'] = [{ wch: 28 }, { wch: 45 }]
+    wsSummary['!cols'] = [{ wch: 28 }, { wch: 50 }]
     XLSX.utils.book_append_sheet(wb, wsSummary, 'Resumen Ejecutivo')
 
     // Solapa 2: Desglose de Costos e Ingresos
@@ -189,7 +199,24 @@ export const excelExportService = {
       { 'Categoría': 'INGRESOS', 'Ítem': 'Venta Entradas Preventa', 'Monto ($)': (Number(event.preventa_qty) || 0) * (Number(event.preventa_price) || 0) },
       { 'Categoría': 'INGRESOS', 'Ítem': 'Venta Entradas General', 'Monto ($)': (Number(event.general_qty) || 0) * (Number(event.general_price) || 0) },
       { 'Categoría': 'INGRESOS', 'Ítem': 'Alquiler de Espacio', 'Monto ($)': Number(event.alquiler_espacio) || 0 },
-      { 'Categoría': 'INGRESOS', 'Ítem': 'Contratación Salón', 'Monto ($)': Number(event.contratacion_salon) || 0 },
+      { 'Categoría': 'INGRESOS', 'Ítem': 'Contratación Salón', 'Monto ($)': Number(event.contratacion_salon) || 0 }
+    ]
+
+    // Ingresos adicionales / sensibles
+    if (event.extra_incomes && Array.isArray(event.extra_incomes)) {
+      event.extra_incomes.forEach(inc => {
+        if (!inc.name && !inc.value) return
+        const isSens = inc.is_sensitive
+        const canSee = !isSens || canViewSensitiveData(inc, currentUser)
+        breakdownData.push({
+          'Categoría': 'INGRESOS ADICIONALES',
+          'Ítem': isSens ? (canSee ? `🔒 ${inc.name}` : `🔒 [Ingreso Confidencial - Reservado]`) : (inc.name || 'Ingreso adicional'),
+          'Monto ($)': Number(inc.value) || 0
+        })
+      })
+    }
+
+    breakdownData.push(
       { 'Categoría': 'COSTOS DIRECTOS', 'Ítem': 'Honorarios Artistas / Disertantes', 'Monto ($)': (Number(event.cost_artistas) || 0) + (Number(event.cost_disertantes) || 0) },
       { 'Categoría': 'COSTOS DIRECTOS', 'Ítem': 'Técnica, Sonido e Iluminación', 'Monto ($)': Number(event.cost_tecnica) || 0 },
       { 'Categoría': 'COSTOS DIRECTOS', 'Ítem': 'Catering & Gastronomía', 'Monto ($)': (Number(event.cost_catering) || 0) + (Number(event.cost_gastronomicos) || 0) },
@@ -199,10 +226,24 @@ export const excelExportService = {
       { 'Categoría': 'COSTOS INDIRECTOS', 'Ítem': 'Limpieza Integral y Desinfección', 'Monto ($)': Number(event.cost_limpieza) || 0 },
       { 'Categoría': 'COSTOS INDIRECTOS', 'Ítem': 'Seguros y Responsabilidad Civil', 'Monto ($)': Number(event.cost_seguros) || 0 },
       { 'Categoría': 'COSTOS INDIRECTOS', 'Ítem': 'Marketing, Difusión y SADAIC', 'Monto ($)': (Number(event.cost_marketing) || 0) + (Number(event.cost_sadaic) || 0) }
-    ]
+    )
+
+    // Gastos extras / sensibles
+    if (event.extra_expenses && Array.isArray(event.extra_expenses)) {
+      event.extra_expenses.forEach(exp => {
+        if (!exp.name && !exp.value) return
+        const isSens = exp.is_sensitive
+        const canSee = !isSens || canViewSensitiveData(exp, currentUser)
+        breakdownData.push({
+          'Categoría': 'COSTOS ADICIONALES',
+          'Ítem': isSens ? (canSee ? `🔒 ${exp.name}` : `🔒 [Gasto Confidencial - Reservado]`) : (exp.name || 'Gasto extra'),
+          'Monto ($)': Number(exp.value) || 0
+        })
+      })
+    }
 
     const wsBreakdown = XLSX.utils.json_to_sheet(breakdownData)
-    wsBreakdown['!cols'] = [{ wch: 22 }, { wch: 38 }, { wch: 20 }]
+    wsBreakdown['!cols'] = [{ wch: 24 }, { wch: 45 }, { wch: 20 }]
     XLSX.utils.book_append_sheet(wb, wsBreakdown, 'Desglose Económico')
 
     const cleanCode = (event.calc_code || 'CALC').replace(/[^a-zA-Z0-9_-]/g, '')
@@ -210,8 +251,8 @@ export const excelExportService = {
   },
 
   // Alias para exportar evento individual
-  exportSingleEvent(event) {
-    this.exportEventDetailToExcel(event)
+  exportSingleEvent(event, currentUser) {
+    this.exportEventDetailToExcel(event, currentUser)
   },
 
   // 4. Exportar Comparativa de 2 o más eventos lado a lado

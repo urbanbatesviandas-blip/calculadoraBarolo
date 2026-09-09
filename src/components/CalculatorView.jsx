@@ -2,10 +2,10 @@ import React, { useState, useEffect, useMemo } from 'react'
 import { 
   Calculator, Plus, Trash2, Save, CheckCircle2, RotateCcw, 
   Sparkles, DollarSign, Users, Calendar, MapPin, Building, AlertCircle, FileText, ArrowRight, BookmarkCheck,
-  Sliders
+  Sliders, Lock, EyeOff, ShieldAlert 
 } from 'lucide-react'
 import confetti from 'canvas-confetti'
-import { canCreateEvent, canEditEvent, canChangeStatus, isAdmin } from '../services/authService'
+import { canCreateEvent, canEditEvent, canChangeStatus, isAdmin, canViewSensitiveData } from '../services/authService'
 import { calculatorConfigService } from '../services/calculatorConfigService'
 
 export default function CalculatorView({ initialEventData, onSaveEvent, onSwitchView, currentUser }) {
@@ -72,6 +72,7 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
   const [eventStatus, setEventStatus] = useState(initialEventData?.status || 'cotizado')
   const [attendees, setAttendees] = useState(initialEventData?.attendees || templateConfig.defaultAttendees || 25)
   const [notes, setNotes] = useState(initialEventData?.notes || '')
+  const [sensitiveNotes, setSensitiveNotes] = useState(initialEventData?.sensitive_notes || '')
 
   // Entradas (Ticketing)
   const [preventaQty, setPreventaQty] = useState(0)
@@ -221,6 +222,9 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
       } else {
         setExtraExpenses([{ id: 'exp-1', concept: '', amount: 0 }])
       }
+
+      // 6. Restaurar Notas Confidenciales
+      setSensitiveNotes(initialEventData.sensitive_notes || '')
     } else {
       // Estado limpio para nueva cotización usando la plantilla maestra del Admin
       const cfg = calculatorConfigService.getConfig()
@@ -240,6 +244,7 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
       setEventStatus('cotizado')
       setAttendees(clean.attendees)
       setNotes('')
+      setSensitiveNotes('')
       setPreventaQty(0)
       setPreventaPrice(0)
       setGeneralQty(0)
@@ -273,6 +278,21 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
   const updateExtraIncome = (id, field, value) => {
     setExtraIncomes(extraIncomes.map(i => i.id === id ? { ...i, [field]: value } : i))
   }
+  const toggleIncomeSensitive = (id) => {
+    setExtraIncomes(prev => prev.map(inc => {
+      if (inc.id === id) {
+        const nextSensitive = !inc.is_sensitive
+        return {
+          ...inc,
+          is_sensitive: nextSensitive,
+          author_id: nextSensitive ? (inc.author_id || currentUser?.id) : null,
+          author_name: nextSensitive ? (inc.author_name || currentUser?.displayName || currentUser?.name) : null,
+          author_email: nextSensitive ? (inc.author_email || currentUser?.email) : null
+        }
+      }
+      return inc
+    }))
+  }
 
   const addExtraExpense = () => {
     setExtraExpenses([...extraExpenses, { id: `exp-${Date.now()}`, concept: '', amount: 0 }])
@@ -282,6 +302,21 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
   }
   const updateExtraExpense = (id, field, value) => {
     setExtraExpenses(extraExpenses.map(e => e.id === id ? { ...e, [field]: value } : e))
+  }
+  const toggleExpenseSensitive = (id) => {
+    setExtraExpenses(prev => prev.map(exp => {
+      if (exp.id === id) {
+        const nextSensitive = !exp.is_sensitive
+        return {
+          ...exp,
+          is_sensitive: nextSensitive,
+          author_id: nextSensitive ? (exp.author_id || currentUser?.id) : null,
+          author_name: nextSensitive ? (exp.author_name || currentUser?.displayName || currentUser?.name) : null,
+          author_email: nextSensitive ? (exp.author_email || currentUser?.email) : null
+        }
+      }
+      return exp
+    }))
   }
 
   // Cálculos reactivos en vivo
@@ -358,6 +393,7 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
       setAgreementType(clean.agreementType)
       setAttendees(clean.attendees)
       setNotes('')
+      setSensitiveNotes('')
       setEventStatus('cotizado')
       setPreventaQty(0)
       setPreventaPrice(0)
@@ -387,6 +423,28 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
     const finalStatus = overrideStatus || eventStatus || 'cotizado'
     const defaultPrefix = finalStatus === 'cotizado' ? 'Cotización' : finalStatus === 'reservado' ? 'Reserva' : 'Evento'
     const finalName = eventName.trim() || `${defaultPrefix} ${eventType} - ${clientName || 'Cliente'}`
+
+    // Preservar conceptos de ítems confidenciales si el usuario actual no tiene permiso de verlos
+    const finalExtraExpenses = extraExpenses.map(exp => {
+      if (exp.is_sensitive && !canViewSensitiveData(exp, currentUser) && initialEventData?.extra_expenses) {
+        const orig = initialEventData.extra_expenses.find(o => o.id === exp.id)
+        if (orig) return orig
+      }
+      return exp
+    }).filter(e => e.concept || Number(e.amount) > 0)
+
+    const finalExtraIncomes = extraIncomes.map(inc => {
+      if (inc.is_sensitive && !canViewSensitiveData(inc, currentUser) && initialEventData?.extra_incomes) {
+        const orig = initialEventData.extra_incomes.find(o => o.id === inc.id)
+        if (orig) return orig
+      }
+      return inc
+    }).filter(i => i.concept || Number(i.amount) > 0)
+
+    const finalSensitiveNotes = (!eventId || canViewSensitiveData(initialEventData, currentUser))
+      ? sensitiveNotes.trim()
+      : (initialEventData?.sensitive_notes || '')
+
     return {
       id: eventId || undefined,
       calc_code: calcCode || undefined,
@@ -410,7 +468,7 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
       ticket_price: ticketAvgPrice,
       alquiler_espacio: Number(alquilerEspacio) || 0,
       contratacion_salon: Number(contratacionSalon) || 0,
-      extra_incomes: extraIncomes.filter(i => i.concept || Number(i.amount) > 0),
+      extra_incomes: finalExtraIncomes,
       cost_artistas: Number(costArtistas) || 0,
       cost_tecnica: Number(costTecnica) || 0,
       cost_disertantes: Number(costDisertantes) || 0,
@@ -423,7 +481,7 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
       cost_alquiler_espacio: Number(costAlquilerEspacio) || 0,
       cost_marketing: Number(costMarketing) || 0,
       cost_sadaic: Number(costSadaic) || 0,
-      extra_expenses: extraExpenses.filter(e => e.concept || Number(e.amount) > 0),
+      extra_expenses: finalExtraExpenses,
       gross_income: totalGrossIncome,
       direct_costs: totalDirectCosts,
       indirect_costs: totalIndirectCosts,
@@ -433,6 +491,11 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
       margin_pct: marginPct,
       payment_method: 'Transferencia',
       invoice_type: 'Factura A',
+      has_sensitive_data: finalExtraExpenses.some(e => e.is_sensitive) || finalExtraIncomes.some(i => i.is_sensitive) || Boolean(finalSensitiveNotes),
+      sensitive_notes: finalSensitiveNotes || undefined,
+      created_by_user_id: eventId ? (initialEventData?.created_by_user_id || currentUser?.id) : currentUser?.id,
+      created_by_name: eventId ? (initialEventData?.created_by_name || currentUser?.displayName || currentUser?.name) : (currentUser?.displayName || currentUser?.name),
+      created_by_email: eventId ? (initialEventData?.created_by_email || currentUser?.email) : currentUser?.email,
       notes: notes.trim() || (
         finalStatus === 'cotizado' ? 'Cotización guardada en el sistema.' :
         finalStatus === 'reservado' ? 'Fecha reservada. En espera de seña o confirmación definitiva.' :
@@ -820,33 +883,76 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
               </div>
 
               <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
-                {extraIncomes.map((item) => (
-                  <div key={item.id} className="flex items-center space-x-1.5">
-                    <input
-                      type="text"
-                      placeholder="Concepto (ej: Sponsor Santander)"
-                      value={item.concept}
-                      onChange={(e) => updateExtraIncome(item.id, 'concept', e.target.value)}
-                      className="flex-1 bg-amber-50/70 border border-amber-300/80 rounded-lg px-2 py-1 text-xs font-medium"
-                    />
-                    <input
-                      type="number"
-                      placeholder="Monto ($)"
-                      value={item.amount || ''}
-                      onChange={(e) => updateExtraIncome(item.id, 'amount', Number(e.target.value))}
-                      className="w-24 bg-amber-50/70 border border-amber-300/80 rounded-lg px-2 py-1 text-xs text-right font-medium"
-                    />
-                    {extraIncomes.length > 1 && (
+                {extraIncomes.map((item) => {
+                  const canView = !item.is_sensitive || canViewSensitiveData(item, currentUser)
+                  return (
+                    <div 
+                      key={item.id} 
+                      className={`flex items-center space-x-1.5 p-1 rounded-xl transition-all ${
+                        item.is_sensitive ? 'bg-amber-500/10 border border-amber-400/50' : ''
+                      }`}
+                    >
                       <button
                         type="button"
-                        onClick={() => removeExtraIncome(item.id)}
-                        className="text-rose-400 hover:text-rose-600 p-1"
+                        onClick={() => toggleIncomeSensitive(item.id)}
+                        className={`p-1 rounded-lg transition-colors ${
+                          item.is_sensitive 
+                            ? 'text-amber-800 bg-amber-200/90 hover:bg-amber-300' 
+                            : 'text-slate-300 hover:text-amber-600 hover:bg-slate-100'
+                        }`}
+                        title={item.is_sensitive ? 'Ingreso Confidencial (Solo visible por quien lo cargó y Dirección)' : 'Marcar como ingreso confidencial / sensible'}
                       >
-                        <Trash2 className="w-3.5 h-3.5" />
+                        <Lock className={`w-3.5 h-3.5 ${item.is_sensitive ? 'text-amber-800' : ''}`} />
                       </button>
-                    )}
-                  </div>
-                ))}
+
+                      {canView ? (
+                        <input
+                          type="text"
+                          placeholder={item.is_sensitive ? "Concepto Confidencial (ej: Sponsor VIP)" : "Concepto (ej: Sponsor Santander)"}
+                          value={item.concept}
+                          onChange={(e) => updateExtraIncome(item.id, 'concept', e.target.value)}
+                          className={`flex-1 border rounded-lg px-2 py-1 text-xs font-medium ${
+                            item.is_sensitive ? 'bg-amber-50/90 border-amber-400 text-amber-950 font-semibold' : 'bg-amber-50/70 border-amber-300/80'
+                          }`}
+                        />
+                      ) : (
+                        <div className="flex-1 bg-slate-100 border border-slate-200 text-slate-500 rounded-lg px-2 py-1 text-xs font-medium italic select-none flex items-center space-x-1">
+                          <Lock className="w-3 h-3 text-slate-400 flex-shrink-0" />
+                          <span className="truncate">[Ingreso Confidencial - Cargado por {item.author_name || 'Operador'}]</span>
+                        </div>
+                      )}
+
+                      {canView ? (
+                        <input
+                          type="number"
+                          placeholder="Monto ($)"
+                          value={item.amount || ''}
+                          onChange={(e) => updateExtraIncome(item.id, 'amount', Number(e.target.value))}
+                          className={`w-24 border rounded-lg px-2 py-1 text-xs text-right font-medium ${
+                            item.is_sensitive ? 'bg-amber-50/90 border-amber-400 text-amber-950 font-bold' : 'bg-amber-50/70 border-amber-300/80'
+                          }`}
+                        />
+                      ) : (
+                        <div 
+                          className="w-24 bg-slate-100 border border-slate-200 text-slate-500 rounded-lg px-2 py-1 text-xs text-right font-mono font-bold select-none"
+                          title="Monto confidencial (computado en el total general)"
+                        >
+                          ••••••
+                        </div>
+                      )}
+
+                      {extraIncomes.length > 1 && canView && (
+                        <button
+                          type="button"
+                          onClick={() => removeExtraIncome(item.id)}
+                          className="text-rose-400 hover:text-rose-600 p-1"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  )
+                })}
               </div>
             </div>
 
@@ -962,33 +1068,76 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
               </div>
 
               <div className="space-y-1.5 max-h-28 overflow-y-auto pr-1">
-                {extraExpenses.map((item) => (
-                  <div key={item.id} className="flex items-center space-x-1.5">
-                    <input
-                      type="text"
-                      placeholder="Concepto (ej: Seguridad Privada)"
-                      value={item.concept}
-                      onChange={(e) => updateExtraExpense(item.id, 'concept', e.target.value)}
-                      className="flex-1 bg-amber-50/70 border border-amber-300/80 rounded-lg px-2 py-1 text-xs font-medium"
-                    />
-                    <input
-                      type="number"
-                      placeholder="Monto ($)"
-                      value={item.amount || ''}
-                      onChange={(e) => updateExtraExpense(item.id, 'amount', Number(e.target.value))}
-                      className="w-24 bg-amber-50/70 border border-amber-300/80 rounded-lg px-2 py-1 text-xs text-right font-medium"
-                    />
-                    {extraExpenses.length > 1 && (
+                {extraExpenses.map((item) => {
+                  const canView = !item.is_sensitive || canViewSensitiveData(item, currentUser)
+                  return (
+                    <div 
+                      key={item.id} 
+                      className={`flex items-center space-x-1.5 p-1 rounded-xl transition-all ${
+                        item.is_sensitive ? 'bg-amber-500/10 border border-amber-400/50' : ''
+                      }`}
+                    >
                       <button
                         type="button"
-                        onClick={() => removeExtraExpense(item.id)}
-                        className="text-rose-400 hover:text-rose-600 p-1"
+                        onClick={() => toggleExpenseSensitive(item.id)}
+                        className={`p-1 rounded-lg transition-colors ${
+                          item.is_sensitive 
+                            ? 'text-amber-800 bg-amber-200/90 hover:bg-amber-300' 
+                            : 'text-slate-300 hover:text-amber-600 hover:bg-slate-100'
+                        }`}
+                        title={item.is_sensitive ? 'Gasto Confidencial (Solo visible por quien lo cargó y Dirección)' : 'Marcar como gasto confidencial / sensible'}
                       >
-                        <Trash2 className="w-3.5 h-3.5" />
+                        <Lock className={`w-3.5 h-3.5 ${item.is_sensitive ? 'text-amber-800' : ''}`} />
                       </button>
-                    )}
-                  </div>
-                ))}
+
+                      {canView ? (
+                        <input
+                          type="text"
+                          placeholder={item.is_sensitive ? "Concepto Confidencial (ej: Cachet Especial)" : "Concepto (ej: Seguridad Privada)"}
+                          value={item.concept}
+                          onChange={(e) => updateExtraExpense(item.id, 'concept', e.target.value)}
+                          className={`flex-1 border rounded-lg px-2 py-1 text-xs font-medium ${
+                            item.is_sensitive ? 'bg-amber-50/90 border-amber-400 text-amber-950 font-semibold' : 'bg-amber-50/70 border-amber-300/80'
+                          }`}
+                        />
+                      ) : (
+                        <div className="flex-1 bg-slate-100 border border-slate-200 text-slate-500 rounded-lg px-2 py-1 text-xs font-medium italic select-none flex items-center space-x-1">
+                          <Lock className="w-3 h-3 text-slate-400 flex-shrink-0" />
+                          <span className="truncate">[Gasto Confidencial - Cargado por {item.author_name || 'Operador'}]</span>
+                        </div>
+                      )}
+
+                      {canView ? (
+                        <input
+                          type="number"
+                          placeholder="Monto ($)"
+                          value={item.amount || ''}
+                          onChange={(e) => updateExtraExpense(item.id, 'amount', Number(e.target.value))}
+                          className={`w-24 border rounded-lg px-2 py-1 text-xs text-right font-medium ${
+                            item.is_sensitive ? 'bg-amber-50/90 border-amber-400 text-amber-950 font-bold' : 'bg-amber-50/70 border-amber-300/80'
+                          }`}
+                        />
+                      ) : (
+                        <div 
+                          className="w-24 bg-slate-100 border border-slate-200 text-slate-500 rounded-lg px-2 py-1 text-xs text-right font-mono font-bold select-none"
+                          title="Monto confidencial (computado en el total general)"
+                        >
+                          ••••••
+                        </div>
+                      )}
+
+                      {extraExpenses.length > 1 && canView && (
+                        <button
+                          type="button"
+                          onClick={() => removeExtraExpense(item.id)}
+                          className="text-rose-400 hover:text-rose-600 p-1"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  )
+                })}
               </div>
             </div>
 
@@ -1042,6 +1191,38 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
           />
         </div>
       </div>
+
+      {/* 🔒 NOTAS SENSIBLES & CONFIDENCIALES */}
+      {(!eventId || canViewSensitiveData(initialEventData, currentUser)) ? (
+        <div className="bg-gradient-to-r from-amber-500/10 via-amber-100/30 to-purple-900/10 rounded-2xl p-5 shadow-luxury border border-amber-400/40 space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 border-b border-amber-200/60 pb-2">
+            <div className="flex items-center space-x-2">
+              <Lock className="w-4 h-4 text-amber-800" />
+              <h3 className="font-serif font-bold text-barolo-navy text-sm uppercase tracking-wider">
+                🔒 Notas Sensibles & Información Confidencial
+              </h3>
+            </div>
+            <span className="text-[10px] bg-amber-400/20 text-amber-900 border border-amber-400/50 px-2 py-0.5 rounded-full font-bold self-start sm:self-auto">
+              Solo vos ({currentUser?.displayName || currentUser?.name || 'Autor'}) y Dirección 👑
+            </span>
+          </div>
+
+          <div>
+            <textarea
+              value={sensitiveNotes}
+              onChange={(e) => setSensitiveNotes(e.target.value)}
+              placeholder="Escribí aquí acuerdos privados, comisiones, honorarios confidenciales, o condiciones reservadas que NO deben ser vistas por otros operadores..."
+              rows={2}
+              className="w-full bg-white/90 border border-amber-300/80 rounded-xl p-3 text-xs text-slate-800 placeholder:text-slate-400 focus:bg-white focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20 focus:outline-none transition-all resize-y font-medium leading-relaxed"
+            />
+          </div>
+        </div>
+      ) : initialEventData?.sensitive_notes ? (
+        <div className="bg-slate-100/80 rounded-2xl p-4 border border-slate-200 flex items-center space-x-2.5 text-xs text-slate-500 shadow-sm">
+          <Lock className="w-4 h-4 text-slate-400 flex-shrink-0" />
+          <span>Este evento contiene información sensible y notas confidenciales reservadas únicamente al creador del registro y a la Dirección.</span>
+        </div>
+      ) : null}
 
       {/* FLOATING ACTION BAR AT THE BOTTOM */}
       <div className="fixed bottom-0 left-0 right-0 z-30 bg-barolo-navy text-white shadow-2xl border-t border-barolo-gold/40 p-4">

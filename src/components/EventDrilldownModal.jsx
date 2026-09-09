@@ -2,12 +2,12 @@ import React, { useMemo } from 'react'
 import { 
   X, CheckCircle, Clock, XCircle, AlertTriangle, Building2, Calendar, 
   Users, DollarSign, ArrowUpRight, TrendingUp, Sparkles, Receipt, Calculator, PieChart, BookmarkCheck,
-  FileSpreadsheet, ShieldAlert
+  FileSpreadsheet, ShieldAlert, Lock 
 } from 'lucide-react'
 import { Bar } from 'react-chartjs-2'
 import confetti from 'canvas-confetti'
 import { excelExportService } from '../services/excelExportService'
-import { canEditEvent, canChangeStatus } from '../services/authService'
+import { canEditEvent, canChangeStatus, canViewSensitiveData } from '../services/authService'
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -52,7 +52,14 @@ export default function EventDrilldownModal({ event, onClose, onUpdateStatus, on
       if (event.extra_incomes && event.extra_incomes.length > 0) {
         event.extra_incomes.forEach(inc => {
           if (Number(inc.amount) > 0) {
-            items.push({ label: inc.concept || 'Otros Ingresos', amount: Number(inc.amount), icon: '✨' })
+            const canView = !inc.is_sensitive || canViewSensitiveData(inc, currentUser)
+            items.push({ 
+              label: canView ? (inc.concept || 'Otros Ingresos') : `[Ingreso Confidencial - ${inc.author_name || 'Operador'}]`, 
+              amount: Number(inc.amount), 
+              icon: inc.is_sensitive ? '🔒' : '✨',
+              is_sensitive: inc.is_sensitive,
+              is_hidden: !canView
+            })
           }
         })
       }
@@ -120,7 +127,14 @@ export default function EventDrilldownModal({ event, onClose, onUpdateStatus, on
       if (event.extra_expenses && event.extra_expenses.length > 0) {
         event.extra_expenses.forEach(exp => {
           if (Number(exp.amount) > 0) {
-            items.push({ label: exp.concept || 'Otros Gastos', amount: Number(exp.amount), icon: '📦' })
+            const canView = !exp.is_sensitive || canViewSensitiveData(exp, currentUser)
+            items.push({ 
+              label: canView ? (exp.concept || 'Otros Gastos') : `[Gasto Confidencial - ${exp.author_name || 'Operador'}]`, 
+              amount: Number(exp.amount), 
+              icon: exp.is_sensitive ? '🔒' : '📦',
+              is_sensitive: exp.is_sensitive,
+              is_hidden: !canView
+            })
           }
         })
       }
@@ -276,7 +290,7 @@ export default function EventDrilldownModal({ event, onClose, onUpdateStatus, on
 
           <div className="flex items-center space-x-2">
             <button
-              onClick={() => excelExportService.exportSingleEvent(event)}
+              onClick={() => excelExportService.exportSingleEvent(event, currentUser)}
               className="flex items-center space-x-1.5 bg-emerald-700/80 hover:bg-emerald-600 text-white px-3 py-1.5 rounded-xl text-xs font-bold transition-all shadow-md active:scale-95"
               title="Descargar Ficha Completa del Evento en Excel"
             >
@@ -346,9 +360,15 @@ export default function EventDrilldownModal({ event, onClose, onUpdateStatus, on
                       <span className="truncate pr-1 flex items-center">
                         <span className="mr-1 text-[10px]">{item.icon}</span> {item.label}
                       </span>
-                      <span className="font-semibold text-slate-900 flex-shrink-0">
-                        ${item.amount.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
-                      </span>
+                      {item.is_hidden ? (
+                        <span className="font-mono text-slate-400 font-bold flex-shrink-0" title="Monto confidencial (computado en el total general)">
+                          ••••••
+                        </span>
+                      ) : (
+                        <span className="font-semibold text-slate-900 flex-shrink-0">
+                          ${item.amount.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
+                        </span>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -410,9 +430,15 @@ export default function EventDrilldownModal({ event, onClose, onUpdateStatus, on
                       <span className="truncate pr-1 flex items-center">
                         <span className="mr-1 text-[10px]">{item.icon}</span> {item.label}
                       </span>
-                      <span className="font-semibold text-rose-950 flex-shrink-0">
-                        ${item.amount.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
-                      </span>
+                      {item.is_hidden ? (
+                        <span className="font-mono text-slate-400 font-bold flex-shrink-0" title="Monto confidencial (computado en el total general)">
+                          ••••••
+                        </span>
+                      ) : (
+                        <span className="font-semibold text-rose-950 flex-shrink-0">
+                          ${item.amount.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
+                        </span>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -489,8 +515,31 @@ export default function EventDrilldownModal({ event, onClose, onUpdateStatus, on
           {event.notes && (
             <div className="bg-white border border-slate-200 rounded-2xl p-4 text-xs text-slate-600">
               <span className="font-bold text-slate-800 block mb-1">Notas Comerciales:</span>
-              <p>{event.notes}</p>
+              <p className="whitespace-pre-wrap">{event.notes}</p>
             </div>
+          )}
+
+          {/* 🔒 Notas Sensibles & Confidenciales */}
+          {event.sensitive_notes && (
+            canViewSensitiveData(event, currentUser) ? (
+              <div className="bg-gradient-to-r from-amber-500/10 via-amber-100/30 to-purple-900/10 border border-amber-300/80 rounded-2xl p-4 text-xs text-amber-950 space-y-1 shadow-sm">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 border-b border-amber-200/80 pb-1.5 mb-1.5">
+                  <span className="font-bold text-amber-900 flex items-center space-x-1.5">
+                    <Lock className="w-3.5 h-3.5 text-amber-700" />
+                    <span>Notas Sensibles & Información Confidencial:</span>
+                  </span>
+                  <span className="text-[10px] bg-amber-200/80 text-amber-800 font-bold px-2 py-0.5 rounded-full self-start sm:self-auto">
+                    Solo vos ({currentUser?.displayName || currentUser?.name || 'Autor'}) y Dirección 👑
+                  </span>
+                </div>
+                <p className="whitespace-pre-wrap leading-relaxed text-slate-800 font-medium">{event.sensitive_notes}</p>
+              </div>
+            ) : (
+              <div className="bg-slate-100/90 border border-slate-200 rounded-2xl p-3.5 text-xs text-slate-500 flex items-center space-x-2">
+                <Lock className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                <span className="italic">Este evento contiene notas confidenciales reservadas únicamente al creador del registro y a la Dirección.</span>
+              </div>
+            )
           )}
 
         </div>
@@ -510,7 +559,7 @@ export default function EventDrilldownModal({ event, onClose, onUpdateStatus, on
             )}
 
             <button
-              onClick={() => excelExportService.exportSingleEvent(event)}
+              onClick={() => excelExportService.exportSingleEvent(event, currentUser)}
               className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold bg-emerald-50 text-emerald-800 border border-emerald-300 hover:bg-emerald-100 transition-colors"
               title="Descargar Ficha en Excel"
             >
