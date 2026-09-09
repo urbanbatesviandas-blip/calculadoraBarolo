@@ -6,9 +6,10 @@ import DashboardView from './components/DashboardView'
 import EventsListView from './components/EventsListView'
 import EventDrilldownModal from './components/EventDrilldownModal'
 import SettingsModal from './components/SettingsModal'
-import LoginModal from './components/LoginModal'
 import EventComparisonModal from './components/EventComparisonModal'
 import CalculatorConfigView from './components/CalculatorConfigView'
+import UserManagementView from './components/UserManagementView'
+import LoginView from './components/LoginView'
 import { eventService } from './services/eventService'
 import { supabase, isSupabaseConfigured } from './services/supabaseClient'
 import { authService, canCreateEvent, canDeleteEvent } from './services/authService'
@@ -16,14 +17,13 @@ import { excelExportService } from './services/excelExportService'
 import { Scale, X, FileSpreadsheet, ArrowRight } from 'lucide-react'
 
 export default function App() {
-  const [currentView, setCurrentView] = useState('calendar') // 'calendar', 'calculator', 'dashboard', 'list'
+  const [currentView, setCurrentView] = useState('calendar') // 'calendar', 'calculator', 'dashboard', 'list', 'calculator_config', 'users'
   const [events, setEvents] = useState([])
   const [loading, setLoading] = useState(true)
   const [selectedEvent, setSelectedEvent] = useState(null)
   const [calculatorEvent, setCalculatorEvent] = useState(null)
   const [calendarTargetDate, setCalendarTargetDate] = useState(null)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
-  const [isLoginOpen, setIsLoginOpen] = useState(false)
   const [isComparisonOpen, setIsComparisonOpen] = useState(false)
   const [comparisonEventIds, setComparisonEventIds] = useState([])
   const [currentUser, setCurrentUser] = useState(() => authService.getCurrentUser())
@@ -64,11 +64,13 @@ export default function App() {
   }
 
   useEffect(() => {
-    loadEvents()
+    if (currentUser) {
+      loadEvents()
+    }
 
     // Sincronizar automáticamente cuando el usuario regresa a la app en celular o PC
     const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
+      if (document.visibilityState === 'visible' && currentUser) {
         console.log('App resumed, reloading events...')
         loadEvents()
       }
@@ -88,7 +90,9 @@ export default function App() {
         .channel('public:events_realtime')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'events' }, (payload) => {
           console.log('⚡ Realtime update:', payload.eventType)
-          loadEvents()
+          if (currentUser) {
+            loadEvents()
+          }
         })
         .subscribe()
     }
@@ -101,11 +105,18 @@ export default function App() {
         supabase.removeChannel(channel)
       }
     }
-  }, [])
+  }, [currentUser])
 
   const showToast = (msg) => {
     setToastMessage(msg)
     setTimeout(() => setToastMessage(null), 3500)
+  }
+
+  // Cerrar sesión
+  const handleLogout = async () => {
+    await authService.logout()
+    setCurrentUser(null)
+    showToast('Sesión cerrada correctamente.')
   }
 
   // Alternar selección de eventos para la comparativa
@@ -130,43 +141,30 @@ export default function App() {
     showToast('Comparativa vaciada.')
   }
 
-  // Lista de eventos seleccionados para comparar
   const comparisonEvents = useMemo(() => {
     return events.filter(e => comparisonEventIds.includes(e.id))
   }, [events, comparisonEventIds])
 
-  // Manejo de descargas Excel
+  // Exportar todas las tablas a Excel
   const handleExportAllExcel = () => {
-    if (events.length === 0) {
-      showToast('⚠️ No hay eventos para exportar')
-      return
-    }
     excelExportService.exportAllEvents(events)
-    showToast(`📥 Exportando los ${events.length} eventos a Excel...`)
+    showToast('📊 Descargando histórico completo de eventos en Excel...')
   }
 
+  // Exportar mes actual a Excel
   const handleExportMonthExcel = () => {
-    if (events.length === 0) {
-      showToast('⚠️ No hay eventos para exportar')
-      return
-    }
-    const monthStr = calendarTargetDate ? calendarTargetDate.substring(0, 7) : '2026-09'
-    excelExportService.exportMonthEvents(events, monthStr)
-    showToast(`📥 Exportando planilla del mes ${monthStr} a Excel...`)
+    excelExportService.exportMonthEvents(events, new Date())
+    showToast('📅 Descargando eventos del mes actual en Excel...')
   }
 
-  // Guardar evento desde la Calculadora
-  const handleSaveEvent = async (eventData, targetStatus) => {
+  // Guardar evento (crear o actualizar)
+  const handleSaveEvent = async (eventData) => {
     const res = await eventService.saveEvent(eventData)
     if (res.success) {
       await loadEvents()
-      setCalculatorEvent(null)
-      if (eventData.event_date) {
-        setCalendarTargetDate(eventData.event_date)
-      }
       showToast(
-        targetStatus === 'cotizado' ? '📝 ¡Cotización guardada con éxito!' :
-        targetStatus === 'reservado' ? '🔵 ¡Fecha guardada como Reservada!' :
+        eventData.status === 'cotizado' ? '📝 ¡Cotización guardada exitosamente!' :
+        eventData.status === 'reservado' ? '🔵 ¡Fecha guardada como Reservada!' :
         '💾 ¡Evento contratado confirmado!'
       )
       setCurrentView('calendar')
@@ -195,7 +193,6 @@ export default function App() {
     const res = await eventService.deleteEvent(eventId)
     if (res.success) {
       await loadEvents()
-      // Si estaba en comparativa, removerlo
       setComparisonEventIds(prev => prev.filter(id => id !== eventId))
       showToast('Evento eliminado.')
     }
@@ -216,6 +213,18 @@ export default function App() {
 
   const quotesCount = events.filter(e => e.status === 'cotizado').length
 
+  // Si no hay usuario autenticado, mostrar pantalla de ingreso directo
+  if (!currentUser) {
+    return (
+      <LoginView 
+        onLoginSuccess={(u) => {
+          setCurrentUser(u)
+          showToast(`¡Bienvenido/a al Palacio Barolo, ${u.name}!`)
+        }} 
+      />
+    )
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col selection:bg-amber-200 selection:text-amber-900 pb-16">
       
@@ -231,10 +240,10 @@ export default function App() {
         currentView={currentView}
         setCurrentView={setCurrentView}
         onOpenSettings={() => setIsSettingsOpen(true)}
-        onOpenLogin={() => setIsLoginOpen(true)}
         onOpenComparison={() => setIsComparisonOpen(true)}
         comparisonCount={comparisonEventIds.length}
         currentUser={currentUser}
+        onLogout={handleLogout}
         onNewEvent={() => {
           setCalculatorEvent(null)
           setCurrentView('calculator')
@@ -309,6 +318,13 @@ export default function App() {
                 }}
               />
             )}
+
+            {currentView === 'users' && (
+              <UserManagementView
+                currentUser={currentUser}
+                onBack={() => setCurrentView('calendar')}
+              />
+            )}
           </>
         )}
       </main>
@@ -346,7 +362,7 @@ export default function App() {
             <button
               onClick={() => setIsComparisonOpen(true)}
               disabled={comparisonEvents.length < 2}
-              className="flex items-center space-x-1.5 bg-gradient-to-r from-amber-500 to-barolo-gold hover:from-amber-400 hover:to-amber-300 text-barolo-navy px-3.5 py-1.5 rounded-xl text-xs font-bold shadow-md transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
+              className="flex items-center space-x-1.5 bg-gradient-to-r from-amber-500 to-barolo-gold hover:from-amber-400 hover:to-amber-300 text-barolo-navy px-3.5 py-1.5 rounded-xl text-xs font-bold shadow-md transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
             >
               <span>{comparisonEvents.length < 2 ? 'Elegí 2 o más' : 'Comparar ahora'}</span>
               <ArrowRight className="w-3.5 h-3.5" />
@@ -355,7 +371,7 @@ export default function App() {
             <button
               onClick={() => excelExportService.exportComparison(comparisonEvents)}
               disabled={comparisonEvents.length < 2}
-              className="flex items-center space-x-1 bg-emerald-700/80 hover:bg-emerald-600 text-white px-2.5 py-1.5 rounded-xl text-xs font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+              className="flex items-center space-x-1 bg-emerald-700/80 hover:bg-emerald-600 text-white px-2.5 py-1.5 rounded-xl text-xs font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
               title="Descargar comparativa en Excel"
             >
               <FileSpreadsheet className="w-3.5 h-3.5" />
@@ -364,7 +380,7 @@ export default function App() {
 
             <button
               onClick={handleClearComparison}
-              className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-colors"
+              className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-colors cursor-pointer"
               title="Limpiar selección"
             >
               <X className="w-4 h-4" />
@@ -383,16 +399,6 @@ export default function App() {
           onEditInCalculator={handleEditInCalculator}
         />
       )}
-
-      {/* Login & User Management Modal */}
-      <LoginModal
-        isOpen={isLoginOpen}
-        onClose={() => setIsLoginOpen(false)}
-        onUserChange={(u) => {
-          setCurrentUser(u)
-          showToast(`👤 Perfil activo: ${u.displayName} (${u.roleBadge?.title || u.role})`)
-        }}
-      />
 
       {/* Event Comparison Modal */}
       <EventComparisonModal

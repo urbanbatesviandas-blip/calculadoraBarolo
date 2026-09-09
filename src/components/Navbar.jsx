@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react'
 import { 
   Calendar, Calculator, LayoutDashboard, ListFilter, Cloud, CloudOff, 
   Settings, ShieldCheck, PlusCircle, RefreshCw, FileSpreadsheet, 
-  Scale, User, ChevronDown, Check, Sliders 
+  Scale, User, ChevronDown, Check, Sliders, Users, LogOut 
 } from 'lucide-react'
 import { isSupabaseConfigured } from '../services/supabaseClient'
 import { canCreateEvent, isAdmin } from '../services/authService'
@@ -11,10 +11,10 @@ export default function Navbar({
   currentView, 
   setCurrentView, 
   onOpenSettings, 
-  onOpenLogin,
   onOpenComparison,
   comparisonCount = 0,
   currentUser,
+  onLogout,
   onNewEvent, 
   eventsCount, 
   quotesCount, 
@@ -25,13 +25,18 @@ export default function Navbar({
 }) {
   const isOnline = isSupabaseConfigured()
   const [showExcelMenu, setShowExcelMenu] = useState(false)
+  const [showUserMenu, setShowUserMenu] = useState(false)
   const excelMenuRef = useRef(null)
+  const userMenuRef = useRef(null)
 
-  // Cerrar menú de excel al hacer click afuera
+  // Cerrar menús al hacer click afuera
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (excelMenuRef.current && !excelMenuRef.current.contains(e.target)) {
         setShowExcelMenu(false)
+      }
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target)) {
+        setShowUserMenu(false)
       }
     }
     document.addEventListener('mousedown', handleClickOutside)
@@ -40,7 +45,7 @@ export default function Navbar({
 
   const userCanCreate = canCreateEvent(currentUser)
   const isUserAdmin = isAdmin(currentUser)
-  const roleBadge = currentUser?.roleBadge || { title: 'Admin', icon: '👑', color: 'text-amber-300' }
+  const roleBadge = currentUser?.roleBadge || { title: 'Admin', icon: '👑', badgeClass: 'bg-amber-100 text-amber-900 border-amber-300' }
 
   return (
     <header className="sticky top-0 z-40 bg-barolo-navy text-white shadow-xl border-b border-barolo-gold/30">
@@ -65,7 +70,7 @@ export default function Navbar({
           <nav className="hidden md:flex items-center space-x-1 bg-barolo-navy-dark/60 p-1.5 rounded-2xl border border-white/10 backdrop-blur-md">
             <button
               onClick={() => setCurrentView('calendar')}
-              className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl font-medium text-sm transition-all duration-200 ${
+              className={`flex items-center space-x-2 px-3.5 py-2.5 rounded-xl font-medium text-sm transition-all duration-200 ${
                 currentView === 'calendar'
                   ? 'bg-gradient-to-r from-barolo-gold to-amber-500 text-barolo-navy font-bold shadow-md shadow-amber-500/20'
                   : 'text-slate-300 hover:text-white hover:bg-white/10'
@@ -77,7 +82,7 @@ export default function Navbar({
 
             <button
               onClick={() => setCurrentView('calculator')}
-              className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl font-medium text-sm transition-all duration-200 ${
+              className={`flex items-center space-x-2 px-3.5 py-2.5 rounded-xl font-medium text-sm transition-all duration-200 ${
                 currentView === 'calculator'
                   ? 'bg-gradient-to-r from-barolo-gold to-amber-500 text-barolo-navy font-bold shadow-md shadow-amber-500/20'
                   : 'text-slate-300 hover:text-white hover:bg-white/10'
@@ -89,19 +94,19 @@ export default function Navbar({
 
             <button
               onClick={() => setCurrentView('dashboard')}
-              className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl font-medium text-sm transition-all duration-200 ${
+              className={`flex items-center space-x-2 px-3.5 py-2.5 rounded-xl font-medium text-sm transition-all duration-200 ${
                 currentView === 'dashboard'
                   ? 'bg-gradient-to-r from-barolo-gold to-amber-500 text-barolo-navy font-bold shadow-md shadow-amber-500/20'
                   : 'text-slate-300 hover:text-white hover:bg-white/10'
               }`}
             >
               <LayoutDashboard className="w-4 h-4" />
-              <span>Dashboard Ejecutivo</span>
+              <span>Dashboard</span>
             </button>
 
             <button
               onClick={() => setCurrentView('list')}
-              className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl font-medium text-sm transition-all duration-200 ${
+              className={`flex items-center space-x-2 px-3.5 py-2.5 rounded-xl font-medium text-sm transition-all duration-200 ${
                 currentView === 'list'
                   ? 'bg-gradient-to-r from-barolo-gold to-amber-500 text-barolo-navy font-bold shadow-md shadow-amber-500/20'
                   : 'text-slate-300 hover:text-white hover:bg-white/10'
@@ -117,29 +122,44 @@ export default function Navbar({
             </button>
 
             {isUserAdmin && (
-              <button
-                onClick={() => setCurrentView('calculator_config')}
-                className={`flex items-center space-x-1.5 px-3.5 py-2.5 rounded-xl font-medium text-sm transition-all duration-200 ${
-                  currentView === 'calculator_config'
-                    ? 'bg-gradient-to-r from-barolo-gold to-amber-500 text-barolo-navy font-bold shadow-md shadow-amber-500/20'
-                    : 'text-amber-200 hover:text-white hover:bg-white/10'
-                }`}
-                title="Configuración de Plantilla Maestra de Calculadora (Solo Administrador)"
-              >
-                <Sliders className="w-4 h-4 text-amber-300" />
-                <span>Plantilla</span>
-              </button>
+              <>
+                <button
+                  onClick={() => setCurrentView('calculator_config')}
+                  className={`flex items-center space-x-1.5 px-3 py-2.5 rounded-xl font-medium text-sm transition-all duration-200 ${
+                    currentView === 'calculator_config'
+                      ? 'bg-gradient-to-r from-barolo-gold to-amber-500 text-barolo-navy font-bold shadow-md shadow-amber-500/20'
+                      : 'text-amber-200 hover:text-white hover:bg-white/10'
+                  }`}
+                  title="Configuración de Plantilla Maestra de Calculadora"
+                >
+                  <Sliders className="w-4 h-4 text-amber-300" />
+                  <span>Plantilla</span>
+                </button>
+
+                <button
+                  onClick={() => setCurrentView('users')}
+                  className={`flex items-center space-x-1.5 px-3 py-2.5 rounded-xl font-medium text-sm transition-all duration-200 ${
+                    currentView === 'users'
+                      ? 'bg-gradient-to-r from-barolo-gold to-amber-500 text-barolo-navy font-bold shadow-md shadow-amber-500/20'
+                      : 'text-amber-200 hover:text-white hover:bg-white/10'
+                  }`}
+                  title="Gestión de Usuarios & Accesos (Solo Administrador)"
+                >
+                  <Users className="w-4 h-4 text-amber-300" />
+                  <span>Usuarios</span>
+                </button>
+              </>
             )}
           </nav>
 
-          {/* Right Actions: Excel, Compare, User Role, Sync & New Event */}
+          {/* Right Actions: Excel, Compare, User Menu, Sync & New Event */}
           <div className="flex items-center space-x-1.5 sm:space-x-2">
             
             {/* Excel Export Dropdown */}
             <div className="relative" ref={excelMenuRef}>
               <button
                 onClick={() => setShowExcelMenu(!showExcelMenu)}
-                className="flex items-center space-x-1 bg-emerald-900/60 hover:bg-emerald-800 text-emerald-200 border border-emerald-500/50 px-2.5 py-2 rounded-xl text-xs font-bold transition-all shadow-md active:scale-95"
+                className="flex items-center space-x-1 bg-emerald-900/60 hover:bg-emerald-800 text-emerald-200 border border-emerald-500/50 px-2.5 py-2 rounded-xl text-xs font-bold transition-all shadow-md active:scale-95 cursor-pointer"
                 title="Descargar datos en planilla de Excel (.xlsx)"
               >
                 <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
@@ -192,7 +212,7 @@ export default function Navbar({
             {comparisonCount > 0 && (
               <button
                 onClick={onOpenComparison}
-                className="flex items-center space-x-1.5 bg-gradient-to-r from-purple-700 to-indigo-700 hover:from-purple-600 hover:to-indigo-600 text-white border border-purple-400/40 px-2.5 py-2 rounded-xl text-xs font-bold transition-all shadow-md animate-pulse"
+                className="flex items-center space-x-1.5 bg-gradient-to-r from-purple-700 to-indigo-700 hover:from-purple-600 hover:to-indigo-600 text-white border border-purple-400/40 px-2.5 py-2 rounded-xl text-xs font-bold transition-all shadow-md animate-pulse cursor-pointer"
                 title="Ver comparativa de eventos seleccionados"
               >
                 <Scale className="w-3.5 h-3.5" />
@@ -203,21 +223,80 @@ export default function Navbar({
               </button>
             )}
 
-            {/* User Profile & Role Switcher */}
-            <button
-              onClick={onOpenLogin}
-              className="flex items-center space-x-1.5 bg-barolo-navy-dark hover:bg-barolo-navy-light text-amber-200 border border-amber-400/40 px-2.5 sm:px-3 py-2 rounded-xl text-xs font-bold transition-all shadow-md active:scale-95"
-              title={`Usuario actual: ${currentUser?.displayName || 'Admin'} (${roleBadge.title}) - Clic para cambiar rol o iniciar sesión`}
-            >
-              <span className="text-sm">{roleBadge.icon}</span>
-              <span className="hidden sm:inline font-medium">{roleBadge.title}</span>
-            </button>
+            {/* User Profile Dropdown Menu */}
+            <div className="relative" ref={userMenuRef}>
+              <button
+                onClick={() => setShowUserMenu(!showUserMenu)}
+                className="flex items-center space-x-2 bg-barolo-navy-dark hover:bg-barolo-navy-light text-amber-200 border border-amber-400/40 px-2.5 sm:px-3 py-2 rounded-xl text-xs font-bold transition-all shadow-md active:scale-95 cursor-pointer"
+                title={`Usuario actual: ${currentUser?.name || 'Usuario'} (${roleBadge.title})`}
+              >
+                <span className="w-6 h-6 rounded-full bg-amber-400/20 border border-amber-300/40 flex items-center justify-center text-xs font-bold text-amber-300">
+                  {currentUser?.name?.charAt(0)?.toUpperCase() || 'U'}
+                </span>
+                <span className="hidden sm:inline font-medium max-w-[120px] truncate">{currentUser?.name || 'Usuario'}</span>
+                <span className="text-xs">{roleBadge.icon}</span>
+                <ChevronDown className="w-3 h-3 opacity-70" />
+              </button>
+
+              {showUserMenu && (
+                <div className="absolute right-0 mt-2 w-64 bg-white rounded-2xl shadow-2xl border border-slate-200 py-2 z-50 text-slate-800 animate-in fade-in zoom-in-95 duration-100">
+                  <div className="px-4 py-2.5 border-b border-slate-100">
+                    <p className="text-xs font-bold text-slate-900 truncate">{currentUser?.name}</p>
+                    <p className="text-[11px] text-slate-400 truncate">@{currentUser?.username || currentUser?.email}</p>
+                    <div className="mt-1.5">
+                      <span className={`inline-flex items-center text-[10px] px-2 py-0.5 rounded-full border ${roleBadge.badgeClass}`}>
+                        <span className="mr-1">{roleBadge.icon}</span>
+                        <span>{roleBadge.title}</span>
+                      </span>
+                    </div>
+                  </div>
+
+                  {isUserAdmin && (
+                    <div className="py-1 border-b border-slate-100">
+                      <button
+                        onClick={() => {
+                          setCurrentView('users')
+                          setShowUserMenu(false)
+                        }}
+                        className="w-full text-left px-4 py-2 text-xs font-bold text-slate-700 hover:bg-amber-50 hover:text-amber-900 flex items-center space-x-2 transition-colors cursor-pointer"
+                      >
+                        <Users className="w-4 h-4 text-amber-600" />
+                        <span>Gestión de Usuarios</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          setCurrentView('calculator_config')
+                          setShowUserMenu(false)
+                        }}
+                        className="w-full text-left px-4 py-2 text-xs font-bold text-slate-700 hover:bg-amber-50 hover:text-amber-900 flex items-center space-x-2 transition-colors cursor-pointer"
+                      >
+                        <Sliders className="w-4 h-4 text-amber-600" />
+                        <span>Plantilla Maestra</span>
+                      </button>
+                    </div>
+                  )}
+
+                  <div className="pt-1">
+                    <button
+                      onClick={() => {
+                        setShowUserMenu(false)
+                        if (onLogout) onLogout()
+                      }}
+                      className="w-full text-left px-4 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50 flex items-center space-x-2 transition-colors cursor-pointer"
+                    >
+                      <LogOut className="w-4 h-4 text-rose-500" />
+                      <span>Cerrar Sesión</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
 
             {/* Sync Button */}
             <button
               onClick={onForceSync}
               disabled={isSyncing}
-              className="flex items-center space-x-1.5 bg-barolo-navy-dark hover:bg-barolo-navy-light text-amber-300 border border-amber-400/40 px-2.5 py-2 rounded-xl text-xs font-bold transition-all shadow-md active:scale-95 disabled:opacity-50"
+              className="flex items-center space-x-1.5 bg-barolo-navy-dark hover:bg-barolo-navy-light text-amber-300 border border-amber-400/40 px-2.5 py-2 rounded-xl text-xs font-bold transition-all shadow-md active:scale-95 disabled:opacity-50 cursor-pointer"
               title="Sincronizar y actualizar con la Nube Supabase"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin text-amber-400' : 'text-amber-300'}`} />
@@ -228,7 +307,7 @@ export default function Navbar({
             {userCanCreate && (
               <button
                 onClick={onNewEvent}
-                className="flex items-center space-x-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white px-2.5 sm:px-3 py-2 rounded-xl text-xs sm:text-sm font-semibold shadow-lg shadow-emerald-900/30 transition-all transform hover:scale-105"
+                className="flex items-center space-x-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white px-2.5 sm:px-3 py-2 rounded-xl text-xs sm:text-sm font-semibold shadow-lg shadow-emerald-900/30 transition-all transform hover:scale-105 cursor-pointer"
               >
                 <PlusCircle className="w-4 h-4" />
                 <span className="hidden sm:inline">Nueva</span>
@@ -238,7 +317,7 @@ export default function Navbar({
             {/* Supabase Status Pill */}
             <button
               onClick={onOpenSettings}
-              className={`flex items-center space-x-1 sm:space-x-1.5 px-2 sm:px-2.5 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
+              className={`flex items-center space-x-1 sm:space-x-1.5 px-2 sm:px-2.5 py-1.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
                 isOnline
                   ? 'bg-emerald-950/70 border-emerald-500/60 text-emerald-300 hover:bg-emerald-900'
                   : 'bg-amber-950/70 border-amber-500/60 text-amber-300 hover:bg-amber-900'
@@ -266,7 +345,7 @@ export default function Navbar({
       </div>
 
       {/* Mobile Bar */}
-      <div className="md:hidden flex justify-around py-2 border-t border-white/10 bg-barolo-navy-dark">
+      <div className="md:hidden flex justify-around py-2 border-t border-white/10 bg-barolo-navy-dark overflow-x-auto">
         <button onClick={() => setCurrentView('calendar')} className={`text-xs p-2 flex flex-col items-center ${currentView === 'calendar' ? 'text-amber-400 font-bold' : 'text-slate-300'}`}>
           <Calendar className="w-4 h-4 mb-1" />
           Calendario
@@ -281,13 +360,19 @@ export default function Navbar({
         </button>
         <button onClick={() => setCurrentView('list')} className={`text-xs p-2 flex flex-col items-center ${currentView === 'list' ? 'text-amber-400 font-bold' : 'text-slate-300'}`}>
           <ListFilter className="w-4 h-4 mb-1" />
-          Registro ({eventsCount})
+          Registro
         </button>
         {isUserAdmin && (
-          <button onClick={() => setCurrentView('calculator_config')} className={`text-xs p-2 flex flex-col items-center ${currentView === 'calculator_config' ? 'text-amber-400 font-bold' : 'text-amber-300'}`}>
-            <Sliders className="w-4 h-4 mb-1" />
-            Plantilla
-          </button>
+          <>
+            <button onClick={() => setCurrentView('calculator_config')} className={`text-xs p-2 flex flex-col items-center ${currentView === 'calculator_config' ? 'text-amber-400 font-bold' : 'text-amber-300'}`}>
+              <Sliders className="w-4 h-4 mb-1" />
+              Plantilla
+            </button>
+            <button onClick={() => setCurrentView('users')} className={`text-xs p-2 flex flex-col items-center ${currentView === 'users' ? 'text-amber-400 font-bold' : 'text-amber-300'}`}>
+              <Users className="w-4 h-4 mb-1" />
+              Usuarios
+            </button>
+          </>
         )}
       </div>
     </header>

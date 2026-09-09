@@ -14,7 +14,7 @@ const getLocalEvents = () => {
       if (Array.isArray(parsed) && parsed.length > 0) {
         // Auto-deduplicar por calc_code o ID para limpiar de raíz cualquier duplicación vieja en PC
         const seen = new Map()
-        parsed.forEach(item => {
+        parsed.filter(e => !e.calc_code?.startsWith('SYS-') && e.cancellation_reason !== 'CONFIG_STORAGE').forEach(item => {
           const key = item.calc_code || item.id
           if (!seen.has(key) || isUuidString(item.id)) {
             seen.set(key, item)
@@ -22,7 +22,7 @@ const getLocalEvents = () => {
         })
         const clean = Array.from(seen.values())
         if (clean.length !== parsed.length) {
-          console.log(`Auto-cleaned ${parsed.length - clean.length} duplicate events from localStorage`)
+          console.log(`Auto-cleaned duplicate/system events from localStorage`)
           try {
             localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(clean))
           } catch (e) {}
@@ -42,7 +42,8 @@ const getLocalEvents = () => {
 
 const saveLocalEvents = (events) => {
   try {
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(events))
+    const cleanEvents = events.filter(e => !e.calc_code?.startsWith('SYS-') && e.cancellation_reason !== 'CONFIG_STORAGE')
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(cleanEvents))
   } catch (e) {
     console.error('Error saving to localStorage', e)
   }
@@ -88,12 +89,14 @@ export const eventService = {
         }
         
         if (data && data.length > 0) {
+          const eventsOnly = data.filter(e => !e.calc_code?.startsWith('SYS-') && e.cancellation_reason !== 'CONFIG_STORAGE')
+          
           // Intentar subir borradores o eventos que pudieran haber quedado solo en este navegador
-          await this.syncPendingLocalEvents(data)
+          await this.syncPendingLocalEvents(eventsOnly)
 
           // Usar datos de Supabase como única fuente de verdad indexada por calc_code
           const codeMap = new Map()
-          data.forEach(remoteEv => {
+          eventsOnly.forEach(remoteEv => {
             const key = remoteEv.calc_code || remoteEv.id
             codeMap.set(key, remoteEv)
           })
@@ -135,8 +138,9 @@ export const eventService = {
 
       if (error) throw error
       if (data && data.length > 0) {
-        saveLocalEvents(data)
-        return { success: true, count: data.length, events: data }
+        const cleanEvents = data.filter(e => !e.calc_code?.startsWith('SYS-') && e.cancellation_reason !== 'CONFIG_STORAGE')
+        saveLocalEvents(cleanEvents)
+        return { success: true, count: cleanEvents.length, events: cleanEvents }
       }
       return { success: false, error: 'No se encontraron datos en Supabase' }
     } catch (e) {

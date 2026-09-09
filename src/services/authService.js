@@ -1,112 +1,57 @@
-import { supabase, isSupabaseConfigured } from './supabaseClient'
+import { 
+  userManagementService, 
+  ROLES, 
+  getRoleBadge, 
+  DEFAULT_ADMIN_USER 
+} from './userManagementService'
 
-export const ROLES = {
-  admin: {
-    id: 'admin',
-    name: 'Administrador',
-    shortName: 'Admin',
-    badgeClass: 'bg-amber-400 text-barolo-navy font-bold border-amber-500/40',
-    description: 'Acceso total: gestión completa de eventos, estados, usuarios y configuración.'
-  },
-  modificador: {
-    id: 'modificador',
-    name: 'Modificador',
-    shortName: 'Modificador',
-    badgeClass: 'bg-sky-500 text-white font-bold border-sky-600/40',
-    description: 'Edición comercial: crear y retocar eventos/cotizaciones y reservar fechas. Sin permisos de eliminación.'
-  },
-  cargador: {
-    id: 'cargador',
-    name: 'Cargador de Datos',
-    shortName: 'Cargador',
-    badgeClass: 'bg-emerald-600 text-white font-bold border-emerald-700/40',
-    description: 'Carga inicial: puede generar nuevas cotizaciones y calcular presupuestos. Sin confirmación de contratos.'
-  },
-  viewer: {
-    id: 'viewer',
-    name: 'Solo Lectura',
-    shortName: 'Lector',
-    badgeClass: 'bg-slate-500 text-white font-semibold border-slate-600/40',
-    description: 'Auditoría y consulta: acceso a visualizaciones, filtros, comparativas y descargas Excel sin edición.'
-  }
-}
+export { ROLES, getRoleBadge, DEFAULT_ADMIN_USER }
 
-export const PRESET_USERS = [
-  {
-    id: 'usr-admin',
-    name: 'Ignacio Barolo (Director)',
-    email: 'admin@palaciobarolo.com.ar',
-    role: 'admin'
-  },
-  {
-    id: 'usr-mod',
-    name: 'Camila Paz (Coordinadora Comercial)',
-    email: 'comercial@palaciobarolo.com.ar',
-    role: 'modificador'
-  },
-  {
-    id: 'usr-cargador',
-    name: 'Lucas Rossi (Operador de Carga)',
-    email: 'carga@palaciobarolo.com.ar',
-    role: 'cargador'
-  },
-  {
-    id: 'usr-viewer',
-    name: 'Auditoría Externa (Solo Lectura)',
-    email: 'auditor@palaciobarolo.com.ar',
-    role: 'viewer'
-  }
-]
-
-export const getRoleBadge = (roleId) => {
-  const r = ROLES[roleId] || ROLES.viewer
-  const icons = {
-    admin: '👑',
-    modificador: '✏️',
-    cargador: '📝',
-    viewer: '👁️'
-  }
-  return {
-    title: r.name,
-    shortName: r.shortName,
-    icon: icons[roleId] || '👤',
-    badgeClass: r.badgeClass,
-    description: r.description
-  }
-}
-
-const AUTH_STORAGE_KEY = 'barolo_auth_user'
+const AUTH_STORAGE_KEY = 'barolo_auth_session'
 let authListeners = []
 
 export const authService = {
+  // Obtener usuario actualmente conectado (sesión activa)
   getCurrentUser() {
     try {
       const saved = localStorage.getItem(AUTH_STORAGE_KEY)
       if (saved) {
         const u = JSON.parse(saved)
-        u.roleBadge = getRoleBadge(u.role)
-        return u
+        if (u && u.id && u.role) {
+          u.roleBadge = getRoleBadge(u.role)
+          return u
+        }
       }
     } catch (e) {
-      console.warn('Error reading auth user from localStorage:', e)
+      console.warn('Error leyendo sesión activa:', e)
     }
-    const defaultUser = { ...PRESET_USERS[0], roleBadge: getRoleBadge(PRESET_USERS[0].role) }
-    this.setCurrentUser(defaultUser)
-    return defaultUser
+    return null
   },
 
+  // Establecer sesión activa
   setCurrentUser(user) {
     try {
-      const userWithBadge = { ...user, roleBadge: getRoleBadge(user.role) }
-      localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(userWithBadge))
-      authListeners.forEach(fn => {
-        try { fn(userWithBadge) } catch (err) { console.error('Auth listener error:', err) }
-      })
+      if (user) {
+        const userWithBadge = { ...user, roleBadge: getRoleBadge(user.role) }
+        localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(userWithBadge))
+        authListeners.forEach(fn => {
+          try { fn(userWithBadge) } catch (err) { console.error('Auth listener error:', err) }
+        })
+        return userWithBadge
+      } else {
+        localStorage.removeItem(AUTH_STORAGE_KEY)
+        authListeners.forEach(fn => {
+          try { fn(null) } catch (err) { console.error('Auth listener error:', err) }
+        })
+        return null
+      }
     } catch (e) {
-      console.error('Error saving user to localStorage:', e)
+      console.error('Error guardando sesión de usuario:', e)
+      return null
     }
   },
 
+  // Suscribirse a cambios de sesión (login / logout)
   onAuthStateChanged(cb) {
     if (typeof cb === 'function') {
       authListeners.push(cb)
@@ -116,107 +61,20 @@ export const authService = {
     }
   },
 
-  // Alternar a un perfil preconfigurado con un clic
-  switchUser(presetId) {
-    const found = PRESET_USERS.find(u => u.id === presetId || u.role === presetId)
-    if (found) {
-      this.setCurrentUser(found)
-      return found
+  // Iniciar sesión con usuario o correo y la contraseña asignada por el Administrador
+  async login(identifier, password) {
+    const res = await userManagementService.authenticate(identifier, password)
+    if (res.success && res.user) {
+      this.setCurrentUser(res.user)
+      return { success: true, user: res.user }
     }
-    return this.getCurrentUser()
+    return { success: false, error: res.error || 'Credenciales inválidas.' }
   },
 
-  // Inicio de sesión por Email / Contraseña
-  async login(email, password) {
-    const trimmedEmail = (email || '').trim().toLowerCase()
-    
-    if (isSupabaseConfigured() && supabase) {
-      try {
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email: trimmedEmail,
-          password
-        })
-        if (!error && data?.user) {
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', data.user.id)
-            .single()
-
-          const userObj = {
-            id: data.user.id,
-            email: data.user.email,
-            name: profile?.full_name || data.user.email.split('@')[0],
-            role: profile?.role || 'viewer'
-          }
-          this.setCurrentUser(userObj)
-          return { success: true, user: userObj }
-        }
-      } catch (err) {
-        console.warn('Supabase auth attempt failed, testing preset match:', err.message)
-      }
-    }
-
-    const match = PRESET_USERS.find(u => u.email.toLowerCase() === trimmedEmail)
-    if (match) {
-      this.setCurrentUser(match)
-      return { success: true, user: match }
-    }
-
-    const newUser = {
-      id: 'usr-' + Date.now(),
-      email: trimmedEmail,
-      name: trimmedEmail.split('@')[0],
-      role: 'cargador'
-    }
-    this.setCurrentUser(newUser)
-    return { success: true, user: newUser }
-  },
-
-  async register(email, password, fullName, role = 'cargador') {
-    const trimmedEmail = (email || '').trim().toLowerCase()
-    if (isSupabaseConfigured() && supabase) {
-      try {
-        const { data, error } = await supabase.auth.signUp({
-          email: trimmedEmail,
-          password,
-          options: {
-            data: { full_name: fullName, role }
-          }
-        })
-        if (error) throw error
-        const userObj = {
-          id: data.user?.id || 'usr-' + Date.now(),
-          email: trimmedEmail,
-          name: fullName || trimmedEmail.split('@')[0],
-          role
-        }
-        this.setCurrentUser(userObj)
-        return { success: true, user: userObj }
-      } catch (err) {
-        return { success: false, error: err.message }
-      }
-    }
-
-    const newUser = {
-      id: 'usr-' + Date.now(),
-      email: trimmedEmail,
-      name: fullName || trimmedEmail.split('@')[0],
-      role
-    }
-    this.setCurrentUser(newUser)
-    return { success: true, user: newUser }
-  },
-
+  // Cerrar sesión
   async logout() {
-    if (isSupabaseConfigured() && supabase) {
-      try {
-        await supabase.auth.signOut()
-      } catch (e) {}
-    }
-    const viewerUser = PRESET_USERS.find(u => u.role === 'viewer')
-    this.setCurrentUser(viewerUser)
-    return viewerUser
+    this.setCurrentUser(null)
+    return null
   },
 
   // =========================================================================
@@ -270,6 +128,7 @@ export const authService = {
     // Coincidencia por autor específico del ítem
     if (itemOrEvent.author_id && itemOrEvent.author_id === user.id) return true
     if (itemOrEvent.author_email && user.email && itemOrEvent.author_email.toLowerCase() === user.email.toLowerCase()) return true
+    if (itemOrEvent.author_username && user.username && itemOrEvent.author_username.toLowerCase() === user.username.toLowerCase()) return true
 
     // Coincidencia por creador general del evento
     if (itemOrEvent.created_by_user_id && itemOrEvent.created_by_user_id === user.id) return true
@@ -280,7 +139,7 @@ export const authService = {
   }
 }
 
-// Named exports para conveniencia
+// Named exports para conveniencia en componentes
 export const canCreateEvent = (user) => authService.canCreateEvent(user)
 export const canEditEvent = (user, event) => authService.canEditEvent(user, event)
 export const canDeleteEvent = (user) => authService.canDeleteEvent(user)
@@ -288,6 +147,3 @@ export const canChangeStatus = (user, targetStatus) => authService.canChangeStat
 export const canManageUsers = (user) => authService.canManageUsers(user)
 export const isAdmin = (user) => authService.isAdmin(user)
 export const canViewSensitiveData = (itemOrEvent, user) => authService.canViewSensitiveData(itemOrEvent, user)
-
-
-
