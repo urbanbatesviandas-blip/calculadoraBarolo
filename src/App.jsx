@@ -418,6 +418,7 @@ export default function App() {
         currentView={currentView}
         onNavigate={(view) => setCurrentView(view)}
         currentUser={currentUser}
+        onLogout={handleLogout}
       />
 
       {/* Settings Modal (Supabase Cloud Config) */}

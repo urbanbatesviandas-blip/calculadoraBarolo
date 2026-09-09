@@ -217,74 +217,51 @@ export default function Navbar({
               </button>
             )}
 
-            {/* User Profile Dropdown Menu */}
-            <div className="relative" ref={userMenuRef}>
-              <button
-                onClick={() => setShowUserMenu(!showUserMenu)}
-                className="flex items-center space-x-2 bg-barolo-navy-dark hover:bg-barolo-navy-light text-amber-200 border border-amber-400/40 px-2.5 sm:px-3 py-2 rounded-xl text-xs font-bold transition-all shadow-md active:scale-95 cursor-pointer"
-                title={`Usuario actual: ${currentUser?.name || 'Usuario'} (${roleBadge.title})`}
-              >
-                <span className="w-6 h-6 rounded-full bg-amber-400/20 border border-amber-300/40 flex items-center justify-center text-xs font-bold text-amber-300">
-                  {currentUser?.name?.charAt(0)?.toUpperCase() || 'U'}
-                </span>
-                <span className="hidden sm:inline font-medium max-w-[120px] truncate">{currentUser?.name || 'Usuario'}</span>
-                <span className="text-xs">{roleBadge.icon}</span>
-                <ChevronDown className="w-3 h-3 opacity-70" />
-              </button>
+            {/* User Profile Dropdown Menu (Only for non-admin team members; Administrator is inside the gear ⚙️) */}
+            {!isUserAdmin && currentUser && (
+              <div className="relative" ref={userMenuRef}>
+                <button
+                  onClick={() => setShowUserMenu(!showUserMenu)}
+                  className="flex items-center space-x-2 bg-barolo-navy-dark hover:bg-barolo-navy-light text-amber-200 border border-amber-400/40 px-2.5 sm:px-3 py-2 rounded-xl text-xs font-bold transition-all shadow-md active:scale-95 cursor-pointer"
+                  title={`Usuario actual: ${currentUser?.name || 'Usuario'} (${roleBadge.title})`}
+                >
+                  <span className="w-6 h-6 rounded-full bg-amber-400/20 border border-amber-300/40 flex items-center justify-center text-xs font-bold text-amber-300">
+                    {currentUser?.name?.charAt(0)?.toUpperCase() || 'U'}
+                  </span>
+                  <span className="hidden sm:inline font-medium max-w-[120px] truncate">{currentUser?.name || 'Usuario'}</span>
+                  <span className="text-xs">{roleBadge.icon}</span>
+                  <ChevronDown className="w-3 h-3 opacity-70" />
+                </button>
 
-              {showUserMenu && (
-                <div className="absolute right-0 mt-2 w-64 bg-white rounded-2xl shadow-2xl border border-slate-200 py-2 z-50 text-slate-800 animate-in fade-in zoom-in-95 duration-100">
-                  <div className="px-4 py-2.5 border-b border-slate-100">
-                    <p className="text-xs font-bold text-slate-900 truncate">{currentUser?.name}</p>
-                    <p className="text-[11px] text-slate-400 truncate">@{currentUser?.username || currentUser?.email}</p>
-                    <div className="mt-1.5">
-                      <span className={`inline-flex items-center text-[10px] px-2 py-0.5 rounded-full border ${roleBadge.badgeClass}`}>
-                        <span className="mr-1">{roleBadge.icon}</span>
-                        <span>{roleBadge.title}</span>
-                      </span>
+                {showUserMenu && (
+                  <div className="absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-2xl border border-slate-200 py-2 z-50 text-slate-800 animate-in fade-in zoom-in-95 duration-100">
+                    <div className="px-4 py-2.5 border-b border-slate-100">
+                      <p className="text-xs font-bold text-slate-900 truncate">{currentUser?.name}</p>
+                      <p className="text-[11px] text-slate-400 truncate">@{currentUser?.username || currentUser?.email}</p>
+                      <div className="mt-1.5">
+                        <span className={`inline-flex items-center text-[10px] px-2 py-0.5 rounded-full border ${roleBadge.badgeClass}`}>
+                          <span className="mr-1">{roleBadge.icon}</span>
+                          <span>{roleBadge.title}</span>
+                        </span>
+                      </div>
                     </div>
-                  </div>
 
-                  {isUserAdmin && (
-                    <div className="py-1 border-b border-slate-100">
+                    <div className="pt-1">
                       <button
                         onClick={() => {
-                          setCurrentView('users')
                           setShowUserMenu(false)
+                          if (onLogout) onLogout()
                         }}
-                        className="w-full text-left px-4 py-2 text-xs font-bold text-slate-700 hover:bg-amber-50 hover:text-amber-900 flex items-center space-x-2 transition-colors cursor-pointer"
+                        className="w-full text-left px-4 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50 flex items-center space-x-2 transition-colors cursor-pointer"
                       >
-                        <Users className="w-4 h-4 text-amber-600" />
-                        <span>Gestión de Usuarios</span>
-                      </button>
-                      <button
-                        onClick={() => {
-                          setCurrentView('calculator_config')
-                          setShowUserMenu(false)
-                        }}
-                        className="w-full text-left px-4 py-2 text-xs font-bold text-slate-700 hover:bg-amber-50 hover:text-amber-900 flex items-center space-x-2 transition-colors cursor-pointer"
-                      >
-                        <Sliders className="w-4 h-4 text-amber-600" />
-                        <span>Plantilla Maestra</span>
+                        <LogOut className="w-4 h-4 text-rose-500" />
+                        <span>Cerrar Sesión</span>
                       </button>
                     </div>
-                  )}
-
-                  <div className="pt-1">
-                    <button
-                      onClick={() => {
-                        setShowUserMenu(false)
-                        if (onLogout) onLogout()
-                      }}
-                      className="w-full text-left px-4 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50 flex items-center space-x-2 transition-colors cursor-pointer"
-                    >
-                      <LogOut className="w-4 h-4 text-rose-500" />
-                      <span>Cerrar Sesión</span>
-                    </button>
                   </div>
-                </div>
-              )}
-            </div>
+                )}
+              </div>
+            )}
 
           </div>
 

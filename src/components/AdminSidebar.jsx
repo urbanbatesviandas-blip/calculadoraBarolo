@@ -1,12 +1,13 @@
 import React, { useEffect } from 'react'
-import { X, Users, Sliders, ShieldCheck, ChevronRight, Settings, Sparkles } from 'lucide-react'
+import { X, Users, Sliders, ShieldCheck, ChevronRight, Settings, Sparkles, LogOut } from 'lucide-react'
 
 export default function AdminSidebar({ 
   isOpen, 
   onClose, 
   currentView, 
   onNavigate, 
-  currentUser 
+  currentUser,
+  onLogout 
 }) {
   // Cerrar con Escape
   useEffect(() => {
@@ -131,6 +132,20 @@ export default function AdminSidebar({
                 <p className="text-[11px] text-amber-300 font-medium">👑 Administrador Total</p>
               </div>
             </div>
+
+            {onLogout && (
+              <button
+                onClick={() => {
+                  onClose()
+                  onLogout()
+                }}
+                className="flex items-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-bold text-rose-400 hover:text-rose-200 bg-rose-950/40 hover:bg-rose-900/60 border border-rose-800/50 transition-all cursor-pointer shadow-sm active:scale-95 flex-shrink-0 ml-2"
+                title="Cerrar sesión de Administrador"
+              >
+                <LogOut className="w-4 h-4 text-rose-400" />
+                <span className="hidden xs:inline">Cerrar Sesión</span>
+              </button>
+            )}
           </div>
 
         </div>
