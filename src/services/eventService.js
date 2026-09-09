@@ -1,13 +1,16 @@
 import { supabase, isSupabaseConfigured } from './supabaseClient'
 import initialEvents from '../data/historicalEvents.json'
 
-const LOCAL_STORAGE_KEY = 'barolo_events_data'
+const LOCAL_STORAGE_KEY = 'barolo_events_v2'
 
 const isUuidString = (str) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str)
 
 // Inicializar eventos locales si no existen
 const getLocalEvents = () => {
   try {
+    if (localStorage.getItem('barolo_events_data')) {
+      localStorage.removeItem('barolo_events_data')
+    }
     const saved = localStorage.getItem(LOCAL_STORAGE_KEY)
     if (saved !== null) {
       const parsed = JSON.parse(saved)
@@ -39,26 +42,8 @@ const saveLocalEvents = (events) => {
 
 export const eventService = {
   // Sincronizar eventos locales creados fuera de línea hacia Supabase
-  async syncPendingLocalEvents(remoteEvents = []) {
-    if (!isSupabaseConfigured() || !supabase) return
-    const locals = getLocalEvents()
-    const remoteCodes = new Set(remoteEvents.map(e => e.calc_code).filter(Boolean))
-
-    const pending = locals.filter(e => {
-      // Si el ID es temporal local (evt-...) y su código no está en Supabase
-      const isLocalId = String(e.id).startsWith('evt-') && !isUuidString(e.id)
-      return isLocalId && (!e.calc_code || !remoteCodes.has(e.calc_code))
-    })
-
-    for (const localEv of pending) {
-      try {
-        const payload = { ...localEv }
-        delete payload.id // Permitir que Supabase genere el UUID
-        await supabase.from('events').upsert([payload], { onConflict: 'calc_code' })
-      } catch (err) {
-        console.warn('Error syncing pending local event to Supabase:', err)
-      }
-    }
+  async syncPendingLocalEvents() {
+    return
   },
 
   // Obtener todos los eventos (con sincronización transparente)
@@ -76,35 +61,15 @@ export const eventService = {
           return locals
         }
         
-        if (data && data.length > 0) {
+        if (data) {
           const eventsOnly = data.filter(e => !e.calc_code?.startsWith('SYS-') && e.cancellation_reason !== 'CONFIG_STORAGE')
-          
-          // Intentar subir borradores o eventos que pudieran haber quedado solo en este navegador
-          await this.syncPendingLocalEvents(eventsOnly)
-
-          // Usar datos de Supabase como única fuente de verdad indexada por calc_code
-          const codeMap = new Map()
-          eventsOnly.forEach(remoteEv => {
-            const key = remoteEv.calc_code || remoteEv.id
-            codeMap.set(key, remoteEv)
-          })
-
-          // Si hay algún borrador estrictamente nuevo aún no subido
-          locals.forEach(localEv => {
-            const key = localEv.calc_code || localEv.id
-            if (!codeMap.has(key) && String(localEv.id).startsWith('evt-temp')) {
-              codeMap.set(key, localEv)
-            }
-          })
-
-          const merged = Array.from(codeMap.values()).sort((a, b) => 
+          const sorted = eventsOnly.sort((a, b) => 
             (b.event_date || '').localeCompare(a.event_date || '')
           )
-          saveLocalEvents(merged)
-          return merged
-        } else {
-          return locals
+          saveLocalEvents(sorted)
+          return sorted
         }
+        return locals
       } catch (err) {
         console.error('Supabase fetch failed, using local storage:', err)
         return locals
