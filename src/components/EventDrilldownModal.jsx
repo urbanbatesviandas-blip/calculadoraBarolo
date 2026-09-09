@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react'
 import { 
   X, CheckCircle, Clock, XCircle, AlertTriangle, Building2, Calendar, 
-  Users, DollarSign, ArrowUpRight, TrendingUp, Sparkles, Receipt, Calculator, PieChart 
+  Users, DollarSign, ArrowUpRight, TrendingUp, Sparkles, Receipt, Calculator, PieChart, BookmarkCheck 
 } from 'lucide-react'
 import { Bar } from 'react-chartjs-2'
 import confetti from 'canvas-confetti'
@@ -489,22 +489,51 @@ export default function EventDrilldownModal({ event, onClose, onUpdateStatus, on
             <span>Retocar en Calculadora Madre</span>
           </button>
 
-          <div className="flex items-center space-x-2">
+          <div className="flex flex-wrap items-center gap-2">
             {event.status === 'cotizado' && (
               <>
                 <button
                   onClick={handleCancelQuote}
-                  className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl text-sm font-semibold bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 transition-colors"
+                  className="flex items-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 transition-colors"
                 >
-                  <XCircle className="w-4 h-4" />
+                  <XCircle className="w-3.5 h-3.5" />
+                  <span>Marcar Cancelado</span>
+                </button>
+
+                <button
+                  onClick={() => onUpdateStatus && onUpdateStatus(event.id, 'reservado')}
+                  className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-sky-500 hover:bg-sky-400 text-white shadow-md shadow-sky-500/20 transition-all transform hover:scale-105"
+                  title="Bloquear fecha y pasar a Reservado"
+                >
+                  <BookmarkCheck className="w-3.5 h-3.5" />
+                  <span>🔵 Reservar Fecha</span>
+                </button>
+
+                <button
+                  onClick={handleConfirmQuote}
+                  className="flex items-center space-x-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-700/20 hover:from-emerald-500 hover:to-teal-500 transition-all transform hover:scale-105"
+                >
+                  <CheckCircle className="w-3.5 h-3.5" />
+                  <span>✅ CONFIRMAR Y PASAR A EVENTOS</span>
+                </button>
+              </>
+            )}
+
+            {event.status === 'reservado' && (
+              <>
+                <button
+                  onClick={handleCancelQuote}
+                  className="flex items-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 transition-colors"
+                >
+                  <XCircle className="w-3.5 h-3.5" />
                   <span>Marcar Cancelado</span>
                 </button>
 
                 <button
                   onClick={handleConfirmQuote}
-                  className="flex items-center space-x-1.5 px-5 py-2 rounded-xl text-sm font-bold bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-700/20 hover:from-emerald-500 hover:to-teal-500 transition-all transform hover:scale-105"
+                  className="flex items-center space-x-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-700/20 hover:from-emerald-500 hover:to-teal-500 transition-all transform hover:scale-105"
                 >
-                  <CheckCircle className="w-4 h-4" />
+                  <CheckCircle className="w-3.5 h-3.5" />
                   <span>✅ CONFIRMAR Y PASAR A EVENTOS</span>
                 </button>
               </>

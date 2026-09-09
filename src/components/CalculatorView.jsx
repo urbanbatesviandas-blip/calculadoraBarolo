@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { 
   Calculator, Plus, Trash2, Save, CheckCircle2, RotateCcw, 
-  Sparkles, DollarSign, Users, Calendar, MapPin, Building, AlertCircle, FileText, ArrowRight 
+  Sparkles, DollarSign, Users, Calendar, MapPin, Building, AlertCircle, FileText, ArrowRight, BookmarkCheck 
 } from 'lucide-react'
 import confetti from 'canvas-confetti'
 
@@ -19,6 +19,7 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
   const [eventType, setEventType] = useState(initialEventData?.event_type || 'Social')
   const [origin, setOrigin] = useState(initialEventData?.origin || 'Externo')
   const [agreementType, setAgreementType] = useState(initialEventData?.agreement_type || '50% - 50%')
+  const [eventStatus, setEventStatus] = useState(initialEventData?.status || 'cotizado')
   const [attendees, setAttendees] = useState(initialEventData?.attendees || 25)
   const [notes, setNotes] = useState(initialEventData?.notes || '')
 
@@ -71,6 +72,7 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
       setEventType(initialEventData.event_type || 'Social')
       setOrigin(initialEventData.origin || 'Externo')
       setAgreementType(initialEventData.agreement_type || '50% - 50%')
+      setEventStatus(initialEventData.status || 'cotizado')
       setAttendees(Number(initialEventData.attendees) || 25)
       setNotes(initialEventData.notes || '')
 
@@ -175,6 +177,7 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
       setEventType('Social')
       setOrigin('Externo')
       setAgreementType('50% - 50%')
+      setEventStatus('cotizado')
       setAttendees(25)
       setNotes('')
       setPreventaQty(0)
@@ -287,6 +290,7 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
       setClientContact('')
       setAttendees(25)
       setNotes('')
+      setEventStatus('cotizado')
       setPreventaQty(0)
       setPreventaPrice(0)
       setGeneralQty(0)
@@ -311,8 +315,10 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
   }
 
   // Generador unificado de payload
-  const buildPayload = (status) => {
-    const finalName = eventName.trim() || `Cotización ${eventType} - ${clientName || 'Cliente'}`
+  const buildPayload = (overrideStatus) => {
+    const finalStatus = overrideStatus || eventStatus || 'cotizado'
+    const defaultPrefix = finalStatus === 'cotizado' ? 'Cotización' : finalStatus === 'reservado' ? 'Reserva' : 'Evento'
+    const finalName = eventName.trim() || `${defaultPrefix} ${eventType} - ${clientName || 'Cliente'}`
     return {
       id: eventId || undefined,
       calc_code: calcCode || undefined,
@@ -325,7 +331,7 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
       venue,
       event_type: eventType,
       origin,
-      status,
+      status: finalStatus,
       agreement_type: agreementType,
       attendees: Number(attendees) || 25,
       preventa_qty: Number(preventaQty) || 0,
@@ -359,20 +365,33 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
       margin_pct: marginPct,
       payment_method: 'Transferencia',
       invoice_type: 'Factura A',
-      notes: notes.trim() || (status === 'cotizado' ? 'Cotización guardada en el sistema.' : 'Evento confirmado y cerrado.')
+      notes: notes.trim() || (
+        finalStatus === 'cotizado' ? 'Cotización guardada en el sistema.' :
+        finalStatus === 'reservado' ? 'Fecha reservada. En espera de seña o confirmación definitiva.' :
+        'Evento confirmado y cerrado.'
+      )
     }
   }
 
   // Guardar como Cotización
   const handleSaveAsQuote = () => {
     const payload = buildPayload('cotizado')
+    setEventStatus('cotizado')
     onSaveEvent(payload, 'cotizado')
+  }
+
+  // Guardar como Reservado
+  const handleSaveAsReserved = () => {
+    const payload = buildPayload('reservado')
+    setEventStatus('reservado')
+    onSaveEvent(payload, 'reservado')
   }
 
   // Guardar como Evento Confirmado (Contratado)
   const handleConfirmAndSave = () => {
     confetti({ particleCount: 120, spread: 80, origin: { y: 0.6 } })
     const payload = buildPayload('contratado')
+    setEventStatus('contratado')
     onSaveEvent(payload, 'contratado')
   }
 
@@ -406,14 +425,25 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
           <button
             onClick={handleSaveAsQuote}
             className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl font-bold text-xs bg-amber-400 hover:bg-amber-300 text-barolo-navy shadow-md shadow-amber-400/20 transition-all"
+            title="Guardar como Cotización (en análisis)"
           >
             <FileText className="w-3.5 h-3.5" />
-            <span>📝 Guardar Cotización</span>
+            <span>📝 Cotización</span>
+          </button>
+
+          <button
+            onClick={handleSaveAsReserved}
+            className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl font-bold text-xs bg-sky-500 hover:bg-sky-400 text-white shadow-md shadow-sky-500/25 transition-all"
+            title="Guardar como Reservado (bloqueo de fecha)"
+          >
+            <BookmarkCheck className="w-3.5 h-3.5" />
+            <span>🔵 Reservado</span>
           </button>
 
           <button
             onClick={handleConfirmAndSave}
             className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl font-bold text-xs bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-600/20 transition-all"
+            title="Confirmar en firme como Evento Contratado"
           >
             <CheckCircle2 className="w-3.5 h-3.5" />
             <span>💾 Confirmar Evento</span>
@@ -424,12 +454,15 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
       {/* Banner de Modo Edición si se está modificando un evento existente */}
       {eventId && (
         <div className="bg-amber-500/10 border border-amber-500/40 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm">
-          <div className="flex items-center space-x-2 text-amber-950">
-            <span className="bg-amber-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
-              Modo Edición
+          <div className="flex items-center space-x-2 text-slate-800">
+            <span className={`text-white text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider ${
+              eventStatus === 'contratado' ? 'bg-emerald-600' :
+              eventStatus === 'reservado' ? 'bg-sky-600' : 'bg-amber-500'
+            }`}>
+              {eventStatus === 'contratado' ? 'Contratado' : eventStatus === 'reservado' ? 'Reservado' : 'Cotización'}
             </span>
             <span className="font-bold text-xs">
-              Editando: <strong className="font-mono text-amber-800">{calcCode || 'Cotización'}</strong> — {eventName || clientName || 'Sin título'}
+              Editando: <strong className="font-mono text-barolo-navy">{calcCode || 'Registro'}</strong> — {eventName || clientName || 'Sin título'}
             </span>
           </div>
           <button
@@ -569,6 +602,23 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
                   <option value="Solo Alquiler">Solo Alquiler</option>
                 </select>
               </div>
+            </div>
+
+            <div>
+              <label className="font-semibold text-slate-700 block mb-1">Estado Comercial</label>
+              <select
+                value={eventStatus}
+                onChange={(e) => setEventStatus(e.target.value)}
+                className={`w-full border rounded-xl px-3 py-2 font-bold transition-colors ${
+                  eventStatus === 'contratado' ? 'bg-emerald-50 text-emerald-900 border-emerald-300' :
+                  eventStatus === 'reservado' ? 'bg-sky-50 text-sky-900 border-sky-300' :
+                  'bg-amber-50 text-amber-950 border-amber-300'
+                }`}
+              >
+                <option value="cotizado">🟡 Cotizado (Propuesta en análisis)</option>
+                <option value="reservado">🔵 Reservado (Fecha bloqueada / Seña)</option>
+                <option value="contratado">🟢 Contratado (Confirmado en firme)</option>
+              </select>
             </div>
 
           </div>
@@ -943,19 +993,30 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
           </div>
 
           {/* Action Buttons */}
-          <div className="flex items-center space-x-3 w-full md:w-auto justify-end">
+          <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto justify-end">
             
             <button
               onClick={handleSaveAsQuote}
-              className="flex items-center space-x-1.5 px-4 py-2.5 rounded-xl font-bold text-xs bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-barolo-navy shadow-lg shadow-amber-500/20 transition-all transform hover:scale-105"
+              className="flex items-center space-x-1.5 px-3.5 py-2.5 rounded-xl font-bold text-xs bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-barolo-navy shadow-lg shadow-amber-500/20 transition-all transform hover:scale-105"
+              title="Guardar propuesta comercial en estado Cotizado"
             >
               <FileText className="w-4 h-4" />
-              <span>📝 GUARDAR COMO COTIZACIÓN</span>
+              <span>📝 GUARDAR COTIZACIÓN</span>
+            </button>
+
+            <button
+              onClick={handleSaveAsReserved}
+              className="flex items-center space-x-1.5 px-4 py-2.5 rounded-xl font-bold text-xs bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 text-white shadow-lg shadow-sky-600/30 transition-all transform hover:scale-105"
+              title="Guardar y bloquear fecha en estado Reservado"
+            >
+              <BookmarkCheck className="w-4 h-4" />
+              <span>🔵 RESERVAR FECHA</span>
             </button>
 
             <button
               onClick={handleConfirmAndSave}
-              className="flex items-center space-x-1.5 px-5 py-2.5 rounded-xl font-bold text-xs bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white shadow-lg shadow-emerald-700/30 transition-all transform hover:scale-105"
+              className="flex items-center space-x-1.5 px-4 py-2.5 rounded-xl font-bold text-xs bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white shadow-lg shadow-emerald-700/30 transition-all transform hover:scale-105"
+              title="Confirmar definitivamente y pasar a Evento Contratado"
             >
               <CheckCircle2 className="w-4 h-4" />
               <span>💾 CONFIRMAR EVENTO</span>

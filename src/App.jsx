@@ -49,12 +49,16 @@ export default function App() {
       if (eventData.event_date) {
         setCalendarTargetDate(eventData.event_date)
       }
-      showToast(targetStatus === 'cotizado' ? '📝 ¡Cotización guardada con éxito!' : '💾 ¡Evento contratado confirmado!')
+      showToast(
+        targetStatus === 'cotizado' ? '📝 ¡Cotización guardada con éxito!' :
+        targetStatus === 'reservado' ? '🔵 ¡Fecha guardada como Reservada!' :
+        '💾 ¡Evento contratado confirmado!'
+      )
       setCurrentView('calendar')
     }
   }
 
-  // Actualizar estado de un evento (ej: Cotizado -> Contratado)
+  // Actualizar estado de un evento (ej: Cotizado -> Contratado o Reservado)
   const handleUpdateStatus = async (eventId, newStatus, reason = null) => {
     const res = await eventService.updateStatus(eventId, newStatus, reason)
     if (res.success) {
@@ -62,7 +66,12 @@ export default function App() {
       if (selectedEvent && selectedEvent.id === eventId) {
         setSelectedEvent(res.event)
       }
-      showToast(newStatus === 'contratado' ? '🎉 ¡Cotización confirmada y pasada a Evento oficial!' : 'Evento actualizado.')
+      showToast(
+        newStatus === 'contratado' ? '🎉 ¡Evento confirmado y pasado a Contratado oficial!' :
+        newStatus === 'reservado' ? '🔵 ¡Fecha bloqueada como Reservado!' :
+        newStatus === 'cancelado' ? '❌ Evento marcado como Cancelado.' :
+        'Evento actualizado.'
+      )
     }
   }
 

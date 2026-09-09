@@ -83,10 +83,10 @@ export default function CalendarView({
     return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0]))
   }, [events])
 
-  // Cotizaciones activas en proceso (Pipeline)
+  // Cotizaciones y Reservas activas en proceso (Pipeline)
   const activeQuotes = useMemo(() => {
     return events
-      .filter(e => e.status === 'cotizado')
+      .filter(e => e.status === 'cotizado' || e.status === 'reservado')
       .sort((a, b) => {
         if (quotesSort === 'date_desc') return (b.event_date || '').localeCompare(a.event_date || '')
         if (quotesSort === 'date_asc') return (a.event_date || '').localeCompare(b.event_date || '')
@@ -427,12 +427,13 @@ export default function CalendarView({
       {/* SECCIÓN PIPELINE: COTIZACIONES ACTIVAS EN PROCESO */}
       {/* ========================================================================= */}
       <div className="bg-white rounded-2xl shadow-luxury border border-amber-300/80 p-5 space-y-4">
+        {/* Header con ordenamiento interactivo */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-slate-100 pb-3">
           <div className="flex items-center space-x-2.5">
             <span className="w-3 h-3 rounded-full bg-amber-500 animate-ping"></span>
             <span className="w-3 h-3 rounded-full bg-amber-500 -ml-5.5"></span>
             <h3 className="font-serif font-bold text-barolo-navy text-base">
-              Cotizaciones en Proceso (Pipeline Activo)
+              Cotizaciones & Reservas en Proceso (Pipeline Activo)
             </h3>
             <span className="bg-amber-100 text-amber-900 border border-amber-300 px-2.5 py-0.5 rounded-full text-xs font-bold font-mono">
               {activeQuotes.length}
@@ -459,25 +460,40 @@ export default function CalendarView({
 
         {activeQuotes.length === 0 ? (
           <div className="py-8 text-center text-xs text-slate-400">
-            No hay cotizaciones pendientes en este momento. Hacé clic en <strong>"+ Nueva Cotización"</strong> para crear una.
+            No hay cotizaciones o reservas pendientes en este momento. Hacé clic en <strong>"+ Nueva Cotización"</strong> para crear una.
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
             {activeQuotes.map((q) => {
               const gross = Number(q.gross_income) || 0
               const profit = Number(q.barolo_profit) || 0
+              const isReserved = q.status === 'reservado'
+
               return (
                 <div
                   key={q.id}
-                  className="bg-amber-50/40 hover:bg-amber-50 border border-amber-200/90 rounded-xl p-3.5 flex flex-col justify-between space-y-3 transition-all hover:shadow-md"
+                  className={`border rounded-xl p-3.5 flex flex-col justify-between space-y-3 transition-all hover:shadow-md ${
+                    isReserved 
+                      ? 'bg-blue-50/40 hover:bg-blue-50/70 border-blue-200/90' 
+                      : 'bg-amber-50/40 hover:bg-amber-50 border-amber-200/90'
+                  }`}
                 >
                   <div>
                     <div className="flex items-center justify-between text-xs mb-1">
-                      <span className="font-mono font-bold text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded text-[11px]">
-                        {q.calc_code || 'CALC'}
-                      </span>
+                      <div className="flex items-center space-x-1.5">
+                        <span className={`font-mono font-bold px-1.5 py-0.5 rounded text-[11px] ${
+                          isReserved ? 'text-blue-800 bg-blue-100' : 'text-amber-800 bg-amber-100'
+                        }`}>
+                          {q.calc_code || 'CALC'}
+                        </span>
+                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                          isReserved ? 'bg-blue-200/70 text-blue-900' : 'bg-amber-200/70 text-amber-900'
+                        }`}>
+                          {isReserved ? '🔵 Reservado' : '🟡 Cotizado'}
+                        </span>
+                      </div>
                       <span className="font-semibold text-slate-600 flex items-center">
-                        <CalendarIcon className="w-3 h-3 mr-1 text-amber-600" />
+                        <CalendarIcon className="w-3 h-3 mr-1 text-slate-500" />
                         {q.event_date}
                       </span>
                     </div>
@@ -489,7 +505,7 @@ export default function CalendarView({
                       {q.client_name || 'Particular'} • {q.venue}
                     </p>
 
-                    <div className="mt-2.5 pt-2 border-t border-amber-200/60 flex items-center justify-between text-xs">
+                    <div className="mt-2.5 pt-2 border-t border-slate-200/60 flex items-center justify-between text-xs">
                       <div>
                         <span className="text-[10px] text-slate-400 block uppercase font-semibold">Facturación</span>
                         <span className="font-bold text-slate-800">
@@ -505,14 +521,14 @@ export default function CalendarView({
                     </div>
                   </div>
 
-                  <div className="flex items-center space-x-1.5 pt-2 border-t border-amber-200/60">
+                  <div className="flex items-center space-x-1.5 pt-2 border-t border-slate-200/60">
                     <button
                       onClick={() => handleJumpToDate(q.event_date)}
-                      className="flex-1 bg-white hover:bg-amber-100 text-amber-900 border border-amber-300 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-colors flex items-center justify-center space-x-1"
+                      className="flex-1 bg-white hover:bg-slate-100 text-slate-800 border border-slate-300 px-2 py-1.5 rounded-lg text-xs font-bold transition-colors flex items-center justify-center space-x-1"
                       title="Mover el calendario a esta fecha"
                     >
                       <CalendarIcon className="w-3 h-3" />
-                      <span>Ver en Calendario</span>
+                      <span>Ver</span>
                     </button>
 
                     <button
@@ -524,10 +540,21 @@ export default function CalendarView({
                       <span>Retocar</span>
                     </button>
 
+                    {!isReserved && (
+                      <button
+                        onClick={() => onUpdateStatus && onUpdateStatus(q.id, 'reservado')}
+                        className="bg-sky-500 hover:bg-sky-400 text-white px-2 py-1.5 rounded-lg text-xs font-bold transition-colors flex items-center justify-center"
+                        title="Pasar a Reservado (bloqueo de fecha)"
+                      >
+                        <Clock className="w-3 h-3 mr-0.5" />
+                        <span>Reservar</span>
+                      </button>
+                    )}
+
                     <button
                       onClick={() => onUpdateStatus && onUpdateStatus(q.id, 'contratado')}
                       className="bg-emerald-600 hover:bg-emerald-500 text-white px-2.5 py-1.5 rounded-lg text-xs font-bold transition-colors flex items-center justify-center"
-                      title="Confirmar evento (pasa a verde Contratado)"
+                      title="Confirmar evento en firme (pasa a verde Contratado)"
                     >
                       <CheckCircle2 className="w-3 h-3" />
                     </button>
