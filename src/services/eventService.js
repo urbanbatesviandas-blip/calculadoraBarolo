@@ -9,10 +9,9 @@ const isUuidString = (str) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-
 const getLocalEvents = () => {
   try {
     const saved = localStorage.getItem(LOCAL_STORAGE_KEY)
-    if (saved) {
+    if (saved !== null) {
       const parsed = JSON.parse(saved)
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        // Auto-deduplicar por calc_code o ID para limpiar de raíz cualquier duplicación vieja en PC
+      if (Array.isArray(parsed)) {
         const seen = new Map()
         parsed.filter(e => !e.calc_code?.startsWith('SYS-') && e.cancellation_reason !== 'CONFIG_STORAGE').forEach(item => {
           const key = item.calc_code || item.id
@@ -20,24 +19,13 @@ const getLocalEvents = () => {
             seen.set(key, item)
           }
         })
-        const clean = Array.from(seen.values())
-        if (clean.length !== parsed.length) {
-          console.log(`Auto-cleaned duplicate/system events from localStorage`)
-          try {
-            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(clean))
-          } catch (e) {}
-        }
-        return clean
+        return Array.from(seen.values())
       }
     }
   } catch (e) {
     console.warn('Error reading from localStorage', e)
   }
-  // Guardar datos iniciales
-  try {
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(initialEvents))
-  } catch (e) {}
-  return initialEvents
+  return []
 }
 
 const saveLocalEvents = (events) => {
