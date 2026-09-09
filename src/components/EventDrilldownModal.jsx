@@ -7,7 +7,7 @@ import {
 import { Bar } from 'react-chartjs-2'
 import confetti from 'canvas-confetti'
 import { excelExportService } from '../services/excelExportService'
-import { canEditEvent, canChangeStatus, canViewSensitiveData, getRoleBadge, isAdmin } from '../services/authService'
+import { canEditEvent, canChangeStatus, canViewSensitiveData, isAdmin } from '../services/authService'
 import { eventService, parseNotesAndComments } from '../services/eventService'
 import {
   Chart as ChartJS,
@@ -618,25 +618,22 @@ export default function EventDrilldownModal({ event, onClose, onUpdateStatus, on
                 </div>
               ) : (
                 comments.map(c => {
-                  const roleMeta = getRoleBadge(c.author_role)
                   const isAuthor = c.author_id === currentUser?.id || c.author_username === currentUser?.username
                   const canDelete = isAuthor || isUserAdmin
                   const dateStr = c.created_at 
                     ? new Date(c.created_at).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
                     : ''
+                  const displayName = c.author_name || c.author_username || 'Usuario'
 
                   return (
                     <div key={c.id} className="bg-slate-50 border border-slate-200/80 rounded-xl p-3 text-xs space-y-1 group">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-2">
                           <div className="w-5 h-5 rounded-full bg-barolo-navy text-amber-300 font-bold text-[10px] flex items-center justify-center">
-                            {c.author_name?.charAt(0)?.toUpperCase() || 'U'}
+                            {displayName.charAt(0).toUpperCase()}
                           </div>
-                          <span className="font-bold text-slate-900 text-xs">{c.author_name}</span>
-                          <span className={`text-[9px] px-1.5 py-0.2 rounded-full border ${roleMeta.badgeClass}`}>
-                            {roleMeta.icon} {roleMeta.title}
-                          </span>
-                          <span className="text-[10px] text-slate-400">{dateStr}</span>
+                          <span className="font-bold text-slate-900 text-xs">{displayName}</span>
+                          <span className="text-[10px] text-slate-400">• {dateStr}</span>
                         </div>
 
                         {canDelete && (
