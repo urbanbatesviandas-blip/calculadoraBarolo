@@ -59,7 +59,7 @@ export const eventService = {
 
   // Guardar o actualizar un evento
   async saveEvent(eventData) {
-    const isNew = !eventData.id || eventData.id.startsWith('evt-temp') || !eventData.id.includes('-')
+    const isNew = !eventData.id || String(eventData.id).startsWith('evt-temp')
     
     // Generar código correlativo si no tiene
     if (!eventData.calc_code) {

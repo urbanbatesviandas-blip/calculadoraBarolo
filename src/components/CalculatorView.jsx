@@ -7,72 +7,193 @@ import confetti from 'canvas-confetti'
 
 export default function CalculatorView({ initialEventData, onSaveEvent, onSwitchView }) {
   // Estado general
+  const [eventId, setEventId] = useState(initialEventData?.id || null)
   const [calcCode, setCalcCode] = useState(initialEventData?.calc_code || '')
   const [eventName, setEventName] = useState(initialEventData?.name || '')
   const [clientName, setClientName] = useState(initialEventData?.client_name || '')
-  const [clientCuit, setClientCuit] = useState(initialEventData?.client_cuit || '30-71234567-9')
+  const [clientCuit, setClientCuit] = useState(initialEventData?.client_cuit || '')
   const [clientContact, setClientContact] = useState(initialEventData?.client_contact || '')
-  const [eventDate, setEventDate] = useState(initialEventData?.event_date || '2026-10-15')
+  const [eventDate, setEventDate] = useState(initialEventData?.event_date || new Date().toISOString().substring(0, 10))
   const [eventTime, setEventTime] = useState(initialEventData?.event_time || '19:00')
   const [venue, setVenue] = useState(initialEventData?.venue || 'Espacio Barolo')
   const [eventType, setEventType] = useState(initialEventData?.event_type || 'Social')
   const [origin, setOrigin] = useState(initialEventData?.origin || 'Externo')
   const [agreementType, setAgreementType] = useState(initialEventData?.agreement_type || '50% - 50%')
-  const [attendees, setAttendees] = useState(initialEventData?.attendees || 35)
+  const [attendees, setAttendees] = useState(initialEventData?.attendees || 25)
 
   // Entradas (Ticketing)
-  const [preventaQty, setPreventaQty] = useState(15)
-  const [preventaPrice, setPreventaPrice] = useState(30000)
-  const [generalQty, setGeneralQty] = useState(20)
-  const [generalPrice, setGeneralPrice] = useState(35000)
+  const [preventaQty, setPreventaQty] = useState(0)
+  const [preventaPrice, setPreventaPrice] = useState(0)
+  const [generalQty, setGeneralQty] = useState(0)
+  const [generalPrice, setGeneralPrice] = useState(0)
   const [alquilerEspacio, setAlquilerEspacio] = useState(0)
   const [contratacionSalon, setContratacionSalon] = useState(0)
 
   // Desglose Dinámico de Otros Ingresos
   const [extraIncomes, setExtraIncomes] = useState([
-    { id: 'inc-1', concept: 'Sponsor / Marca', amount: 0 }
+    { id: 'inc-1', concept: '', amount: 0 }
   ])
 
   // Costos Directos
-  const [costArtistas, setCostArtistas] = useState(367500)
+  const [costArtistas, setCostArtistas] = useState(0)
   const [costTecnica, setCostTecnica] = useState(0)
   const [costDisertantes, setCostDisertantes] = useState(0)
   const [costCatering, setCostCatering] = useState(0)
-  const [costMobiliario, setCostMobiliario] = useState(16000)
-  const [costGastronomicos, setCostGastronomicos] = useState(71500)
+  const [costMobiliario, setCostMobiliario] = useState(0)
+  const [costGastronomicos, setCostGastronomicos] = useState(0)
 
   // Costos Indirectos / Operativos
-  const [costRrhh, setCostRrhh] = useState(40000)
-  const [costLimpieza, setCostLimpieza] = useState(16000)
-  const [costSeguros, setCostSeguros] = useState(40350)
+  const [costRrhh, setCostRrhh] = useState(0)
+  const [costLimpieza, setCostLimpieza] = useState(0)
+  const [costSeguros, setCostSeguros] = useState(0)
   const [costAlquilerEspacio, setCostAlquilerEspacio] = useState(0)
   const [costMarketing, setCostMarketing] = useState(0)
   const [costSadaic, setCostSadaic] = useState(0)
 
   // Desglose Dinámico de Otros Gastos
   const [extraExpenses, setExtraExpenses] = useState([
-    { id: 'exp-1', concept: 'Seguridad Adicional', amount: 0 }
+    { id: 'exp-1', concept: '', amount: 0 }
   ])
 
-  // Cargar datos iniciales si vienen de un evento existente
+  // Cargar y restaurar datos completos cuando se abre un evento
   useEffect(() => {
     if (initialEventData) {
+      setEventId(initialEventData.id || null)
       setCalcCode(initialEventData.calc_code || '')
       setEventName(initialEventData.name || '')
       setClientName(initialEventData.client_name || '')
       setClientCuit(initialEventData.client_cuit || '')
       setClientContact(initialEventData.client_contact || '')
-      setEventDate(initialEventData.event_date || '')
+      setEventDate(initialEventData.event_date || new Date().toISOString().substring(0, 10))
+      setEventTime(initialEventData.event_time || '19:00')
       setVenue(initialEventData.venue || 'Espacio Barolo')
       setEventType(initialEventData.event_type || 'Social')
       setOrigin(initialEventData.origin || 'Externo')
       setAgreementType(initialEventData.agreement_type || '50% - 50%')
-      setAttendees(initialEventData.attendees || 25)
-      if (initialEventData.gross_income > 0) {
-        setAlquilerEspacio(Number(initialEventData.gross_income))
+      setAttendees(Number(initialEventData.attendees) || 25)
+
+      // 1. Restaurar Entradas y Alquileres
+      if (initialEventData.preventa_qty !== undefined || initialEventData.general_qty !== undefined) {
+        setPreventaQty(Number(initialEventData.preventa_qty) || 0)
+        setPreventaPrice(Number(initialEventData.preventa_price) || 0)
+        setGeneralQty(Number(initialEventData.general_qty) || 0)
+        setGeneralPrice(Number(initialEventData.general_price) || 0)
+        setAlquilerEspacio(Number(initialEventData.alquiler_espacio) || 0)
+        setContratacionSalon(Number(initialEventData.contratacion_salon) || 0)
+      } else if (Number(initialEventData.ticket_qty) > 0 && Number(initialEventData.ticket_price) > 0) {
         setPreventaQty(0)
+        setPreventaPrice(0)
+        setGeneralQty(Number(initialEventData.ticket_qty) || 0)
+        setGeneralPrice(Number(initialEventData.ticket_price) || 0)
+        setAlquilerEspacio(0)
+        setContratacionSalon(0)
+      } else {
+        setPreventaQty(0)
+        setPreventaPrice(0)
         setGeneralQty(0)
+        setGeneralPrice(0)
+        setAlquilerEspacio(Number(initialEventData.gross_income) || 0)
+        setContratacionSalon(0)
       }
+
+      // 2. Restaurar Otros Ingresos
+      if (initialEventData.extra_incomes && initialEventData.extra_incomes.length > 0) {
+        setExtraIncomes(initialEventData.extra_incomes)
+      } else {
+        setExtraIncomes([{ id: 'inc-1', concept: '', amount: 0 }])
+      }
+
+      // 3. Restaurar Costos Directos
+      if (initialEventData.cost_artistas !== undefined) {
+        setCostArtistas(Number(initialEventData.cost_artistas) || 0)
+        setCostTecnica(Number(initialEventData.cost_tecnica) || 0)
+        setCostDisertantes(Number(initialEventData.cost_disertantes) || 0)
+        setCostCatering(Number(initialEventData.cost_catering) || 0)
+        setCostMobiliario(Number(initialEventData.cost_mobiliario) || 0)
+        setCostGastronomicos(Number(initialEventData.cost_gastronomicos) || 0)
+      } else if (Number(initialEventData.direct_costs) > 0) {
+        const dc = Number(initialEventData.direct_costs)
+        setCostArtistas(Math.round(dc * 0.55))
+        setCostTecnica(Math.round(dc * 0.25))
+        setCostDisertantes(0)
+        setCostCatering(Math.round(dc * 0.15))
+        setCostMobiliario(0)
+        setCostGastronomicos(Math.round(dc * 0.05))
+      } else {
+        setCostArtistas(0)
+        setCostTecnica(0)
+        setCostDisertantes(0)
+        setCostCatering(0)
+        setCostMobiliario(0)
+        setCostGastronomicos(0)
+      }
+
+      // 4. Restaurar Costos Indirectos
+      if (initialEventData.cost_limpieza !== undefined) {
+        setCostRrhh(Number(initialEventData.cost_rrhh) || 0)
+        setCostLimpieza(Number(initialEventData.cost_limpieza) || 0)
+        setCostSeguros(Number(initialEventData.cost_seguros) || 0)
+        setCostAlquilerEspacio(Number(initialEventData.cost_alquiler_espacio) || 0)
+        setCostMarketing(Number(initialEventData.cost_marketing) || 0)
+        setCostSadaic(Number(initialEventData.cost_sadaic) || 0)
+      } else if (Number(initialEventData.indirect_costs) > 0) {
+        const ic = Number(initialEventData.indirect_costs)
+        setCostRrhh(Math.round(ic * 0.35))
+        setCostLimpieza(Math.round(ic * 0.25))
+        setCostSeguros(Math.round(ic * 0.25))
+        setCostAlquilerEspacio(0)
+        setCostMarketing(0)
+        setCostSadaic(Math.round(ic * 0.15))
+      } else {
+        setCostRrhh(0)
+        setCostLimpieza(0)
+        setCostSeguros(0)
+        setCostAlquilerEspacio(0)
+        setCostMarketing(0)
+        setCostSadaic(0)
+      }
+
+      // 5. Restaurar Otros Gastos
+      if (initialEventData.extra_expenses && initialEventData.extra_expenses.length > 0) {
+        setExtraExpenses(initialEventData.extra_expenses)
+      } else {
+        setExtraExpenses([{ id: 'exp-1', concept: '', amount: 0 }])
+      }
+    } else {
+      // Estado limpio para nueva cotización
+      setEventId(null)
+      setCalcCode('')
+      setEventName('')
+      setClientName('')
+      setClientCuit('')
+      setClientContact('')
+      setEventDate(new Date().toISOString().substring(0, 10))
+      setEventTime('19:00')
+      setVenue('Espacio Barolo')
+      setEventType('Social')
+      setOrigin('Externo')
+      setAgreementType('50% - 50%')
+      setAttendees(25)
+      setPreventaQty(0)
+      setPreventaPrice(0)
+      setGeneralQty(0)
+      setGeneralPrice(0)
+      setAlquilerEspacio(0)
+      setContratacionSalon(0)
+      setExtraIncomes([{ id: 'inc-1', concept: '', amount: 0 }])
+      setCostArtistas(0)
+      setCostTecnica(0)
+      setCostDisertantes(0)
+      setCostCatering(0)
+      setCostMobiliario(0)
+      setCostGastronomicos(0)
+      setCostRrhh(0)
+      setCostLimpieza(0)
+      setCostSeguros(0)
+      setCostAlquilerEspacio(0)
+      setCostMarketing(0)
+      setCostSadaic(0)
+      setExtraExpenses([{ id: 'exp-1', concept: '', amount: 0 }])
     }
   }, [initialEventData])
 
@@ -103,7 +224,7 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
   const totalTicketing = subtotalPreventa + subtotalGeneral
   const totalExtraIncomes = extraIncomes.reduce((acc, i) => acc + (Number(i.amount) || 0), 0)
 
-  const totalGrossIncome = totalTicketing + alquilerEspacio + contratacionSalon + totalExtraIncomes
+  const totalGrossIncome = totalTicketing + Number(alquilerEspacio) + Number(contratacionSalon) + totalExtraIncomes
 
   // Suma de Costos Directos
   const totalDirectCosts = 
@@ -139,7 +260,7 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
   } else if (agreementType === '30% Barolo - 70% Productor') {
     baroloProfit = netMargin * 0.30
   } else if (agreementType === 'Solo Alquiler') {
-    baroloProfit = alquilerEspacio + contratacionSalon
+    baroloProfit = Number(alquilerEspacio) + Number(contratacionSalon)
   } else {
     baroloProfit = netMargin * 0.50
   }
@@ -155,25 +276,41 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
   // Limpiar
   const handleReset = () => {
     if (confirm('¿Deseas vaciar la calculadora para preparar una nueva cotización?')) {
+      setEventId(null)
       setCalcCode('')
       setEventName('')
       setClientName('')
+      setClientCuit('')
       setClientContact('')
+      setAttendees(25)
       setPreventaQty(0)
+      setPreventaPrice(0)
       setGeneralQty(0)
+      setGeneralPrice(0)
       setAlquilerEspacio(0)
+      setContratacionSalon(0)
       setExtraIncomes([{ id: 'inc-1', concept: '', amount: 0 }])
       setCostArtistas(0)
       setCostTecnica(0)
+      setCostDisertantes(0)
       setCostCatering(0)
+      setCostMobiliario(0)
+      setCostGastronomicos(0)
+      setCostRrhh(0)
+      setCostLimpieza(0)
+      setCostSeguros(0)
+      setCostAlquilerEspacio(0)
+      setCostMarketing(0)
+      setCostSadaic(0)
       setExtraExpenses([{ id: 'exp-1', concept: '', amount: 0 }])
     }
   }
 
-  // Guardar como Cotización
-  const handleSaveAsQuote = () => {
+  // Generador unificado de payload
+  const buildPayload = (status) => {
     const finalName = eventName.trim() || `Cotización ${eventType} - ${clientName || 'Cliente'}`
-    const payload = {
+    return {
+      id: eventId || undefined,
       calc_code: calcCode || undefined,
       name: finalName,
       client_name: clientName || 'Cliente Particular',
@@ -184,11 +321,31 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
       venue,
       event_type: eventType,
       origin,
-      status: 'cotizado',
+      status,
       agreement_type: agreementType,
       attendees: Number(attendees) || 25,
+      preventa_qty: Number(preventaQty) || 0,
+      preventa_price: Number(preventaPrice) || 0,
+      general_qty: Number(generalQty) || 0,
+      general_price: Number(generalPrice) || 0,
       ticket_qty: preventaQty + generalQty,
       ticket_price: ticketAvgPrice,
+      alquiler_espacio: Number(alquilerEspacio) || 0,
+      contratacion_salon: Number(contratacionSalon) || 0,
+      extra_incomes: extraIncomes.filter(i => i.concept || Number(i.amount) > 0),
+      cost_artistas: Number(costArtistas) || 0,
+      cost_tecnica: Number(costTecnica) || 0,
+      cost_disertantes: Number(costDisertantes) || 0,
+      cost_catering: Number(costCatering) || 0,
+      cost_mobiliario: Number(costMobiliario) || 0,
+      cost_gastronomicos: Number(costGastronomicos) || 0,
+      cost_rrhh: Number(costRrhh) || 0,
+      cost_limpieza: Number(costLimpieza) || 0,
+      cost_seguros: Number(costSeguros) || 0,
+      cost_alquiler_espacio: Number(costAlquilerEspacio) || 0,
+      cost_marketing: Number(costMarketing) || 0,
+      cost_sadaic: Number(costSadaic) || 0,
+      extra_expenses: extraExpenses.filter(e => e.concept || Number(e.amount) > 0),
       gross_income: totalGrossIncome,
       direct_costs: totalDirectCosts,
       indirect_costs: totalIndirectCosts,
@@ -196,60 +353,22 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
       net_profit: netMargin,
       barolo_profit: baroloProfit,
       margin_pct: marginPct,
-      cost_artistas: Number(costArtistas) || 0,
-      cost_tecnica: Number(costTecnica) || 0,
-      cost_catering: Number(costCatering) || 0,
-      cost_mobiliario: Number(costMobiliario) || 0,
-      cost_gastronomicos: Number(costGastronomicos) || 0,
-      cost_rrhh: Number(costRrhh) || 0,
-      cost_limpieza: Number(costLimpieza) || 0,
-      cost_seguros: Number(costSeguros) || 0,
       payment_method: 'Transferencia',
       invoice_type: 'Factura A',
-      notes: `Cotización generada desde la Calculadora Madre online.`
+      notes: status === 'cotizado' ? 'Cotización guardada en el sistema.' : 'Evento confirmado y cerrado.'
     }
+  }
+
+  // Guardar como Cotización
+  const handleSaveAsQuote = () => {
+    const payload = buildPayload('cotizado')
     onSaveEvent(payload, 'cotizado')
   }
 
   // Guardar como Evento Confirmado (Contratado)
   const handleConfirmAndSave = () => {
     confetti({ particleCount: 120, spread: 80, origin: { y: 0.6 } })
-    const finalName = eventName.trim() || `Evento ${eventType} - ${clientName || 'Cliente'}`
-    const payload = {
-      calc_code: calcCode || undefined,
-      name: finalName,
-      client_name: clientName || 'Cliente Particular',
-      client_cuit: clientCuit,
-      client_contact: clientContact,
-      event_date: eventDate,
-      event_time: eventTime,
-      venue,
-      event_type: eventType,
-      origin,
-      status: 'contratado',
-      agreement_type: agreementType,
-      attendees: Number(attendees) || 25,
-      ticket_qty: preventaQty + generalQty,
-      ticket_price: ticketAvgPrice,
-      gross_income: totalGrossIncome,
-      direct_costs: totalDirectCosts,
-      indirect_costs: totalIndirectCosts,
-      total_costs: totalCosts,
-      net_profit: netMargin,
-      barolo_profit: baroloProfit,
-      margin_pct: marginPct,
-      cost_artistas: Number(costArtistas) || 0,
-      cost_tecnica: Number(costTecnica) || 0,
-      cost_catering: Number(costCatering) || 0,
-      cost_mobiliario: Number(costMobiliario) || 0,
-      cost_gastronomicos: Number(costGastronomicos) || 0,
-      cost_rrhh: Number(costRrhh) || 0,
-      cost_limpieza: Number(costLimpieza) || 0,
-      cost_seguros: Number(costSeguros) || 0,
-      payment_method: 'Transferencia',
-      invoice_type: 'Factura A',
-      notes: `Evento cerrado y confirmado desde la Calculadora Madre.`
-    }
+    const payload = buildPayload('contratado')
     onSaveEvent(payload, 'contratado')
   }
 
@@ -280,6 +399,26 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
           </button>
         </div>
       </div>
+
+      {/* Banner de Modo Edición si se está modificando un evento existente */}
+      {eventId && (
+        <div className="bg-amber-500/10 border border-amber-500/40 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm">
+          <div className="flex items-center space-x-2 text-amber-950">
+            <span className="bg-amber-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
+              Modo Edición
+            </span>
+            <span className="font-bold text-xs">
+              Editando: <strong className="font-mono text-amber-800">{calcCode || 'Cotización'}</strong> — {eventName || clientName || 'Sin título'}
+            </span>
+          </div>
+          <button
+            onClick={handleReset}
+            className="text-xs text-amber-800 hover:text-amber-950 font-bold underline cursor-pointer"
+          >
+            Descartar y crear nueva cotización en blanco
+          </button>
+        </div>
+      )}
 
       {/* Main Form Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

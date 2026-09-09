@@ -33,6 +33,26 @@ export default function EventDrilldownModal({ event, onClose, onUpdateStatus, on
 
   // 1. Desglose Detallado de Facturación Bruta
   const incomeBreakdown = useMemo(() => {
+    if (event.preventa_qty !== undefined || event.general_qty !== undefined || event.alquiler_espacio !== undefined) {
+      const items = []
+      const preventaTot = (Number(event.preventa_qty) || 0) * (Number(event.preventa_price) || 0)
+      const generalTot = (Number(event.general_qty) || 0) * (Number(event.general_price) || 0)
+      const alq = (Number(event.alquiler_espacio) || 0) + (Number(event.contratacion_salon) || 0)
+
+      if (preventaTot > 0) items.push({ label: `Preventa (${event.preventa_qty} u.)`, amount: preventaTot, icon: '🎟️' })
+      if (generalTot > 0) items.push({ label: `Entradas Generales (${event.general_qty} u.)`, amount: generalTot, icon: '🎫' })
+      if (alq > 0) items.push({ label: 'Alquiler Espacio Barolo', amount: alq, icon: '🏛️' })
+      
+      if (event.extra_incomes && event.extra_incomes.length > 0) {
+        event.extra_incomes.forEach(inc => {
+          if (Number(inc.amount) > 0) {
+            items.push({ label: inc.concept || 'Otros Ingresos', amount: Number(inc.amount), icon: '✨' })
+          }
+        })
+      }
+      if (items.length > 0) return items
+    }
+
     if (event.ticket_qty > 0 && event.ticket_price > 0) {
       const ticketsTotal = Number(event.ticket_qty) * Number(event.ticket_price)
       const otherIncome = Math.max(0, grossIncome - ticketsTotal)
@@ -59,6 +79,7 @@ export default function EventDrilldownModal({ event, onClose, onUpdateStatus, on
       return [
         { label: 'Honorarios Artistas', amount: Number(event.cost_artistas) || 0, icon: '🎭' },
         { label: 'Técnica & Sonido', amount: Number(event.cost_tecnica) || 0, icon: '🎛️' },
+        { label: 'Disertantes / Speakers', amount: Number(event.cost_disertantes) || 0, icon: '🎙️' },
         { label: 'Catering / Gastronomía', amount: Number(event.cost_catering) || 0, icon: '🍽️' },
         { label: 'Mobiliario & Insumos', amount: (Number(event.cost_mobiliario) || 0) + (Number(event.cost_gastronomicos) || 0), icon: '🛋️' }
       ].filter(i => i.amount > 0)
@@ -82,12 +103,22 @@ export default function EventDrilldownModal({ event, onClose, onUpdateStatus, on
     if (indirectCosts <= 0) return [{ label: 'Sin costos indirectos', amount: 0, icon: '✓' }]
     
     if (event.cost_limpieza !== undefined) {
-      return [
+      const items = [
         { label: 'RRHH Salón & Seguridad', amount: Number(event.cost_rrhh) || 0, icon: '👔' },
         { label: 'Limpieza Integral', amount: Number(event.cost_limpieza) || 0, icon: '🧹' },
         { label: 'Seguros del Evento', amount: Number(event.cost_seguros) || 0, icon: '🛡️' },
-        { label: 'Operación & Varios', amount: Math.max(0, indirectCosts - (Number(event.cost_rrhh) || 0) - (Number(event.cost_limpieza) || 0) - (Number(event.cost_seguros) || 0)), icon: '📢' }
+        { label: 'Canon Espacio / Operación', amount: Number(event.cost_alquiler_espacio) || 0, icon: '🏢' },
+        { label: 'Marketing / SADAIC', amount: (Number(event.cost_marketing) || 0) + (Number(event.cost_sadaic) || 0), icon: '📢' }
       ].filter(i => i.amount > 0)
+
+      if (event.extra_expenses && event.extra_expenses.length > 0) {
+        event.extra_expenses.forEach(exp => {
+          if (Number(exp.amount) > 0) {
+            items.push({ label: exp.concept || 'Otros Gastos', amount: Number(exp.amount), icon: '📦' })
+          }
+        })
+      }
+      return items.length > 0 ? items : [{ label: 'Costos Indirectos', amount: indirectCosts, icon: '📋' }]
     }
 
     const limpieza = Math.round(indirectCosts * 0.25)

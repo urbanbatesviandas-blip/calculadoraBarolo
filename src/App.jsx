@@ -44,6 +44,7 @@ export default function App() {
     const res = await eventService.saveEvent(eventData)
     if (res.success) {
       await loadEvents()
+      setCalculatorEvent(null)
       showToast(targetStatus === 'cotizado' ? '📝 ¡Cotización guardada con éxito!' : '💾 ¡Evento contratado confirmado!')
       setCurrentView('calendar')
     }
