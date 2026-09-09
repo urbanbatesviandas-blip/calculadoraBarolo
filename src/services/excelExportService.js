@@ -478,6 +478,7 @@ export const excelExportService = {
     addRow('Costo Asociado Extra', '🏷️ Otros Gastos Adicionales Dinámicos ($)', e => {
       const extras = Array.isArray(e.extra_expenses) ? e.extra_expenses : []
       return extras.reduce((sum, item) => sum + (Number(item.value) || 0), 0)
+      return extras.reduce((sum, item) => sum + (Number(item.amount ?? item.value) || 0), 0)
     }, CURRENCY_FORMAT)
 
     // --- SECCIÓN 4: EFICIENCIA UNITARIA POR ASISTENTE (PAX) ---
@@ -502,9 +503,7 @@ export const excelExportService = {
 
     const wb = new ExcelJS.Workbook()
     wb.creator = 'Palacio Barolo'
-    wb.created = new Date()
-
-    const canViewSens = canViewSensitiveData(currentUser, event)
+    const canViewSens = canViewSensitiveData(event, currentUser)
     const cleanCode = (event.calc_code || 'CALC').replace(/[^a-zA-Z0-9_-]/g, '')
 
     // --- HOJA 1: RESUMEN EJECUTIVO ---
@@ -638,7 +637,7 @@ export const excelExportService = {
         breakdownItems.push({
           tipo: 'Ingreso Adicional',
           concepto: isSens ? '🔒 [Ingreso Confidencial]' : (inc.concept || 'Ingreso Extra'),
-          val: Number(inc.value) || 0
+          val: Number(inc.amount ?? inc.value) || 0
         })
       })
     }
@@ -650,7 +649,7 @@ export const excelExportService = {
         breakdownItems.push({
           tipo: 'Gasto Adicional',
           concepto: isSens ? '🔒 [Gasto Confidencial]' : (exp.concept || 'Gasto Extra'),
-          val: Number(exp.value) || 0
+          val: Number(exp.amount ?? exp.value) || 0
         })
       })
     }

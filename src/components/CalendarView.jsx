@@ -27,7 +27,7 @@ export default function CalendarView({
   const userCanEdit = canEditEvent(currentUser)
   const userCanChange = canChangeStatus(currentUser)
 
-  const [currentMonth, setCurrentMonth] = useState(new Date(2026, 8, 1)) // Septiembre 2026
+  const [currentMonth, setCurrentMonth] = useState(() => new Date())
   const [selectedStatus, setSelectedStatus] = useState('all')
   const [selectedVenue, setSelectedVenue] = useState('all')
   const [highlightDay, setHighlightDay] = useState(null)
@@ -78,7 +78,7 @@ export default function CalendarView({
   // Navegación de mes
   const nextMonth = () => setCurrentMonth(addMonths(currentMonth, 1))
   const prevMonth = () => setCurrentMonth(subMonths(currentMonth, 1))
-  const todayMonth = () => setCurrentMonth(new Date(2026, 8, 1))
+  const todayMonth = () => setCurrentMonth(new Date())
 
   // Lista de meses que tienen eventos registrados
   const availableMonths = useMemo(() => {
@@ -182,6 +182,16 @@ export default function CalendarView({
       const isToday = isSameDay(dayItem, new Date())
       const isHighlighted = highlightDay === dateKey
 
+      // Detección de solapamiento de salón en el mismo día
+      const venueCounts = {}
+      dayEvents.forEach(e => {
+        if (e.status === 'contratado' || e.status === 'reservado') {
+          const v = (e.venue || '').trim().toLowerCase()
+          if (v) venueCounts[v] = (venueCounts[v] || 0) + 1
+        }
+      })
+      const hasVenueConflict = Object.values(venueCounts).some(count => count > 1)
+
       return (
         <div
           key={idx}
@@ -204,6 +214,29 @@ export default function CalendarView({
               <span>{format(dayItem, 'd')}</span>
               {isHighlighted && <span className="text-[10px] uppercase tracking-wider ml-1">⭐ ¡NUEVO!</span>}
             </span>
+            <div className="flex items-center space-x-1">
+              <span
+                className={`text-xs font-semibold px-2 py-0.5 rounded-full flex items-center space-x-1 ${
+                  isHighlighted
+                    ? 'bg-amber-600 text-white font-extrabold animate-pulse'
+                    : isToday 
+                      ? 'bg-barolo-navy text-amber-300 font-bold' 
+                      : isCurrentMonth ? 'text-slate-700' : 'text-slate-400'
+                }`}
+              >
+                <span>{format(dayItem, 'd')}</span>
+                {isHighlighted && <span className="text-[10px] uppercase tracking-wider ml-1">⭐ ¡NUEVO!</span>}
+              </span>
+
+              {hasVenueConflict && (
+                <span 
+                  className="text-[10px] bg-rose-600 text-white font-bold px-1.5 py-0.5 rounded shadow-sm flex items-center cursor-help" 
+                  title="⚠️ Conflicto: 2 o más eventos confirmados o reservados en el mismo salón este día"
+                >
+                  ⚠️
+                </span>
+              )}
+            </div>
 
             {isCurrentMonth && userCanCreate && (
               <button

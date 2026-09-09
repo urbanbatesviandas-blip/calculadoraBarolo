@@ -2,13 +2,14 @@ import React, { useState, useEffect, useMemo } from 'react'
 import { 
   X, CheckCircle, Clock, XCircle, AlertTriangle, Building2, Calendar, 
   Users, DollarSign, ArrowUpRight, TrendingUp, Sparkles, Receipt, Calculator, PieChart, BookmarkCheck,
-  FileSpreadsheet, ShieldAlert, Lock, MessageSquare, Send, Trash2
+  FileSpreadsheet, ShieldAlert, Lock, MessageSquare, Send, Trash2, Printer
 } from 'lucide-react'
 import { Bar } from 'react-chartjs-2'
 import confetti from 'canvas-confetti'
 import { excelExportService } from '../services/excelExportService'
 import { canEditEvent, canChangeStatus, canViewSensitiveData, isAdmin } from '../services/authService'
 import { eventService, parseNotesAndComments } from '../services/eventService'
+import CommercialProposalModal from './CommercialProposalModal'
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -23,6 +24,8 @@ ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend)
 
 export default function EventDrilldownModal({ event, onClose, onUpdateStatus, onEditInCalculator, currentUser }) {
   if (!event) return null
+
+  const [isProposalOpen, setIsProposalOpen] = useState(false)
 
   const userCanEdit = canEditEvent(currentUser)
   const userCanChange = canChangeStatus(currentUser)
@@ -698,6 +701,15 @@ export default function EventDrilldownModal({ event, onClose, onUpdateStatus, on
               <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
               <span>Ficha Excel (.xlsx)</span>
             </button>
+
+            <button
+              onClick={() => setIsProposalOpen(true)}
+              className="flex items-center space-x-1.5 px-3 py-2 rounded-xl text-xs sm:text-sm font-bold bg-amber-50 text-amber-900 border border-amber-300 hover:bg-amber-100 transition-colors cursor-pointer"
+              title="Generar Presupuesto Formal para el Cliente (PDF / Imprimir)"
+            >
+              <Printer className="w-4 h-4 text-amber-600" />
+              <span>Presupuesto PDF</span>
+            </button>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
@@ -771,6 +783,15 @@ export default function EventDrilldownModal({ event, onClose, onUpdateStatus, on
         </div>
 
       </div>
+
+      {/* Modal de Propuesta Comercial Formal */}
+      {isProposalOpen && (
+        <CommercialProposalModal
+          event={event}
+          currentUser={currentUser}
+          onClose={() => setIsProposalOpen(false)}
+        />
+      )}
     </div>
   )
 }

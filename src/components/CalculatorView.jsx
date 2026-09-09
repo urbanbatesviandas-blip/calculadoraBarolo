@@ -3,11 +3,12 @@ import {
   Calculator, Plus, Trash2, Save, CheckCircle2, RotateCcw, 
   Sparkles, DollarSign, Users, Calendar, MapPin, Building, AlertCircle, FileText, 
   ArrowRight, BookmarkCheck, Sliders, Lock, EyeOff, ShieldAlert, ChevronRight,
-  TrendingUp, Percent, Award, Info, Scale, Check, RefreshCw, Layers
+  TrendingUp, Percent, Award, Info, Scale, Check, RefreshCw, Layers, Printer
 } from 'lucide-react'
 import confetti from 'canvas-confetti'
 import { canCreateEvent, canEditEvent, canChangeStatus, isAdmin, canViewSensitiveData } from '../services/authService'
 import { calculatorConfigService } from '../services/calculatorConfigService'
+import CommercialProposalModal from './CommercialProposalModal'
 
 // Helper formatters
 const formatARS = (val) => {
@@ -48,11 +49,61 @@ const MONTHS_LIST = [
   'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
 ]
 
-export default function CalculatorView({ initialEventData, onSaveEvent, onSwitchView, currentUser }) {
+// Plantilla oficial precargada: LC-076 Jam de Dibujo (Edición Especial)
+export const OFFICIAL_LC076_DATA = {
+  id: 'LC-076',
+  calc_code: 'LC-076',
+  name: 'Jam de Dibujo (Edición Especial)',
+  client_name: 'Camila Ocampo',
+  client_cuit: '27-35894120-4',
+  client_contact: '+54 9 11 5842-9901',
+  client_email: 'camila.arte@gmail.com',
+  contact_date: '2026-04-15',
+  event_date: '2026-05-09',
+  event_time: '19:00',
+  month: 'Mayo',
+  venue: 'Espacio Barolo',
+  event_type: 'Cultural',
+  origin: 'Fundación',
+  invoice_type: 'Factura A',
+  payment_method: 'Transferencia',
+  agreement_type: '50% - 50%',
+  status: 'contratado',
+  attendees: 35,
+  notes: 'Jam de Dibujo (Edición Especial) - Matriz oficial de liquidación Palacio Barolo',
+  sensitive_notes: '',
+  preventa_qty: 15,
+  preventa_price: 30000,
+  general_qty: 20,
+  general_price: 35000,
+  alquiler_espacio: 0,
+  contratacion_salon: 0,
+  comision_catering: 0,
+  otros_ingresos: 0,
+  extra_incomes: [],
+  cost_artistas: 367500,
+  cost_tecnica: 0,
+  cost_disertantes: 0,
+  cost_mobiliario: 16000,
+  cost_rrhh: 40000,
+  cost_catering: 0,
+  cost_limpieza: 16000,
+  cost_seguros: 40351.70,
+  cost_alquiler_espacio: 0,
+  cost_gastronomicos: 71503.16,
+  cost_marketing: 0,
+  cost_sadaic: 0,
+  cost_otros_operativos: 0,
+  extra_expenses: []
+}
+
+export default function CalculatorView({ initialEventData, onSaveEvent, onSwitchView, currentUser, allEvents = [] }) {
   const userCanCreate = canCreateEvent(currentUser)
   const userCanEdit = canEditEvent(currentUser)
   const userCanChange = canChangeStatus(currentUser)
   const isUserAdmin = isAdmin(currentUser)
+
+  const [isProposalModalOpen, setIsProposalModalOpen] = useState(false)
 
   // Configuración de plantilla maestra del Administrador
   const [templateConfig, setTemplateConfig] = useState(() => calculatorConfigService.getConfig())
@@ -87,42 +138,44 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
 
     return {
       venue: cfg?.venues?.[0]?.name || 'Espacio Barolo',
-      eventType: cfg?.eventTypes?.[0] || 'Social',
+      eventType: cfg?.eventTypes?.[0] || 'Cultural',
       agreementType: cfg?.agreementTypes?.[0] || '50% - 50%',
       attendees: cfg?.defaultAttendees || 35,
-      extraExpenses: defaultExps.length > 0 ? defaultExps : [{ id: 'exp-1', concept: '', amount: 0 }],
-      extraIncomes: defaultIncs.length > 0 ? defaultIncs : [{ id: 'inc-1', concept: '', amount: 0 }]
+      extraExpenses: defaultExps.length > 0 ? defaultExps : [],
+      extraIncomes: defaultIncs.length > 0 ? defaultIncs : []
     }
   }
+
+  const activeInitial = initialEventData?.isBlank ? null : (initialEventData || OFFICIAL_LC076_DATA)
 
   // ==========================================
   // ESTADOS - BLOQUE 1: DATOS GENERALES Y CLIENTE
   // ==========================================
-  const [eventId, setEventId] = useState(initialEventData?.id || null)
-  const [calcCode, setCalcCode] = useState(initialEventData?.calc_code || '')
-  const [eventName, setEventName] = useState(initialEventData?.name || '')
-  const [clientName, setClientName] = useState(initialEventData?.client_name || '')
-  const [clientCuit, setClientCuit] = useState(initialEventData?.client_cuit || '')
-  const [clientContact, setClientContact] = useState(initialEventData?.client_contact || '')
-  const [clientEmail, setClientEmail] = useState(initialEventData?.client_email || '')
-  const [contactDate, setContactDate] = useState(initialEventData?.contact_date || new Date().toISOString().substring(0, 10))
-  const [eventDate, setEventDate] = useState(initialEventData?.event_date || new Date().toISOString().substring(0, 10))
-  const [eventTime, setEventTime] = useState(initialEventData?.event_time || '19:00')
+  const [eventId, setEventId] = useState(activeInitial?.id || null)
+  const [calcCode, setCalcCode] = useState(activeInitial?.calc_code || '')
+  const [eventName, setEventName] = useState(activeInitial?.name || '')
+  const [clientName, setClientName] = useState(activeInitial?.client_name || '')
+  const [clientCuit, setClientCuit] = useState(activeInitial?.client_cuit || '')
+  const [clientContact, setClientContact] = useState(activeInitial?.client_contact || '')
+  const [clientEmail, setClientEmail] = useState(activeInitial?.client_email || '')
+  const [contactDate, setContactDate] = useState(activeInitial?.contact_date || new Date().toISOString().substring(0, 10))
+  const [eventDate, setEventDate] = useState(activeInitial?.event_date || new Date().toISOString().substring(0, 10))
+  const [eventTime, setEventTime] = useState(activeInitial?.event_time || '19:00')
   const [month, setMonth] = useState(() => {
-    if (initialEventData?.month) return initialEventData.month
+    if (activeInitial?.month) return activeInitial.month
     const d = new Date()
-    return MONTHS_LIST[d.getMonth()] || 'Enero'
+    return MONTHS_LIST[d.getMonth()] || 'Mayo'
   })
-  const [venue, setVenue] = useState(initialEventData?.venue || templateConfig.venues?.[0]?.name || 'Espacio Barolo')
-  const [eventType, setEventType] = useState(initialEventData?.event_type || templateConfig.eventTypes?.[0] || 'Social')
-  const [origin, setOrigin] = useState(initialEventData?.origin || 'Externo')
-  const [invoiceType, setInvoiceType] = useState(initialEventData?.invoice_type || 'Factura A')
-  const [paymentMethod, setPaymentMethod] = useState(initialEventData?.payment_method || 'Transferencia')
-  const [agreementType, setAgreementType] = useState(initialEventData?.agreement_type || templateConfig.agreementTypes?.[0] || '50% - 50%')
-  const [eventStatus, setEventStatus] = useState(initialEventData?.status || 'cotizado')
-  const [attendees, setAttendees] = useState(initialEventData?.attendees || templateConfig.defaultAttendees || 35)
-  const [notes, setNotes] = useState(initialEventData?.notes || '')
-  const [sensitiveNotes, setSensitiveNotes] = useState(initialEventData?.sensitive_notes || '')
+  const [venue, setVenue] = useState(activeInitial?.venue || templateConfig.venues?.[0]?.name || 'Espacio Barolo')
+  const [eventType, setEventType] = useState(activeInitial?.event_type || templateConfig.eventTypes?.[0] || 'Cultural')
+  const [origin, setOrigin] = useState(activeInitial?.origin || 'Fundación')
+  const [invoiceType, setInvoiceType] = useState(activeInitial?.invoice_type || 'Factura A')
+  const [paymentMethod, setPaymentMethod] = useState(activeInitial?.payment_method || 'Transferencia')
+  const [agreementType, setAgreementType] = useState(activeInitial?.agreement_type || templateConfig.agreementTypes?.[0] || '50% - 50%')
+  const [eventStatus, setEventStatus] = useState(activeInitial?.status || 'contratado')
+  const [attendees, setAttendees] = useState(activeInitial?.attendees !== undefined ? activeInitial.attendees : 35)
+  const [notes, setNotes] = useState(activeInitial?.notes || '')
+  const [sensitiveNotes, setSensitiveNotes] = useState(activeInitial?.sensitive_notes || '')
 
   // Sincronizar mes automáticamente al cambiar fecha de evento si el usuario no lo forzó manualmente
   const handleDateChange = (newDate) => {
@@ -143,19 +196,19 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
   // ==========================================
   // ESTADOS - BLOQUE 2: DETALLE DE INGRESOS
   // ==========================================
-  const [preventaQty, setPreventaQty] = useState(0)
-  const [preventaPrice, setPreventaPrice] = useState(0)
-  const [generalQty, setGeneralQty] = useState(0)
-  const [generalPrice, setGeneralPrice] = useState(0)
-  const [alquilerEspacio, setAlquilerEspacio] = useState(0)
-  const [contratacionSalon, setContratacionSalon] = useState(0)
-  const [comisionCatering, setComisionCatering] = useState(0)
-  const [otrosIngresos, setOtrosIngresos] = useState(0)
+  const [preventaQty, setPreventaQty] = useState(activeInitial?.preventa_qty ?? 15)
+  const [preventaPrice, setPreventaPrice] = useState(activeInitial?.preventa_price ?? 30000)
+  const [generalQty, setGeneralQty] = useState(activeInitial?.general_qty ?? 20)
+  const [generalPrice, setGeneralPrice] = useState(activeInitial?.general_price ?? 35000)
+  const [alquilerEspacio, setAlquilerEspacio] = useState(activeInitial?.alquiler_espacio ?? 0)
+  const [contratacionSalon, setContratacionSalon] = useState(activeInitial?.contratacion_salon ?? 0)
+  const [comisionCatering, setComisionCatering] = useState(activeInitial?.comision_catering ?? 0)
+  const [otrosIngresos, setOtrosIngresos] = useState(activeInitial?.otros_ingresos ?? 0)
 
   // Desglose dinámico opcional de otros ingresos adicionales
   const [extraIncomes, setExtraIncomes] = useState(() => {
-    if (initialEventData?.extra_incomes && initialEventData.extra_incomes.length > 0) {
-      return initialEventData.extra_incomes
+    if (activeInitial?.extra_incomes && activeInitial.extra_incomes.length > 0) {
+      return activeInitial.extra_incomes
     }
     return []
   })
@@ -163,140 +216,135 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
   // ==========================================
   // ESTADOS - BLOQUE 3: COSTOS DEL EVENTO (Desglose exacto Excel)
   // ==========================================
-  const [costArtistas, setCostArtistas] = useState(0)
-  const [costTecnica, setCostTecnica] = useState(0)
-  const [costDisertantes, setCostDisertantes] = useState(0)
-  const [costMobiliario, setCostMobiliario] = useState(0)
-  const [costRrhh, setCostRrhh] = useState(0)
-  const [costCatering, setCostCatering] = useState(0)
-  const [costLimpieza, setCostLimpieza] = useState(0)
-  const [costSeguros, setCostSeguros] = useState(0)
-  const [costAlquilerEspacio, setCostAlquilerEspacio] = useState(0)
-  const [costGastronomicos, setCostGastronomicos] = useState(0)
-  const [costMarketing, setCostMarketing] = useState(0)
-  const [costSadaic, setCostSadaic] = useState(0)
-  const [costOtrosOperativos, setCostOtrosOperativos] = useState(0)
+  const [costArtistas, setCostArtistas] = useState(activeInitial?.cost_artistas ?? 367500)
+  const [costTecnica, setCostTecnica] = useState(activeInitial?.cost_tecnica ?? 0)
+  const [costDisertantes, setCostDisertantes] = useState(activeInitial?.cost_disertantes ?? 0)
+  const [costMobiliario, setCostMobiliario] = useState(activeInitial?.cost_mobiliario ?? 16000)
+  const [costRrhh, setCostRrhh] = useState(activeInitial?.cost_rrhh ?? 40000)
+  const [costCatering, setCostCatering] = useState(activeInitial?.cost_catering ?? 0)
+  const [costLimpieza, setCostLimpieza] = useState(activeInitial?.cost_limpieza ?? 16000)
+  const [costSeguros, setCostSeguros] = useState(activeInitial?.cost_seguros ?? 40351.70)
+  const [costAlquilerEspacio, setCostAlquilerEspacio] = useState(activeInitial?.cost_alquiler_espacio ?? 0)
+  const [costGastronomicos, setCostGastronomicos] = useState(activeInitial?.cost_gastronomicos ?? 71503.16)
+  const [costMarketing, setCostMarketing] = useState(activeInitial?.cost_marketing ?? 0)
+  const [costSadaic, setCostSadaic] = useState(activeInitial?.cost_sadaic ?? 0)
+  const [costOtrosOperativos, setCostOtrosOperativos] = useState(activeInitial?.cost_otros_operativos ?? 0)
 
   // Desglose dinámico opcional de otros gastos adicionales
   const [extraExpenses, setExtraExpenses] = useState(() => {
-    if (initialEventData?.extra_expenses && initialEventData.extra_expenses.length > 0) {
-      return initialEventData.extra_expenses
+    if (activeInitial?.extra_expenses && activeInitial.extra_expenses.length > 0) {
+      return activeInitial.extra_expenses
     }
     return []
   })
+
+  // Helper unificado para cargar cualquier objeto de evento al estado
+  const loadEventDataIntoState = (data) => {
+    if (!data) return
+    setEventId(data.id || null)
+    setCalcCode(data.calc_code || '')
+    setEventName(data.name || '')
+    setClientName(data.client_name || '')
+    setClientCuit(data.client_cuit || '')
+    setClientContact(data.client_contact || '')
+    setClientEmail(data.client_email || '')
+    setContactDate(data.contact_date || data.event_date || new Date().toISOString().substring(0, 10))
+    setEventDate(data.event_date || new Date().toISOString().substring(0, 10))
+    setEventTime(data.event_time || '19:00')
+    setMonth(data.month || 'Mayo')
+    setVenue(data.venue || 'Espacio Barolo')
+    setEventType(data.event_type || 'Cultural')
+    setOrigin(data.origin || 'Fundación')
+    setInvoiceType(data.invoice_type || 'Factura A')
+    setPaymentMethod(data.payment_method || 'Transferencia')
+    setAgreementType(data.agreement_type || '50% - 50%')
+    setEventStatus(data.status || 'contratado')
+    setAttendees(data.attendees !== undefined ? Number(data.attendees) : 35)
+    setNotes(data.notes || '')
+    setSensitiveNotes(data.sensitive_notes || '')
+    setPreventaQty(Number(data.preventa_qty) || 0)
+    setPreventaPrice(Number(data.preventa_price) || 0)
+    setGeneralQty(Number(data.general_qty) || 0)
+    setGeneralPrice(Number(data.general_price) || 0)
+    setAlquilerEspacio(Number(data.alquiler_espacio) || 0)
+    setContratacionSalon(Number(data.contratacion_salon) || 0)
+    setComisionCatering(Number(data.comision_catering) || 0)
+    setOtrosIngresos(Number(data.otros_ingresos) || 0)
+    setExtraIncomes(Array.isArray(data.extra_incomes) ? data.extra_incomes : [])
+    setCostArtistas(Number(data.cost_artistas) || 0)
+    setCostTecnica(Number(data.cost_tecnica) || 0)
+    setCostDisertantes(Number(data.cost_disertantes) || 0)
+    setCostMobiliario(Number(data.cost_mobiliario) || 0)
+    setCostRrhh(Number(data.cost_rrhh) || 0)
+    setCostCatering(Number(data.cost_catering) || 0)
+    setCostLimpieza(Number(data.cost_limpieza) || 0)
+    setCostSeguros(Number(data.cost_seguros) || 0)
+    setCostAlquilerEspacio(Number(data.cost_alquiler_espacio) || 0)
+    setCostGastronomicos(Number(data.cost_gastronomicos) || 0)
+    setCostMarketing(Number(data.cost_marketing) || 0)
+    setCostSadaic(Number(data.cost_sadaic) || 0)
+    setCostOtrosOperativos(Number(data.cost_otros_operativos) || 0)
+    setExtraExpenses(Array.isArray(data.extra_expenses) ? data.extra_expenses : [])
+  }
 
   // ==========================================
   // RESTAURAR DATOS AL ABRIR UN EVENTO
   // ==========================================
   useEffect(() => {
     if (initialEventData) {
-      setEventId(initialEventData.id || null)
-      setCalcCode(initialEventData.calc_code || '')
-      setEventName(initialEventData.name || '')
-      setClientName(initialEventData.client_name || '')
-      setClientCuit(initialEventData.client_cuit || '')
-      setClientContact(initialEventData.client_contact || '')
-      setClientEmail(initialEventData.client_email || '')
-      setContactDate(initialEventData.contact_date || initialEventData.event_date || new Date().toISOString().substring(0, 10))
-      setEventDate(initialEventData.event_date || new Date().toISOString().substring(0, 10))
-      setEventTime(initialEventData.event_time || '19:00')
-      setMonth(initialEventData.month || 'Enero')
-      setVenue(initialEventData.venue || 'Espacio Barolo')
-      setEventType(initialEventData.event_type || 'Social')
-      setOrigin(initialEventData.origin || 'Externo')
-      setInvoiceType(initialEventData.invoice_type || 'Factura A')
-      setPaymentMethod(initialEventData.payment_method || 'Transferencia')
-      setAgreementType(initialEventData.agreement_type || '50% - 50%')
-      setEventStatus(initialEventData.status || 'cotizado')
-      setAttendees(Number(initialEventData.attendees) || 35)
-      setNotes(initialEventData.notes || '')
-      setSensitiveNotes(initialEventData.sensitive_notes || '')
-
-      // 1. Ingresos
-      setPreventaQty(Number(initialEventData.preventa_qty) || 0)
-      setPreventaPrice(Number(initialEventData.preventa_price) || 0)
-      setGeneralQty(Number(initialEventData.general_qty) || 0)
-      setGeneralPrice(Number(initialEventData.general_price) || 0)
-      setAlquilerEspacio(Number(initialEventData.alquiler_espacio) || 0)
-      setContratacionSalon(Number(initialEventData.contratacion_salon) || 0)
-      setComisionCatering(Number(initialEventData.comision_catering) || 0)
-      setOtrosIngresos(Number(initialEventData.otros_ingresos) || 0)
-
-      if (initialEventData.extra_incomes && Array.isArray(initialEventData.extra_incomes)) {
-        setExtraIncomes(initialEventData.extra_incomes)
+      if (initialEventData.isBlank) {
+        const cfg = calculatorConfigService.getConfig()
+        const clean = getCleanStateFromConfig(cfg)
+        const d = new Date()
+        loadEventDataIntoState({
+          ...clean,
+          id: null,
+          calc_code: '',
+          name: '',
+          client_name: '',
+          client_cuit: '',
+          client_contact: '',
+          client_email: '',
+          contact_date: initialEventData.event_date || d.toISOString().substring(0, 10),
+          event_date: initialEventData.event_date || d.toISOString().substring(0, 10),
+          event_time: '19:00',
+          month: initialEventData.event_date ? (MONTHS_LIST[parseInt(initialEventData.event_date.split('-')[1], 10) - 1] || 'Enero') : 'Enero',
+          origin: 'Externo',
+          invoice_type: 'Factura A',
+          payment_method: 'Transferencia',
+          status: 'cotizado',
+          notes: '',
+          sensitive_notes: '',
+          preventa_qty: 0,
+          preventa_price: 0,
+          general_qty: 0,
+          general_price: 0,
+          alquiler_espacio: 0,
+          contratacion_salon: 0,
+          comision_catering: 0,
+          otros_ingresos: 0,
+          extra_incomes: [],
+          cost_artistas: 0,
+          cost_tecnica: 0,
+          cost_disertantes: 0,
+          cost_mobiliario: 0,
+          cost_rrhh: 0,
+          cost_catering: 0,
+          cost_limpieza: 0,
+          cost_seguros: 0,
+          cost_alquiler_espacio: 0,
+          cost_gastronomicos: 0,
+          cost_marketing: 0,
+          cost_sadaic: 0,
+          cost_otros_operativos: 0,
+          extra_expenses: []
+        })
       } else {
-        setExtraIncomes([])
-      }
-
-      // 2. Costos
-      setCostArtistas(Number(initialEventData.cost_artistas) || 0)
-      setCostTecnica(Number(initialEventData.cost_tecnica) || 0)
-      setCostDisertantes(Number(initialEventData.cost_disertantes) || 0)
-      setCostMobiliario(Number(initialEventData.cost_mobiliario) || 0)
-      setCostRrhh(Number(initialEventData.cost_rrhh) || 0)
-      setCostCatering(Number(initialEventData.cost_catering) || 0)
-      setCostLimpieza(Number(initialEventData.cost_limpieza) || 0)
-      setCostSeguros(Number(initialEventData.cost_seguros) || 0)
-      setCostAlquilerEspacio(Number(initialEventData.cost_alquiler_espacio) || 0)
-      setCostGastronomicos(Number(initialEventData.cost_gastronomicos) || 0)
-      setCostMarketing(Number(initialEventData.cost_marketing) || 0)
-      setCostSadaic(Number(initialEventData.cost_sadaic) || 0)
-      setCostOtrosOperativos(Number(initialEventData.cost_otros_operativos) || 0)
-
-      if (initialEventData.extra_expenses && Array.isArray(initialEventData.extra_expenses)) {
-        setExtraExpenses(initialEventData.extra_expenses)
-      } else {
-        setExtraExpenses([])
+        loadEventDataIntoState(initialEventData)
       }
     } else {
-      const cfg = calculatorConfigService.getConfig()
-      const clean = getCleanStateFromConfig(cfg)
-      setEventId(null)
-      setCalcCode('')
-      setEventName('')
-      setClientName('')
-      setClientCuit('')
-      setClientContact('')
-      setClientEmail('')
-      const today = new Date().toISOString().substring(0, 10)
-      setContactDate(today)
-      setEventDate(today)
-      setEventTime('19:00')
-      const d = new Date()
-      setMonth(MONTHS_LIST[d.getMonth()] || 'Enero')
-      setVenue(clean.venue)
-      setEventType(clean.eventType)
-      setOrigin('Externo')
-      setInvoiceType('Factura A')
-      setPaymentMethod('Transferencia')
-      setAgreementType(clean.agreementType)
-      setEventStatus('cotizado')
-      setAttendees(clean.attendees)
-      setNotes('')
-      setSensitiveNotes('')
-      setPreventaQty(0)
-      setPreventaPrice(0)
-      setGeneralQty(0)
-      setGeneralPrice(0)
-      setAlquilerEspacio(0)
-      setContratacionSalon(0)
-      setComisionCatering(0)
-      setOtrosIngresos(0)
-      setExtraIncomes([])
-      setCostArtistas(0)
-      setCostTecnica(0)
-      setCostDisertantes(0)
-      setCostMobiliario(0)
-      setCostRrhh(0)
-      setCostCatering(0)
-      setCostLimpieza(0)
-      setCostSeguros(0)
-      setCostAlquilerEspacio(0)
-      setCostGastronomicos(0)
-      setCostMarketing(0)
-      setCostSadaic(0)
-      setCostOtrosOperativos(0)
-      setExtraExpenses([])
+      // Default: Cargar la información oficial de la calculadora LC-076
+      loadEventDataIntoState(OFFICIAL_LC076_DATA)
     }
   }, [initialEventData])
 
@@ -472,55 +520,54 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
 
   // Limpiar calculadora
   const handleReset = () => {
-    if (confirm('¿Deseas vaciar la calculadora para preparar una nueva cotización?')) {
+    if (confirm('¿Deseas vaciar la calculadora para preparar una nueva cotización en blanco?')) {
       const cfg = calculatorConfigService.getConfig()
       const clean = getCleanStateFromConfig(cfg)
-      setEventId(null)
-      setCalcCode('')
-      setEventName('')
-      setClientName('')
-      setClientCuit('')
-      setClientContact('')
-      setClientEmail('')
       const today = new Date().toISOString().substring(0, 10)
-      setContactDate(today)
-      setEventDate(today)
-      setEventTime('19:00')
       const d = new Date()
-      setMonth(MONTHS_LIST[d.getMonth()] || 'Enero')
-      setVenue(clean.venue)
-      setEventType(clean.eventType)
-      setOrigin('Externo')
-      setInvoiceType('Factura A')
-      setPaymentMethod('Transferencia')
-      setAgreementType(clean.agreementType)
-      setEventStatus('cotizado')
-      setAttendees(clean.attendees)
-      setNotes('')
-      setSensitiveNotes('')
-      setPreventaQty(0)
-      setPreventaPrice(0)
-      setGeneralQty(0)
-      setGeneralPrice(0)
-      setAlquilerEspacio(0)
-      setContratacionSalon(0)
-      setComisionCatering(0)
-      setOtrosIngresos(0)
-      setExtraIncomes([])
-      setCostArtistas(0)
-      setCostTecnica(0)
-      setCostDisertantes(0)
-      setCostMobiliario(0)
-      setCostRrhh(0)
-      setCostCatering(0)
-      setCostLimpieza(0)
-      setCostSeguros(0)
-      setCostAlquilerEspacio(0)
-      setCostGastronomicos(0)
-      setCostMarketing(0)
-      setCostSadaic(0)
-      setCostOtrosOperativos(0)
-      setExtraExpenses([])
+      loadEventDataIntoState({
+        ...clean,
+        id: null,
+        calc_code: '',
+        name: '',
+        client_name: '',
+        client_cuit: '',
+        client_contact: '',
+        client_email: '',
+        contact_date: today,
+        event_date: today,
+        event_time: '19:00',
+        month: MONTHS_LIST[d.getMonth()] || 'Enero',
+        origin: 'Externo',
+        invoice_type: 'Factura A',
+        payment_method: 'Transferencia',
+        status: 'cotizado',
+        notes: '',
+        sensitive_notes: '',
+        preventa_qty: 0,
+        preventa_price: 0,
+        general_qty: 0,
+        general_price: 0,
+        alquiler_espacio: 0,
+        contratacion_salon: 0,
+        comision_catering: 0,
+        otros_ingresos: 0,
+        extra_incomes: [],
+        cost_artistas: 0,
+        cost_tecnica: 0,
+        cost_disertantes: 0,
+        cost_mobiliario: 0,
+        cost_rrhh: 0,
+        cost_catering: 0,
+        cost_limpieza: 0,
+        cost_seguros: 0,
+        cost_alquiler_espacio: 0,
+        cost_gastronomicos: 0,
+        cost_marketing: 0,
+        cost_sadaic: 0,
+        cost_otros_operativos: 0,
+        extra_expenses: []
+      })
     }
   }
 
@@ -634,6 +681,20 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
     onSaveEvent(payload, 'contratado')
   }
 
+  // Detección de solapamiento de salón en la misma fecha
+  const venueConflicts = useMemo(() => {
+    if (!eventDate || !venue || !Array.isArray(allEvents)) return []
+    const cleanDate = eventDate.substring(0, 10)
+    return allEvents.filter(e => {
+      if (eventId && (e.id === eventId || e.calc_code === calcCode)) return false
+      const eDate = (e.event_date || '').substring(0, 10)
+      if (eDate !== cleanDate) return false
+      const sameVenue = (e.venue || '').trim().toLowerCase() === venue.trim().toLowerCase()
+      if (!sameVenue) return false
+      return e.status === 'contratado' || e.status === 'reservado'
+    })
+  }, [allEvents, eventDate, venue, eventId, calcCode])
+
   return (
     <div className="space-y-6 pb-32">
       
@@ -673,6 +734,24 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
             >
               <RotateCcw className="w-3.5 h-3.5" />
               <span>Limpiar</span>
+            </button>
+
+            <button
+              onClick={() => loadEventDataIntoState(OFFICIAL_LC076_DATA)}
+              className="flex items-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-bold text-amber-300 bg-amber-950/60 hover:bg-amber-900/80 border border-amber-500/40 transition-all cursor-pointer"
+              title="Restaurar datos oficiales de LC-076: Jam de Dibujo (Edición Especial)"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+              <span>🏛️ LC-076 Oficial</span>
+            </button>
+
+            <button
+              onClick={() => setIsProposalModalOpen(true)}
+              className="flex items-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-semibold text-amber-200 bg-amber-950/60 hover:bg-amber-900/80 border border-amber-500/40 transition-all cursor-pointer"
+              title="Generar Presupuesto Formal con membrete para el cliente (PDF / Imprimir)"
+            >
+              <Printer className="w-3.5 h-3.5 text-amber-400" />
+              <span>📄 Presupuesto PDF</span>
             </button>
 
             {(userCanCreate || userCanEdit) && (
@@ -775,6 +854,28 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
           >
             Volver a calculadora en blanco
           </button>
+        </div>
+      )}
+
+      {/* Alerta de Solapamiento / Doble Reserva en Salón */}
+      {venueConflicts.length > 0 && (
+        <div className="bg-amber-50 border-2 border-amber-400 rounded-2xl p-4 text-xs text-amber-950 shadow-md flex items-start space-x-3">
+          <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="font-bold text-amber-900 text-sm flex items-center gap-1.5">
+              <span>⚠️ Atención: Posible conflicto de fechas en {venue}</span>
+            </p>
+            <p className="text-amber-800 mt-0.5">
+              Ya existe(n) {venueConflicts.length} evento(s) confirmado(s) o reservado(s) para este salón en la fecha {eventDate}:
+            </p>
+            <ul className="mt-1.5 space-y-1">
+              {venueConflicts.map(c => (
+                <li key={c.id || c.calc_code} className="font-semibold text-amber-950 bg-amber-100/80 px-2.5 py-1 rounded-lg inline-block mr-2">
+                  🏛️ {c.name} ({c.status.toUpperCase()} • {c.event_time || '19:00'} hs • {c.client_name || 'Particular'})
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
       )}
 
@@ -928,10 +1029,10 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
                     onChange={(e) => setEventType(e.target.value)}
                     className="w-full bg-[#fef9c3] hover:bg-[#fef08a] focus:bg-white border border-[#fde047] focus:border-amber-500 rounded-lg px-3 py-2 text-slate-900 font-medium outline-none transition-colors"
                   >
-                    {(templateConfig?.eventTypes || ['Social', 'Corporativo', 'Desfile', 'Show', 'Experiencia']).map((t) => (
+                    {(templateConfig?.eventTypes || ['Cultural', 'Social', 'Corporativo', 'Desfile', 'Show', 'Experiencia', 'Gastronómico']).map((t) => (
                       <option key={t} value={t}>{t}</option>
                     ))}
-                    {eventType && !(templateConfig?.eventTypes || []).includes(eventType) && (
+                    {eventType && !(templateConfig?.eventTypes || ['Cultural', 'Social', 'Corporativo', 'Desfile', 'Show', 'Experiencia', 'Gastronómico']).includes(eventType) && (
                       <option value={eventType}>{eventType}</option>
                     )}
                   </select>
@@ -945,10 +1046,14 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
                     onChange={(e) => setOrigin(e.target.value)}
                     className="w-full bg-[#fef9c3] hover:bg-[#fef08a] focus:bg-white border border-[#fde047] focus:border-amber-500 rounded-lg px-3 py-2 text-slate-900 font-medium outline-none transition-colors"
                   >
+                    <option value="Fundación">Fundación</option>
                     <option value="Externo">Externo</option>
                     <option value="Producción Propia">Producción Propia</option>
                     <option value="Coproducción">Coproducción</option>
                     <option value="Alianza Comercial">Alianza Comercial</option>
+                    {origin && !['Fundación', 'Externo', 'Producción Propia', 'Coproducción', 'Alianza Comercial'].includes(origin) && (
+                      <option value={origin}>{origin}</option>
+                    )}
                   </select>
                 </div>
 
@@ -1056,7 +1161,7 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
                       </td>
                       <td className="py-2 px-2 text-right">
                         <div className="bg-[#f1f5f9] border border-slate-200 rounded-lg px-2.5 py-1.5 font-bold text-slate-800">
-                          {formatARS(subtotalPreventa)}
+                          {formatARSWithDecimals(subtotalPreventa)}
                         </div>
                       </td>
                     </tr>
@@ -1085,7 +1190,7 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
                       </td>
                       <td className="py-2 px-2 text-right">
                         <div className="bg-[#f1f5f9] border border-slate-200 rounded-lg px-2.5 py-1.5 font-bold text-slate-800">
-                          {formatARS(subtotalGeneral)}
+                          {formatARSWithDecimals(subtotalGeneral)}
                         </div>
                       </td>
                     </tr>
@@ -1102,12 +1207,12 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
                       </td>
                       <td className="py-2 px-2 text-right">
                         <div className="bg-[#f1f5f9] border border-slate-200 rounded-lg px-2 py-1.5 text-right text-[11px]" title="Ingreso Promedio por Entrada">
-                          {formatARS(ticketAvgPrice)}
+                          {formatARSWithDecimals(ticketAvgPrice)}
                         </div>
                       </td>
                       <td className="py-2 px-2 text-right">
                         <div className="bg-[#e2e8f0] border border-slate-300 rounded-lg px-2.5 py-1.5 font-bold text-slate-900">
-                          {formatARS(totalTicketing)}
+                          {formatARSWithDecimals(totalTicketing)}
                         </div>
                       </td>
                     </tr>
@@ -1257,7 +1362,7 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
                   </span>
                 </div>
                 <div className="text-base sm:text-xl font-mono font-black tracking-tight">
-                  {formatARS(totalGrossIncome)}
+                  {formatARSWithDecimals(totalGrossIncome)}
                 </div>
               </div>
 
@@ -1298,7 +1403,7 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
                         <input
                           type="number"
                           min="0"
-                          step="1000"
+                          step="any"
                           value={costArtistas}
                           onChange={(e) => setCostArtistas(e.target.value)}
                           className="w-full bg-[#fef9c3] border border-[#fde047] focus:bg-white rounded-lg px-2.5 py-1.5 text-right font-semibold outline-none"
@@ -1313,7 +1418,7 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
                         <input
                           type="number"
                           min="0"
-                          step="1000"
+                          step="any"
                           value={costTecnica}
                           onChange={(e) => setCostTecnica(e.target.value)}
                           className="w-full bg-[#fef9c3] border border-[#fde047] focus:bg-white rounded-lg px-2.5 py-1.5 text-right font-semibold outline-none"
@@ -1328,7 +1433,7 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
                         <input
                           type="number"
                           min="0"
-                          step="1000"
+                          step="any"
                           value={costDisertantes}
                           onChange={(e) => setCostDisertantes(e.target.value)}
                           className="w-full bg-[#fef9c3] border border-[#fde047] focus:bg-white rounded-lg px-2.5 py-1.5 text-right font-semibold outline-none"
@@ -1343,7 +1448,7 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
                         <input
                           type="number"
                           min="0"
-                          step="1000"
+                          step="any"
                           value={costMobiliario}
                           onChange={(e) => setCostMobiliario(e.target.value)}
                           className="w-full bg-[#fef9c3] border border-[#fde047] focus:bg-white rounded-lg px-2.5 py-1.5 text-right font-semibold outline-none"
@@ -1358,7 +1463,7 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
                         <input
                           type="number"
                           min="0"
-                          step="1000"
+                          step="any"
                           value={costRrhh}
                           onChange={(e) => setCostRrhh(e.target.value)}
                           className="w-full bg-[#fef9c3] border border-[#fde047] focus:bg-white rounded-lg px-2.5 py-1.5 text-right font-semibold outline-none"
@@ -1373,7 +1478,7 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
                         <input
                           type="number"
                           min="0"
-                          step="1000"
+                          step="any"
                           value={costCatering}
                           onChange={(e) => setCostCatering(e.target.value)}
                           className="w-full bg-[#fef9c3] border border-[#fde047] focus:bg-white rounded-lg px-2.5 py-1.5 text-right font-semibold outline-none"
@@ -1388,7 +1493,7 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
                         <input
                           type="number"
                           min="0"
-                          step="1000"
+                          step="any"
                           value={costLimpieza}
                           onChange={(e) => setCostLimpieza(e.target.value)}
                           className="w-full bg-[#fef9c3] border border-[#fde047] focus:bg-white rounded-lg px-2.5 py-1.5 text-right font-semibold outline-none"
@@ -1403,7 +1508,7 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
                         <input
                           type="number"
                           min="0"
-                          step="1000"
+                          step="any"
                           value={costSeguros}
                           onChange={(e) => setCostSeguros(e.target.value)}
                           className="w-full bg-[#fef9c3] border border-[#fde047] focus:bg-white rounded-lg px-2.5 py-1.5 text-right font-semibold outline-none"
@@ -1418,7 +1523,7 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
                         <input
                           type="number"
                           min="0"
-                          step="1000"
+                          step="any"
                           value={costAlquilerEspacio}
                           onChange={(e) => setCostAlquilerEspacio(e.target.value)}
                           className="w-full bg-[#fef9c3] border border-[#fde047] focus:bg-white rounded-lg px-2.5 py-1.5 text-right font-semibold outline-none"
@@ -1433,7 +1538,7 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
                         <input
                           type="number"
                           min="0"
-                          step="1000"
+                          step="any"
                           value={costGastronomicos}
                           onChange={(e) => setCostGastronomicos(e.target.value)}
                           className="w-full bg-[#fef9c3] border border-[#fde047] focus:bg-white rounded-lg px-2.5 py-1.5 text-right font-semibold outline-none"
@@ -1448,7 +1553,7 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
                         <input
                           type="number"
                           min="0"
-                          step="1000"
+                          step="any"
                           value={costMarketing}
                           onChange={(e) => setCostMarketing(e.target.value)}
                           className="w-full bg-[#fef9c3] border border-[#fde047] focus:bg-white rounded-lg px-2.5 py-1.5 text-right font-semibold outline-none"
@@ -1463,7 +1568,7 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
                         <input
                           type="number"
                           min="0"
-                          step="1000"
+                          step="any"
                           value={costSadaic}
                           onChange={(e) => setCostSadaic(e.target.value)}
                           className="w-full bg-[#fef9c3] border border-[#fde047] focus:bg-white rounded-lg px-2.5 py-1.5 text-right font-semibold outline-none"
@@ -1478,7 +1583,7 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
                         <input
                           type="number"
                           min="0"
-                          step="1000"
+                          step="any"
                           value={costOtrosOperativos}
                           onChange={(e) => setCostOtrosOperativos(e.target.value)}
                           className="w-full bg-[#fef9c3] border border-[#fde047] focus:bg-white rounded-lg px-2.5 py-1.5 text-right font-semibold outline-none"
@@ -1523,6 +1628,7 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
                             <input
                               type="number"
                               min="0"
+                              step="any"
                               value={exp.amount}
                               onChange={(e) => updateExtraExpense(exp.id, 'amount', e.target.value)}
                               className="w-full bg-[#fef9c3] border border-[#fde047] rounded-lg px-2.5 py-1.5 text-right font-semibold outline-none"
@@ -1557,7 +1663,7 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
                   </span>
                 </div>
                 <div className="text-base sm:text-xl font-mono font-black tracking-tight">
-                  {formatARS(totalCosts)}
+                  {formatARSWithDecimals(totalCosts)}
                 </div>
               </div>
 
@@ -1618,7 +1724,7 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
                 <div className="flex items-center justify-between p-2 rounded-lg bg-slate-50 border border-slate-200">
                   <span className="text-slate-600 font-medium">Total Ingresos Brutos</span>
                   <span className="font-mono font-bold text-slate-900 text-sm">
-                    {formatARS(totalGrossIncome)}
+                    {formatARSWithDecimals(totalGrossIncome)}
                   </span>
                 </div>
 
@@ -1626,7 +1732,7 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
                 <div className="flex items-center justify-between p-2 rounded-lg bg-slate-50 border border-slate-200">
                   <span className="text-slate-600 font-medium">Total Costos del Evento</span>
                   <span className="font-mono font-bold text-rose-700 text-sm">
-                    - {formatARS(totalCosts)}
+                    - {formatARSWithDecimals(totalCosts)}
                   </span>
                 </div>
 
@@ -1634,7 +1740,7 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
                 <div className="flex items-center justify-between p-2.5 rounded-lg bg-slate-100 border border-slate-300 font-bold">
                   <span className="text-slate-800">Margen Bruto Operación</span>
                   <span className={`font-mono text-sm ${netMargin >= 0 ? 'text-slate-900' : 'text-rose-600'}`}>
-                    {formatARS(netMargin)}
+                    {formatARSWithDecimals(netMargin)}
                   </span>
                 </div>
 
@@ -1696,7 +1802,7 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
                 <div className="flex items-center justify-between p-2 rounded-lg bg-slate-50 border border-slate-200">
                   <span className="text-slate-600 font-medium">Costos Fijos a Cubrir ($)</span>
                   <span className="font-mono font-bold text-slate-800">
-                    {formatARS(totalCosts)}
+                    {formatARSWithDecimals(totalCosts)}
                   </span>
                 </div>
 
@@ -1704,7 +1810,7 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
                 <div className="flex items-center justify-between p-2 rounded-lg bg-slate-50 border border-slate-200">
                   <span className="text-slate-600 font-medium">Ingreso Promedio x Entrada</span>
                   <span className="font-mono font-bold text-slate-800">
-                    {formatARS(ticketAvgPrice)}
+                    {formatARSWithDecimals(ticketAvgPrice)}
                   </span>
                 </div>
 
@@ -1781,7 +1887,7 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
                 <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200">
                   <span className="text-[10px] font-bold text-slate-500 uppercase block">Ganancia Neta x Asistente</span>
                   <span className="font-mono font-black text-emerald-700 text-sm">
-                    {formatARS(gananciaNetaXAsistente)}
+                    {formatARSWithDecimals(gananciaNetaXAsistente)}
                   </span>
                 </div>
 
@@ -1789,7 +1895,7 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
                 <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200">
                   <span className="text-[10px] font-bold text-slate-500 uppercase block">Costo Promedio x Asistente</span>
                   <span className="font-mono font-black text-slate-700 text-sm">
-                    {formatARS(costoPromedioXAsistente)}
+                    {formatARSWithDecimals(costoPromedioXAsistente)}
                   </span>
                 </div>
 
@@ -1925,6 +2031,15 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
         </div>
 
       </div>
+
+      {/* Modal de Propuesta Comercial Formal Imprimible / PDF */}
+      {isProposalModalOpen && (
+        <CommercialProposalModal
+          event={buildPayload()}
+          currentUser={currentUser}
+          onClose={() => setIsProposalModalOpen(false)}
+        />
+      )}
 
     </div>
   )

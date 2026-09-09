@@ -289,6 +289,7 @@ export default function App() {
                 onSaveEvent={handleSaveEvent}
                 onSwitchView={setCurrentView}
                 currentUser={currentUser}
+                allEvents={events}
               />
             )}
 
@@ -419,6 +420,7 @@ export default function App() {
         onNavigate={(view) => setCurrentView(view)}
         currentUser={currentUser}
         onLogout={handleLogout}
+        onOpenSettings={() => setIsSettingsOpen(true)}
       />
 
       {/* Settings Modal (Supabase Cloud Config) */}

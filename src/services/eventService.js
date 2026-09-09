@@ -14,7 +14,7 @@ const getLocalEvents = () => {
     const saved = localStorage.getItem(LOCAL_STORAGE_KEY)
     if (saved !== null) {
       const parsed = JSON.parse(saved)
-      if (Array.isArray(parsed)) {
+      if (Array.isArray(parsed) && parsed.length > 0) {
         const seen = new Map()
         parsed.filter(e => !e.calc_code?.startsWith('SYS-') && e.cancellation_reason !== 'CONFIG_STORAGE').forEach(item => {
           const key = item.calc_code || item.id
@@ -22,12 +22,35 @@ const getLocalEvents = () => {
             seen.set(key, item)
           }
         })
-        return Array.from(seen.values()).map(unpackEventMeta)
+        // Incorporar automáticamente nuevos eventos históricos oficiales (ej: LC-076) si no existían
+        if (Array.isArray(initialEvents)) {
+          initialEvents.filter(e => !e.calc_code?.startsWith('SYS-') && e.cancellation_reason !== 'CONFIG_STORAGE').forEach(item => {
+            const key = item.calc_code || item.id
+            if (!seen.has(key)) {
+              seen.set(key, item)
+            }
+          })
+        }
+        const mergedList = Array.from(seen.values()).map(unpackEventMeta)
+        saveLocalEvents(mergedList)
+        return mergedList
       }
     }
   } catch (e) {
     console.warn('Error reading from localStorage', e)
   }
+
+  // Si no hay datos guardados previamente, inicializar con los eventos históricos base
+  try {
+    if (Array.isArray(initialEvents) && initialEvents.length > 0) {
+      const cleanInitial = initialEvents.filter(e => !e.calc_code?.startsWith('SYS-') && e.cancellation_reason !== 'CONFIG_STORAGE')
+      saveLocalEvents(cleanInitial)
+      return cleanInitial.map(unpackEventMeta)
+    }
+  } catch (e) {
+    console.warn('Error initializing initialEvents:', e)
+  }
+
   return []
 }
 
@@ -234,7 +257,7 @@ export const eventService = {
         let query = supabase.from('events').update(updatePayload)
         if (isUuid) {
           query = query.eq('id', eventId)
-        } else if (String(eventId).startsWith('CALC-')) {
+        } else if (String(eventId).startsWith('CALC-') || String(eventId).startsWith('LC-')) {
           query = query.eq('calc_code', eventId)
         } else if (localEv?.calc_code) {
           query = query.eq('calc_code', localEv.calc_code)

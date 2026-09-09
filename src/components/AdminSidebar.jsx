@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react'
-import { X, Users, Sliders, ShieldCheck, ChevronRight, Settings, Sparkles, LogOut } from 'lucide-react'
+import { X, Users, Sliders, ShieldCheck, ChevronRight, Settings, Sparkles, LogOut, Cloud } from 'lucide-react'
 
 export default function AdminSidebar({ 
   isOpen, 
@@ -7,7 +7,8 @@ export default function AdminSidebar({
   currentView, 
   onNavigate, 
   currentUser,
-  onLogout 
+  onLogout,
+  onOpenSettings
 }) {
   // Cerrar con Escape
   useEffect(() => {
@@ -34,6 +35,18 @@ export default function AdminSidebar({
       subtitle: 'Gastos predeterminados, salones y acuerdos',
       icon: Sliders,
       badge: 'Cotizador'
+    },
+    {
+      id: 'cloud_settings',
+      title: 'Conexión Supabase (Nube)',
+      subtitle: 'Base de datos, sincronización y credenciales',
+      icon: Cloud,
+      badge: 'Nube',
+      isAction: true,
+      onClick: () => {
+        onClose()
+        if (onOpenSettings) onOpenSettings()
+      }
     }
   ]
 
@@ -92,6 +105,12 @@ export default function AdminSidebar({
                   onClick={() => {
                     onNavigate(item.id)
                     onClose()
+                    if (item.onClick) {
+                      item.onClick()
+                    } else {
+                      onNavigate(item.id)
+                      onClose()
+                    }
                   }}
                   className={`w-full text-left p-4 rounded-2xl border transition-all flex items-center justify-between group cursor-pointer ${
                     isActive

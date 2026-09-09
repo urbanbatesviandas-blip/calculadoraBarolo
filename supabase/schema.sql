@@ -176,3 +176,18 @@ create policy "Anon delete costs" on public.event_cost_items for delete to anon 
 
 -- Habilitar Realtime para eventos
 alter publication supabase_realtime add table public.events;
+
+-- 8. Tabla de Configuración Global de la Aplicación (Plantillas de Calculadora y Ajustes)
+create table if not exists public.app_settings (
+    key text primary key,
+    value jsonb not null default '{}'::jsonb,
+    updated_at timestamptz default now()
+);
+
+alter table public.app_settings enable row level security;
+
+create policy "Anon and auth can select app_settings" on public.app_settings for select using (true);
+create policy "Anon and auth can insert app_settings" on public.app_settings for insert with check (true);
+create policy "Anon and auth can update app_settings" on public.app_settings for update using (true);
+create policy "Anon and auth can delete app_settings" on public.app_settings for delete using (true);
+
