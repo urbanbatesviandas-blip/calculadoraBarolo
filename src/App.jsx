@@ -8,6 +8,7 @@ import EventDrilldownModal from './components/EventDrilldownModal'
 import SettingsModal from './components/SettingsModal'
 import LoginModal from './components/LoginModal'
 import EventComparisonModal from './components/EventComparisonModal'
+import CalculatorConfigView from './components/CalculatorConfigView'
 import { eventService } from './services/eventService'
 import { supabase, isSupabaseConfigured } from './services/supabaseClient'
 import { authService, canCreateEvent, canDeleteEvent } from './services/authService'
@@ -296,6 +297,16 @@ export default function App() {
                 comparisonEventIds={comparisonEventIds}
                 onToggleComparison={handleToggleComparison}
                 onOpenComparison={() => setIsComparisonOpen(true)}
+              />
+            )}
+
+            {currentView === 'calculator_config' && (
+              <CalculatorConfigView
+                currentUser={currentUser}
+                onNavigateToCalculator={() => {
+                  setCalculatorEvent(null)
+                  setCurrentView('calculator')
+                }}
               />
             )}
           </>

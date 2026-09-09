@@ -2,10 +2,10 @@ import React, { useState, useRef, useEffect } from 'react'
 import { 
   Calendar, Calculator, LayoutDashboard, ListFilter, Cloud, CloudOff, 
   Settings, ShieldCheck, PlusCircle, RefreshCw, FileSpreadsheet, 
-  Scale, User, ChevronDown, Check 
+  Scale, User, ChevronDown, Check, Sliders 
 } from 'lucide-react'
 import { isSupabaseConfigured } from '../services/supabaseClient'
-import { canCreateEvent } from '../services/authService'
+import { canCreateEvent, isAdmin } from '../services/authService'
 
 export default function Navbar({ 
   currentView, 
@@ -39,6 +39,7 @@ export default function Navbar({
   }, [])
 
   const userCanCreate = canCreateEvent(currentUser)
+  const isUserAdmin = isAdmin(currentUser)
   const roleBadge = currentUser?.roleBadge || { title: 'Admin', icon: '👑', color: 'text-amber-300' }
 
   return (
@@ -114,6 +115,21 @@ export default function Navbar({
                 </span>
               )}
             </button>
+
+            {isUserAdmin && (
+              <button
+                onClick={() => setCurrentView('calculator_config')}
+                className={`flex items-center space-x-1.5 px-3.5 py-2.5 rounded-xl font-medium text-sm transition-all duration-200 ${
+                  currentView === 'calculator_config'
+                    ? 'bg-gradient-to-r from-barolo-gold to-amber-500 text-barolo-navy font-bold shadow-md shadow-amber-500/20'
+                    : 'text-amber-200 hover:text-white hover:bg-white/10'
+                }`}
+                title="Configuración de Plantilla Maestra de Calculadora (Solo Administrador)"
+              >
+                <Sliders className="w-4 h-4 text-amber-300" />
+                <span>Plantilla</span>
+              </button>
+            )}
           </nav>
 
           {/* Right Actions: Excel, Compare, User Role, Sync & New Event */}
@@ -267,6 +283,12 @@ export default function Navbar({
           <ListFilter className="w-4 h-4 mb-1" />
           Registro ({eventsCount})
         </button>
+        {isUserAdmin && (
+          <button onClick={() => setCurrentView('calculator_config')} className={`text-xs p-2 flex flex-col items-center ${currentView === 'calculator_config' ? 'text-amber-400 font-bold' : 'text-amber-300'}`}>
+            <Sliders className="w-4 h-4 mb-1" />
+            Plantilla
+          </button>
+        )}
       </div>
     </header>
   )

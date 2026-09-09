@@ -254,6 +254,11 @@ export const authService = {
   canManageUsers(user) {
     if (!user) return false
     return user.role === 'admin'
+  },
+
+  isAdmin(user) {
+    if (!user) return false
+    return user.role === 'admin'
   }
 }
 
@@ -263,4 +268,6 @@ export const canEditEvent = (user, event) => authService.canEditEvent(user, even
 export const canDeleteEvent = (user) => authService.canDeleteEvent(user)
 export const canChangeStatus = (user, targetStatus) => authService.canChangeStatus(user, targetStatus)
 export const canManageUsers = (user) => authService.canManageUsers(user)
+export const isAdmin = (user) => authService.isAdmin(user)
+
 

@@ -1,15 +1,60 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { 
   Calculator, Plus, Trash2, Save, CheckCircle2, RotateCcw, 
-  Sparkles, DollarSign, Users, Calendar, MapPin, Building, AlertCircle, FileText, ArrowRight, BookmarkCheck 
+  Sparkles, DollarSign, Users, Calendar, MapPin, Building, AlertCircle, FileText, ArrowRight, BookmarkCheck,
+  Sliders
 } from 'lucide-react'
 import confetti from 'canvas-confetti'
-import { canCreateEvent, canEditEvent, canChangeStatus } from '../services/authService'
+import { canCreateEvent, canEditEvent, canChangeStatus, isAdmin } from '../services/authService'
+import { calculatorConfigService } from '../services/calculatorConfigService'
 
 export default function CalculatorView({ initialEventData, onSaveEvent, onSwitchView, currentUser }) {
   const userCanCreate = canCreateEvent(currentUser)
   const userCanEdit = canEditEvent(currentUser)
   const userCanChange = canChangeStatus(currentUser)
+  const isUserAdmin = isAdmin(currentUser)
+
+  // Configuración de plantilla maestra del Administrador
+  const [templateConfig, setTemplateConfig] = useState(() => calculatorConfigService.getConfig())
+
+  // Escuchar cambios en vivo de la plantilla maestra
+  useEffect(() => {
+    const handleConfigChange = (e) => {
+      if (e.detail) {
+        setTemplateConfig(e.detail)
+      }
+    }
+    window.addEventListener('barolo-calc-config-updated', handleConfigChange)
+    return () => window.removeEventListener('barolo-calc-config-updated', handleConfigChange)
+  }, [])
+
+  // Helper para generar el estado inicial a partir de la configuración maestra del admin
+  const getCleanStateFromConfig = (cfg) => {
+    const defaultExps = (cfg?.defaultExpenses || [])
+      .filter(e => e.enabled !== false && e.concept?.trim())
+      .map((e, idx) => ({ 
+        id: `exp-init-${idx + 1}-${Date.now()}`, 
+        concept: e.concept, 
+        amount: Number(e.defaultAmount) || 0 
+      }))
+      
+    const defaultIncs = (cfg?.defaultIncomes || [])
+      .filter(i => i.enabled !== false && i.concept?.trim())
+      .map((i, idx) => ({ 
+        id: `inc-init-${idx + 1}-${Date.now()}`, 
+        concept: i.concept, 
+        amount: Number(i.defaultAmount) || 0 
+      }))
+
+    return {
+      venue: cfg?.venues?.[0]?.name || 'Espacio Barolo',
+      eventType: cfg?.eventTypes?.[0] || 'Social',
+      agreementType: cfg?.agreementTypes?.[0] || '50% - 50%',
+      attendees: cfg?.defaultAttendees || 25,
+      extraExpenses: defaultExps.length > 0 ? defaultExps : [{ id: 'exp-1', concept: '', amount: 0 }],
+      extraIncomes: defaultIncs.length > 0 ? defaultIncs : [{ id: 'inc-1', concept: '', amount: 0 }]
+    }
+  }
 
   // Estado general
   const [eventId, setEventId] = useState(initialEventData?.id || null)
@@ -20,12 +65,12 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
   const [clientContact, setClientContact] = useState(initialEventData?.client_contact || '')
   const [eventDate, setEventDate] = useState(initialEventData?.event_date || new Date().toISOString().substring(0, 10))
   const [eventTime, setEventTime] = useState(initialEventData?.event_time || '19:00')
-  const [venue, setVenue] = useState(initialEventData?.venue || 'Espacio Barolo')
-  const [eventType, setEventType] = useState(initialEventData?.event_type || 'Social')
+  const [venue, setVenue] = useState(initialEventData?.venue || templateConfig.venues?.[0]?.name || 'Espacio Barolo')
+  const [eventType, setEventType] = useState(initialEventData?.event_type || templateConfig.eventTypes?.[0] || 'Social')
   const [origin, setOrigin] = useState(initialEventData?.origin || 'Externo')
-  const [agreementType, setAgreementType] = useState(initialEventData?.agreement_type || '50% - 50%')
+  const [agreementType, setAgreementType] = useState(initialEventData?.agreement_type || templateConfig.agreementTypes?.[0] || '50% - 50%')
   const [eventStatus, setEventStatus] = useState(initialEventData?.status || 'cotizado')
-  const [attendees, setAttendees] = useState(initialEventData?.attendees || 25)
+  const [attendees, setAttendees] = useState(initialEventData?.attendees || templateConfig.defaultAttendees || 25)
   const [notes, setNotes] = useState(initialEventData?.notes || '')
 
   // Entradas (Ticketing)
@@ -37,9 +82,13 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
   const [contratacionSalon, setContratacionSalon] = useState(0)
 
   // Desglose Dinámico de Otros Ingresos
-  const [extraIncomes, setExtraIncomes] = useState([
-    { id: 'inc-1', concept: '', amount: 0 }
-  ])
+  const [extraIncomes, setExtraIncomes] = useState(() => {
+    if (initialEventData?.extra_incomes && initialEventData.extra_incomes.length > 0) {
+      return initialEventData.extra_incomes
+    }
+    const clean = getCleanStateFromConfig(calculatorConfigService.getConfig())
+    return clean.extraIncomes
+  })
 
   // Costos Directos
   const [costArtistas, setCostArtistas] = useState(0)
@@ -58,9 +107,13 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
   const [costSadaic, setCostSadaic] = useState(0)
 
   // Desglose Dinámico de Otros Gastos
-  const [extraExpenses, setExtraExpenses] = useState([
-    { id: 'exp-1', concept: '', amount: 0 }
-  ])
+  const [extraExpenses, setExtraExpenses] = useState(() => {
+    if (initialEventData?.extra_expenses && initialEventData.extra_expenses.length > 0) {
+      return initialEventData.extra_expenses
+    }
+    const clean = getCleanStateFromConfig(calculatorConfigService.getConfig())
+    return clean.extraExpenses
+  })
 
   // Cargar y restaurar datos completos cuando se abre un evento
   useEffect(() => {
@@ -169,7 +222,9 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
         setExtraExpenses([{ id: 'exp-1', concept: '', amount: 0 }])
       }
     } else {
-      // Estado limpio para nueva cotización
+      // Estado limpio para nueva cotización usando la plantilla maestra del Admin
+      const cfg = calculatorConfigService.getConfig()
+      const clean = getCleanStateFromConfig(cfg)
       setEventId(null)
       setCalcCode('')
       setEventName('')
@@ -178,12 +233,12 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
       setClientContact('')
       setEventDate(new Date().toISOString().substring(0, 10))
       setEventTime('19:00')
-      setVenue('Espacio Barolo')
-      setEventType('Social')
+      setVenue(clean.venue)
+      setEventType(clean.eventType)
       setOrigin('Externo')
-      setAgreementType('50% - 50%')
+      setAgreementType(clean.agreementType)
       setEventStatus('cotizado')
-      setAttendees(25)
+      setAttendees(clean.attendees)
       setNotes('')
       setPreventaQty(0)
       setPreventaPrice(0)
@@ -191,7 +246,7 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
       setGeneralPrice(0)
       setAlquilerEspacio(0)
       setContratacionSalon(0)
-      setExtraIncomes([{ id: 'inc-1', concept: '', amount: 0 }])
+      setExtraIncomes(clean.extraIncomes)
       setCostArtistas(0)
       setCostTecnica(0)
       setCostDisertantes(0)
@@ -204,7 +259,7 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
       setCostAlquilerEspacio(0)
       setCostMarketing(0)
       setCostSadaic(0)
-      setExtraExpenses([{ id: 'exp-1', concept: '', amount: 0 }])
+      setExtraExpenses(clean.extraExpenses)
     }
   }, [initialEventData])
 
@@ -284,16 +339,24 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
     : 35000
   const breakEvenTickets = ticketAvgPrice > 0 ? Math.ceil(totalCosts / ticketAvgPrice) : 0
 
-  // Limpiar
+  // Limpiar y preparar nueva cotización según plantilla maestra
   const handleReset = () => {
-    if (confirm('¿Deseas vaciar la calculadora para preparar una nueva cotización?')) {
+    if (confirm('¿Deseas vaciar la calculadora para preparar una nueva cotización con la plantilla actual?')) {
+      const cfg = calculatorConfigService.getConfig()
+      const clean = getCleanStateFromConfig(cfg)
       setEventId(null)
       setCalcCode('')
       setEventName('')
       setClientName('')
       setClientCuit('')
       setClientContact('')
-      setAttendees(25)
+      setEventDate(new Date().toISOString().substring(0, 10))
+      setEventTime('19:00')
+      setVenue(clean.venue)
+      setEventType(clean.eventType)
+      setOrigin('Externo')
+      setAgreementType(clean.agreementType)
+      setAttendees(clean.attendees)
       setNotes('')
       setEventStatus('cotizado')
       setPreventaQty(0)
@@ -302,7 +365,7 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
       setGeneralPrice(0)
       setAlquilerEspacio(0)
       setContratacionSalon(0)
-      setExtraIncomes([{ id: 'inc-1', concept: '', amount: 0 }])
+      setExtraIncomes(clean.extraIncomes)
       setCostArtistas(0)
       setCostTecnica(0)
       setCostDisertantes(0)
@@ -315,7 +378,7 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
       setCostAlquilerEspacio(0)
       setCostMarketing(0)
       setCostSadaic(0)
-      setExtraExpenses([{ id: 'exp-1', concept: '', amount: 0 }])
+      setExtraExpenses(clean.extraExpenses)
     }
   }
 
@@ -418,6 +481,17 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          {isUserAdmin && (
+            <button
+              onClick={() => onSwitchView && onSwitchView('calculator_config')}
+              className="flex items-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-bold text-amber-900 bg-amber-100 hover:bg-amber-200 border border-amber-300 transition-all active:scale-95 shadow-sm"
+              title="Personalizar plantilla de la calculadora (agregar o quitar publicidad, salones, convenios)"
+            >
+              <Sliders className="w-3.5 h-3.5 text-amber-800" />
+              <span>⚙️ Modificar Plantilla</span>
+            </button>
+          )}
+
           <button
             onClick={handleReset}
             className="flex items-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors"
@@ -567,10 +641,13 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
                   onChange={(e) => setVenue(e.target.value)}
                   className="w-full bg-amber-50/70 border border-amber-300/80 rounded-xl px-3 py-2 text-slate-800 font-medium"
                 >
-                  <option value="Espacio Barolo">Espacio Barolo</option>
-                  <option value="Salón 1923">Salón 1923</option>
-                  <option value="Terraza del piso 13">Terraza del piso 13</option>
-                  <option value="EB + Cielos">EB + Cielos</option>
+                  {(templateConfig?.venues || []).map((v) => (
+                    <option key={v.id || v.name} value={v.name}>{v.name}</option>
+                  ))}
+                  {/* Asegurar que si el evento guardado tiene otro salón no se pierda */}
+                  {venue && !(templateConfig?.venues || []).some(v => v.name === venue) && (
+                    <option value={venue}>{venue}</option>
+                  )}
                 </select>
               </div>
               <div>
@@ -580,11 +657,12 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
                   onChange={(e) => setEventType(e.target.value)}
                   className="w-full bg-amber-50/70 border border-amber-300/80 rounded-xl px-3 py-2 text-slate-800 font-medium"
                 >
-                  <option value="Social">Social</option>
-                  <option value="Corporativo">Corporativo</option>
-                  <option value="Desfile">Desfile</option>
-                  <option value="Show">Show / Concierto</option>
-                  <option value="Experiencia">Experiencia</option>
+                  {(templateConfig?.eventTypes || ['Social', 'Corporativo', 'Desfile', 'Show', 'Experiencia']).map((t) => (
+                    <option key={t} value={t}>{t}</option>
+                  ))}
+                  {eventType && !(templateConfig?.eventTypes || []).includes(eventType) && (
+                    <option value={eventType}>{eventType}</option>
+                  )}
                 </select>
               </div>
             </div>
@@ -606,11 +684,12 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
                   onChange={(e) => setAgreementType(e.target.value)}
                   className="w-full bg-amber-50/70 border border-amber-300/80 rounded-xl px-3 py-2 text-slate-800 font-medium"
                 >
-                  <option value="50% - 50%">50% - 50%</option>
-                  <option value="100% Barolo">100% Barolo</option>
-                  <option value="70% Barolo - 30% Productor">70% Barolo - 30% Productor</option>
-                  <option value="30% Barolo - 70% Productor">30% Barolo - 70% Productor</option>
-                  <option value="Solo Alquiler">Solo Alquiler</option>
+                  {(templateConfig?.agreementTypes || ['50% - 50%', '100% Barolo', '70% Barolo - 30% Productor', '30% Barolo - 70% Productor', 'Solo Alquiler']).map((a) => (
+                    <option key={a} value={a}>{a}</option>
+                  ))}
+                  {agreementType && !(templateConfig?.agreementTypes || []).includes(agreementType) && (
+                    <option value={agreementType}>{agreementType}</option>
+                  )}
                 </select>
               </div>
             </div>
