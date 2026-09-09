@@ -1,5 +1,8 @@
 # 🏛️ Palacio Barolo — Sistema Web de Gestión de Eventos & Rentabilidad
 
+🌐 **Acceso Web en Vivo (GitHub Pages):**  
+👉 **[https://urbanbatesviandas-blip.github.io/calculadoraBarolo/](https://urbanbatesviandas-blip.github.io/calculadoraBarolo/)**
+
 > **Última Actualización (v1.2.0)**:
 > - 🧮 **Calculadora Oficial Precargada**: Evento **LC-076 Jam de Dibujo (Edición Especial)** de Camila Ocampo precargado por defecto con formato exacto a 2 decimales y costos en centavos (`step="any"`).
 > - 🏛️ **Botón "LC-076 Oficial"**: Restauración instantánea de la matriz oficial histórica de liquidación Palacio Barolo.
