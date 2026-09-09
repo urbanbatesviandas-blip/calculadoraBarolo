@@ -1,6 +1,11 @@
 # 🏛️ Palacio Barolo — Sistema Web de Gestión de Eventos & Rentabilidad
 
-Plataforma colaborativa y en la nube para la cotización, gestión comercial, análisis de rentabilidad y calendario de eventos del **Palacio Barolo**.
+> **Última Actualización (v1.2.0)**:
+> - 🧮 **Calculadora Oficial Precargada**: Evento **LC-076 Jam de Dibujo (Edición Especial)** de Camila Ocampo precargado por defecto con formato exacto a 2 decimales y costos en centavos (`step="any"`).
+> - 🏛️ **Botón "LC-076 Oficial"**: Restauración instantánea de la matriz oficial histórica de liquidación Palacio Barolo.
+> - 📄 **Presupuesto Comercial Formal PDF**: Generación e impresión de propuestas comerciales elegantes para clientes con membrete, términos y firma en 1 clic.
+> - ⚠️ **Detección de Solapamiento (Double-Booking)**: Alertas visuales inmediatas en Cotizador y Calendario ante reservas conflictivas en el mismo salón y fecha.
+> - 🟢 **Sincronización en Nube y Local**: Integración transparente con Supabase y modo local robusto con los eventos históricos oficiales.
 
 ---
 
