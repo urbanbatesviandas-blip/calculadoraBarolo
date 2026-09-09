@@ -7,7 +7,7 @@ import { es } from 'date-fns/locale'
 import { 
   ChevronLeft, ChevronRight, Calendar as CalendarIcon, Filter, 
   MapPin, DollarSign, Users, TrendingUp, Sparkles, CheckCircle2, Clock, AlertCircle, XCircle, 
-  Calculator, ArrowRight, Eye, Check
+  Calculator, ArrowRight, Eye, Check, List
 } from 'lucide-react'
 
 export default function CalendarView({ 
@@ -24,6 +24,7 @@ export default function CalendarView({
   const [selectedVenue, setSelectedVenue] = useState('all')
   const [highlightDay, setHighlightDay] = useState(null)
   const [quotesSort, setQuotesSort] = useState('date_desc')
+  const [calendarViewType, setCalendarViewType] = useState('grid') // 'grid' | 'agenda'
 
   // Auto-navegar a la fecha de una cotización/evento recién guardado
   useEffect(() => {
@@ -248,6 +249,134 @@ export default function CalendarView({
     })
   }
 
+  // Generar vista de Agenda vertical (ideal para celulares)
+  const renderAgendaView = () => {
+    const monthStr = format(currentMonth, 'yyyy-MM')
+    const inMonth = filteredEvents
+      .filter(e => e.event_date && e.event_date.startsWith(monthStr))
+      .sort((a, b) => (a.event_date || '').localeCompare(b.event_date || ''))
+
+    if (inMonth.length === 0) {
+      return (
+        <div className="bg-white rounded-2xl shadow-luxury border border-slate-200 p-8 text-center text-slate-400">
+          <CalendarIcon className="w-10 h-10 mx-auto mb-2 text-slate-300" />
+          <p className="text-sm font-semibold text-slate-600">No hay eventos registrados para los filtros seleccionados en este mes.</p>
+        </div>
+      )
+    }
+
+    const groups = {}
+    inMonth.forEach(ev => {
+      const d = ev.event_date.substring(0, 10)
+      if (!groups[d]) groups[d] = []
+      groups[d].push(ev)
+    })
+
+    return (
+      <div className="bg-white rounded-2xl shadow-luxury border border-slate-200 p-4 sm:p-6 space-y-4">
+        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+          <h3 className="font-serif font-bold text-base text-barolo-navy">
+            Agenda del Mes — {format(currentMonth, 'MMMM yyyy', { locale: es })}
+          </h3>
+          <span className="text-xs bg-amber-100 text-amber-900 border border-amber-300 px-2.5 py-0.5 rounded-full font-bold font-mono">
+            {inMonth.length} {inMonth.length === 1 ? 'evento' : 'eventos'}
+          </span>
+        </div>
+
+        <div className="space-y-4">
+          {Object.entries(groups).map(([dateStr, dayEvs]) => {
+            let dayLabel = dateStr
+            try {
+              const dObj = parseISO(dateStr)
+              dayLabel = format(dObj, "EEEE d 'de' MMMM", { locale: es })
+            } catch (e) {}
+
+            return (
+              <div key={dateStr} className="bg-slate-50/80 border border-slate-200 rounded-2xl p-3 sm:p-4 space-y-2.5">
+                <div className="flex items-center justify-between border-b border-slate-200/60 pb-2">
+                  <span className="font-bold text-barolo-navy capitalize text-xs sm:text-sm flex items-center space-x-1.5">
+                    <CalendarIcon className="w-3.5 h-3.5 text-barolo-gold" />
+                    <span>{dayLabel}</span>
+                  </span>
+                  <button
+                    onClick={() => onNewEventAtDate(dateStr)}
+                    className="text-[11px] font-bold text-amber-800 bg-amber-100/70 hover:bg-amber-100 px-2 py-0.5 rounded-md transition-colors"
+                    title="Nueva cotización en este día"
+                  >
+                    + Cotizar día
+                  </button>
+                </div>
+
+                <div className="space-y-2">
+                  {dayEvs.map(ev => {
+                    const isContratado = ev.status === 'contratado'
+                    const isReservado = ev.status === 'reservado'
+                    const isCotizado = ev.status === 'cotizado'
+
+                    return (
+                      <div
+                        key={ev.id}
+                        onClick={() => onSelectEvent(ev)}
+                        className={`p-3 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 cursor-pointer transition-all hover:shadow-md ${
+                          isContratado ? 'bg-emerald-50/70 border-emerald-300 hover:bg-emerald-50' :
+                          isReservado ? 'bg-blue-50/70 border-blue-300 hover:bg-blue-50' :
+                          isCotizado ? 'bg-amber-50/70 border-amber-300 hover:bg-amber-50' :
+                          'bg-rose-50/70 border-rose-200 opacity-75'
+                        }`}
+                      >
+                        <div className="flex items-start space-x-2.5 min-w-0">
+                          <span className={`w-3 h-3 rounded-full mt-1 flex-shrink-0 ${
+                            isContratado ? 'bg-emerald-500' :
+                            isReservado ? 'bg-blue-500' :
+                            isCotizado ? 'bg-amber-500' : 'bg-rose-500'
+                          }`}></span>
+                          <div className="min-w-0">
+                            <div className="flex items-center space-x-2">
+                              <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-white/90 border border-slate-200 text-slate-700">
+                                {ev.calc_code || 'CALC'}
+                              </span>
+                              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase ${
+                                isContratado ? 'bg-emerald-200/70 text-emerald-900' :
+                                isReservado ? 'bg-blue-200/70 text-blue-900' :
+                                isCotizado ? 'bg-amber-200/70 text-amber-900' :
+                                'bg-rose-200/70 text-rose-900'
+                              }`}>
+                                {ev.status}
+                              </span>
+                            </div>
+                            <h4 className="font-bold text-slate-900 text-sm truncate mt-1">{ev.name}</h4>
+                            <p className="text-xs text-slate-500 truncate">
+                              {ev.client_name || 'Particular'} • {ev.venue} • {ev.attendees || 0} pax
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between sm:justify-end sm:space-x-4 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-200/60 text-xs flex-shrink-0">
+                          <div>
+                            <span className="text-[10px] text-slate-400 block uppercase font-semibold">Facturación</span>
+                            <span className="font-bold text-slate-800">
+                              ${(Number(ev.gross_income) || 0).toLocaleString('es-AR')}
+                            </span>
+                          </div>
+                          <div className="text-right">
+                            <span className="text-[10px] text-emerald-700 block uppercase font-semibold">Ganancia Barolo</span>
+                            <span className="font-bold text-emerald-700">
+                              ${(Number(ev.barolo_profit) || 0).toLocaleString('es-AR')}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
       
@@ -283,6 +412,34 @@ export default function CalendarView({
             <h2 className="text-xl sm:text-2xl font-serif font-bold text-barolo-navy capitalize">
               {format(currentMonth, 'MMMM yyyy', { locale: es })}
             </h2>
+
+            {/* View Mode Toggle: Cuadrícula vs Agenda */}
+            <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200">
+              <button
+                onClick={() => setCalendarViewType('grid')}
+                className={`flex items-center space-x-1 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                  calendarViewType === 'grid'
+                    ? 'bg-white text-barolo-navy shadow-sm'
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+                title="Vista de cuadrícula mensual"
+              >
+                <CalendarIcon className="w-3.5 h-3.5" />
+                <span>Mes</span>
+              </button>
+              <button
+                onClick={() => setCalendarViewType('agenda')}
+                className={`flex items-center space-x-1 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                  calendarViewType === 'agenda'
+                    ? 'bg-white text-barolo-navy shadow-sm'
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+                title="Vista de agenda corrida (óptima para celular)"
+              >
+                <List className="w-3.5 h-3.5" />
+                <span>Agenda</span>
+              </button>
+            </div>
 
             {/* Quick Month Dropdown */}
             {availableMonths.length > 0 && (
@@ -403,25 +560,37 @@ export default function CalendarView({
         </div>
       </div>
 
-      {/* Main Calendar Grid */}
-      <div className="bg-white rounded-2xl shadow-luxury border border-slate-200 overflow-hidden">
-        
-        {/* Days Header (Lun - Dom) */}
-        <div className="grid grid-cols-7 bg-barolo-navy text-white text-center py-2.5 text-xs font-bold uppercase tracking-wider border-b border-barolo-gold/40">
-          <div>Lunes</div>
-          <div>Martes</div>
-          <div>Miércoles</div>
-          <div>Jueves</div>
-          <div>Viernes</div>
-          <div>Sábado</div>
-          <div>Domingo</div>
-        </div>
+      {/* Main Calendar View: Cuadrícula or Agenda */}
+      {calendarViewType === 'grid' ? (
+        <div className="bg-white rounded-2xl shadow-luxury border border-slate-200 overflow-hidden">
+          {/* Mobile swipe helper */}
+          <div className="md:hidden bg-amber-50/90 text-amber-900 px-3 py-1.5 text-[11px] font-semibold flex items-center justify-center space-x-1 border-b border-amber-200/80">
+            <span>👈 Deslizá hacia los costados para ver toda la semana 👉</span>
+          </div>
 
-        {/* Days Matrix */}
-        <div className="grid grid-cols-7">
-          {renderCalendarDays()}
+          <div className="overflow-x-auto w-full">
+            <div className="min-w-[640px] md:min-w-full">
+              {/* Days Header (Lun - Dom) con nombres abreviados responsivos para que nunca se encimen */}
+              <div className="grid grid-cols-7 bg-barolo-navy text-white text-center py-2.5 text-xs font-bold uppercase tracking-wider border-b border-barolo-gold/40">
+                <div><span className="hidden sm:inline">Lunes</span><span className="sm:hidden">Lun</span></div>
+                <div><span className="hidden sm:inline">Martes</span><span className="sm:hidden">Mar</span></div>
+                <div><span className="hidden sm:inline">Miércoles</span><span className="sm:hidden">Mié</span></div>
+                <div><span className="hidden sm:inline">Jueves</span><span className="sm:hidden">Jue</span></div>
+                <div><span className="hidden sm:inline">Viernes</span><span className="sm:hidden">Vie</span></div>
+                <div><span className="hidden sm:inline">Sábado</span><span className="sm:hidden">Sáb</span></div>
+                <div><span className="hidden sm:inline">Domingo</span><span className="sm:hidden">Dom</span></div>
+              </div>
+
+              {/* Days Matrix */}
+              <div className="grid grid-cols-7">
+                {renderCalendarDays()}
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
+      ) : (
+        renderAgendaView()
+      )}
 
       {/* ========================================================================= */}
       {/* SECCIÓN PIPELINE: COTIZACIONES ACTIVAS EN PROCESO */}

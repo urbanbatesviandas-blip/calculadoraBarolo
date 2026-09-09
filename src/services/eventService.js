@@ -3,12 +3,32 @@ import initialEvents from '../data/historicalEvents.json'
 
 const LOCAL_STORAGE_KEY = 'barolo_events_data'
 
+const isUuidString = (str) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str)
+
 // Inicializar eventos locales si no existen
 const getLocalEvents = () => {
   try {
     const saved = localStorage.getItem(LOCAL_STORAGE_KEY)
     if (saved) {
-      return JSON.parse(saved)
+      const parsed = JSON.parse(saved)
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        // Auto-deduplicar por calc_code o ID para limpiar de raíz cualquier duplicación vieja en PC
+        const seen = new Map()
+        parsed.forEach(item => {
+          const key = item.calc_code || item.id
+          if (!seen.has(key) || isUuidString(item.id)) {
+            seen.set(key, item)
+          }
+        })
+        const clean = Array.from(seen.values())
+        if (clean.length !== parsed.length) {
+          console.log(`Auto-cleaned ${parsed.length - clean.length} duplicate events from localStorage`)
+          try {
+            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(clean))
+          } catch (e) {}
+        }
+        return clean
+      }
     }
   } catch (e) {
     console.warn('Error reading from localStorage', e)
@@ -27,8 +47,6 @@ const saveLocalEvents = (events) => {
     console.error('Error saving to localStorage', e)
   }
 }
-
-const isUuidString = (str) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str)
 
 export const eventService = {
   // Sincronizar eventos locales creados fuera de línea hacia Supabase
