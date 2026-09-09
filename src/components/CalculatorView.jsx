@@ -16,8 +16,8 @@ const formatARS = (val) => {
   return new Intl.NumberFormat('es-AR', {
     style: 'currency',
     currency: 'ARS',
-    maximumFractionDigits: 0,
-    minimumFractionDigits: 0
+    maximumFractionDigits: 2,
+    minimumFractionDigits: 2
   }).format(num)
 }
 
