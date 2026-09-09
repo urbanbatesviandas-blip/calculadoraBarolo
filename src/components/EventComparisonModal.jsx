@@ -387,6 +387,184 @@ export default function EventComparisonModal({ events = [], onClose, onSelectEve
                     ))}
                   </tr>
 
+                  {/* SECCIÓN DESGLOSE DE COSTOS ASOCIADOS */}
+                  <tr className="bg-rose-100/50 text-rose-950 font-bold border-t-2 border-rose-300">
+                    <td colSpan={events.length + 1} className="p-2.5 text-[11px] uppercase tracking-wider flex items-center justify-between">
+                      <span className="flex items-center space-x-1.5">
+                        <span>📦</span>
+                        <span>Desglose Detallado de Costos Asociados (Rubro por Rubro)</span>
+                      </span>
+                      <span className="text-[10px] font-normal text-rose-800 lowercase">
+                        especificación completa de gastos operativos
+                      </span>
+                    </td>
+                  </tr>
+
+                  {/* Rubro: Artistas */}
+                  <tr className="bg-slate-50/40">
+                    <td className="p-2.5 text-xs font-semibold text-slate-700 sticky left-0 bg-slate-50/90 flex items-center space-x-1.5">
+                      <span>🎭</span>
+                      <span>Artistas & Shows</span>
+                    </td>
+                    {events.map(e => (
+                      <td key={e.id} className="p-2.5 text-xs text-slate-800 font-medium">
+                        ${(Number(e.cost_artistas) || 0).toLocaleString('es-AR')}
+                      </td>
+                    ))}
+                  </tr>
+
+                  {/* Rubro: Técnica */}
+                  <tr>
+                    <td className="p-2.5 text-xs font-semibold text-slate-700 sticky left-0 bg-white flex items-center space-x-1.5">
+                      <span>🔊</span>
+                      <span>Técnica & Sonido</span>
+                    </td>
+                    {events.map(e => (
+                      <td key={e.id} className="p-2.5 text-xs text-slate-800 font-medium">
+                        ${(Number(e.cost_tecnica) || 0).toLocaleString('es-AR')}
+                      </td>
+                    ))}
+                  </tr>
+
+                  {/* Rubro: Disertantes */}
+                  <tr className="bg-slate-50/40">
+                    <td className="p-2.5 text-xs font-semibold text-slate-700 sticky left-0 bg-slate-50/90 flex items-center space-x-1.5">
+                      <span>🎤</span>
+                      <span>Disertantes & Oradores</span>
+                    </td>
+                    {events.map(e => (
+                      <td key={e.id} className="p-2.5 text-xs text-slate-800 font-medium">
+                        ${(Number(e.cost_disertantes) || 0).toLocaleString('es-AR')}
+                      </td>
+                    ))}
+                  </tr>
+
+                  {/* Rubro: Catering */}
+                  <tr>
+                    <td className="p-2.5 text-xs font-semibold text-slate-700 sticky left-0 bg-white flex items-center space-x-1.5">
+                      <span>🍽️</span>
+                      <span>Catering & Bebidas</span>
+                    </td>
+                    {events.map(e => (
+                      <td key={e.id} className="p-2.5 text-xs text-slate-800 font-medium">
+                        ${(Number(e.cost_catering) || 0).toLocaleString('es-AR')}
+                      </td>
+                    ))}
+                  </tr>
+
+                  {/* Rubro: Mobiliario */}
+                  <tr className="bg-slate-50/40">
+                    <td className="p-2.5 text-xs font-semibold text-slate-700 sticky left-0 bg-slate-50/90 flex items-center space-x-1.5">
+                      <span>🪑</span>
+                      <span>Mobiliario & Montaje</span>
+                    </td>
+                    {events.map(e => (
+                      <td key={e.id} className="p-2.5 text-xs text-slate-800 font-medium">
+                        ${(Number(e.cost_mobiliario) || 0).toLocaleString('es-AR')}
+                      </td>
+                    ))}
+                  </tr>
+
+                  {/* Rubro: RRHH Salón & Seguridad */}
+                  <tr>
+                    <td className="p-2.5 text-xs font-semibold text-slate-700 sticky left-0 bg-white flex items-center space-x-1.5">
+                      <span>👥</span>
+                      <span>RRHH Salón & Seguridad</span>
+                    </td>
+                    {events.map(e => (
+                      <td key={e.id} className="p-2.5 text-xs text-slate-800 font-medium">
+                        ${(Number(e.cost_rrhh) || 0).toLocaleString('es-AR')}
+                      </td>
+                    ))}
+                  </tr>
+
+                  {/* Rubro: Limpieza */}
+                  <tr className="bg-slate-50/40">
+                    <td className="p-2.5 text-xs font-semibold text-slate-700 sticky left-0 bg-slate-50/90 flex items-center space-x-1.5">
+                      <span>🧹</span>
+                      <span>Limpieza Integral</span>
+                    </td>
+                    {events.map(e => (
+                      <td key={e.id} className="p-2.5 text-xs text-slate-800 font-medium">
+                        ${(Number(e.cost_limpieza) || 0).toLocaleString('es-AR')}
+                      </td>
+                    ))}
+                  </tr>
+
+                  {/* Rubro: Seguros */}
+                  <tr>
+                    <td className="p-2.5 text-xs font-semibold text-slate-700 sticky left-0 bg-white flex items-center space-x-1.5">
+                      <span>🛡️</span>
+                      <span>Seguros Obligatorios</span>
+                    </td>
+                    {events.map(e => (
+                      <td key={e.id} className="p-2.5 text-xs text-slate-800 font-medium">
+                        ${(Number(e.cost_seguros) || 0).toLocaleString('es-AR')}
+                      </td>
+                    ))}
+                  </tr>
+
+                  {/* Rubro: Alquiler Espacio */}
+                  <tr className="bg-slate-50/40">
+                    <td className="p-2.5 text-xs font-semibold text-slate-700 sticky left-0 bg-slate-50/90 flex items-center space-x-1.5">
+                      <span>🏢</span>
+                      <span>Canon Alquiler Espacio</span>
+                    </td>
+                    {events.map(e => (
+                      <td key={e.id} className="p-2.5 text-xs text-slate-800 font-medium">
+                        ${(Number(e.cost_alquiler_espacio) || 0).toLocaleString('es-AR')}
+                      </td>
+                    ))}
+                  </tr>
+
+                  {/* Rubro: Marketing */}
+                  <tr>
+                    <td className="p-2.5 text-xs font-semibold text-slate-700 sticky left-0 bg-white flex items-center space-x-1.5">
+                      <span>📢</span>
+                      <span>Marketing & Pauta</span>
+                    </td>
+                    {events.map(e => (
+                      <td key={e.id} className="p-2.5 text-xs text-slate-800 font-medium">
+                        ${(Number(e.cost_marketing) || 0).toLocaleString('es-AR')}
+                      </td>
+                    ))}
+                  </tr>
+
+                  {/* Rubro: SADAIC */}
+                  <tr className="bg-slate-50/40">
+                    <td className="p-2.5 text-xs font-semibold text-slate-700 sticky left-0 bg-slate-50/90 flex items-center space-x-1.5">
+                      <span>🎵</span>
+                      <span>SADAIC / AADI CAPIF</span>
+                    </td>
+                    {events.map(e => (
+                      <td key={e.id} className="p-2.5 text-xs text-slate-800 font-medium">
+                        ${(Number(e.cost_sadaic) || 0).toLocaleString('es-AR')}
+                      </td>
+                    ))}
+                  </tr>
+
+                  {/* Rubro: Otros Gastos Extras */}
+                  <tr>
+                    <td className="p-2.5 text-xs font-semibold text-slate-700 sticky left-0 bg-white flex items-center space-x-1.5">
+                      <span>🏷️</span>
+                      <span>Otros Gastos Adicionales</span>
+                    </td>
+                    {events.map(e => {
+                      const extras = Array.isArray(e.extra_expenses) ? e.extra_expenses : []
+                      const totalExtra = extras.reduce((sum, item) => sum + (Number(item.value) || 0), 0)
+                      return (
+                        <td key={e.id} className="p-2.5 text-xs text-slate-800 font-medium">
+                          ${totalExtra.toLocaleString('es-AR')}
+                          {extras.length > 0 && (
+                            <span className="text-[10px] text-slate-400 block">
+                              ({extras.length} ítem{extras.length > 1 ? 's' : ''})
+                            </span>
+                          )}
+                        </td>
+                      )
+                    })}
+                  </tr>
+
                   {/* SECCIÓN UNITARIA */}
                   <tr className="bg-sky-100/40 text-sky-950 font-bold border-t-2 border-sky-200">
                     <td colSpan={events.length + 1} className="p-2 text-[11px] uppercase tracking-wider">
