@@ -45,12 +45,20 @@ export const eventService = {
         }
         
         if (data && data.length > 0) {
-          // Fusionar con eventos locales para que los creados recientemente nunca se pierdan
-          const localMap = new Map(locals.map(e => [e.id, e]))
+          // Usar datos de Supabase indexados por calc_code para evitar duplicados entre UUID y IDs locales
+          const codeMap = new Map()
           data.forEach(remoteEv => {
-            localMap.set(remoteEv.id, remoteEv)
+            const key = remoteEv.calc_code || remoteEv.id
+            codeMap.set(key, remoteEv)
           })
-          const merged = Array.from(localMap.values()).sort((a, b) => 
+          // Preservar borradores temporales locales no sincronizados
+          locals.forEach(localEv => {
+            const key = localEv.calc_code || localEv.id
+            if (!codeMap.has(key) && String(localEv.id).startsWith('evt-temp')) {
+              codeMap.set(key, localEv)
+            }
+          })
+          const merged = Array.from(codeMap.values()).sort((a, b) => 
             (b.event_date || '').localeCompare(a.event_date || '')
           )
           saveLocalEvents(merged)
@@ -68,6 +76,7 @@ export const eventService = {
 
   // Guardar o actualizar un evento
   async saveEvent(eventData) {
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(eventData.id)
     const isNew = !eventData.id || String(eventData.id).startsWith('evt-temp')
     
     // Generar código correlativo si no tiene
@@ -83,12 +92,17 @@ export const eventService = {
     if (isSupabaseConfigured()) {
       try {
         const payload = { ...eventData }
-        if (isNew) {
-          delete payload.id // Dejar que Supabase genere el UUID
-          const { data, error } = await supabase.from('events').insert([payload]).select().single()
+        if (isNew || !isUuid) {
+          delete payload.id // Dejar que Supabase use/genere el UUID
+          // Usar upsert basado en calc_code
+          const { data, error } = await supabase
+            .from('events')
+            .upsert([payload], { onConflict: 'calc_code' })
+            .select()
+            .single()
           if (error) throw error
-          // Actualizar local también
-          const locals = getLocalEvents()
+          // Actualizar local
+          const locals = getLocalEvents().filter(e => e.calc_code !== data.calc_code)
           saveLocalEvents([data, ...locals])
           return { success: true, event: data, source: 'supabase' }
         } else {
@@ -139,16 +153,24 @@ export const eventService = {
           cancellation_reason: reason,
           updated_at: new Date().toISOString()
         }
-        const { data, error } = await supabase
-          .from('events')
-          .update(updatePayload)
-          .eq('id', eventId)
-          .select()
-          .single()
+        const locals = getLocalEvents()
+        const localEv = locals.find(e => e.id === eventId || e.calc_code === eventId)
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(eventId)
+
+        let query = supabase.from('events').update(updatePayload)
+        if (isUuid) {
+          query = query.eq('id', eventId)
+        } else if (localEv?.calc_code) {
+          query = query.eq('calc_code', localEv.calc_code)
+        } else {
+          query = query.eq('id', eventId)
+        }
+
+        const { data, error } = await query.select().single()
           
         if (!error && data) {
-          const locals = getLocalEvents().map(e => e.id === eventId ? data : e)
-          saveLocalEvents(locals)
+          const updatedLocals = locals.map(e => (e.id === eventId || (data.calc_code && e.calc_code === data.calc_code)) ? data : e)
+          saveLocalEvents(updatedLocals)
           return { success: true, event: data, source: 'supabase' }
         }
       } catch (err) {
@@ -158,7 +180,7 @@ export const eventService = {
 
     // Local
     const locals = getLocalEvents()
-    const idx = locals.findIndex(e => e.id === eventId)
+    const idx = locals.findIndex(e => e.id === eventId || (locals[e]?.calc_code === eventId))
     if (idx !== -1) {
       locals[idx].status = newStatus
       if (reason) locals[idx].cancellation_reason = reason

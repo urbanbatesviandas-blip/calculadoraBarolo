@@ -7,6 +7,7 @@ import EventsListView from './components/EventsListView'
 import EventDrilldownModal from './components/EventDrilldownModal'
 import SettingsModal from './components/SettingsModal'
 import { eventService } from './services/eventService'
+import { supabase, isSupabaseConfigured } from './services/supabaseClient'
 
 export default function App() {
   const [currentView, setCurrentView] = useState('calendar') // 'calendar', 'calculator', 'dashboard', 'list'
@@ -33,6 +34,20 @@ export default function App() {
 
   useEffect(() => {
     loadEvents()
+
+    // Suscripción Realtime para sincronizar automáticamente celular, PC y otros dispositivos
+    if (isSupabaseConfigured() && supabase) {
+      const channel = supabase
+        .channel('public:events_realtime')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'events' }, () => {
+          loadEvents()
+        })
+        .subscribe()
+
+      return () => {
+        supabase.removeChannel(channel)
+      }
+    }
   }, [])
 
   const showToast = (msg) => {
