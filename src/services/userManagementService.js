@@ -281,7 +281,8 @@ export const userManagementService = {
     const users = await this.getUsers()
     const user = users.find(u => 
       (u.username && u.username.toLowerCase() === cleanId) || 
-      (u.email && u.email.toLowerCase() === cleanId)
+      (u.email && u.email.toLowerCase() === cleanId) ||
+      (u.name && u.name.toLowerCase() === cleanId)
     )
 
     if (!user) {
