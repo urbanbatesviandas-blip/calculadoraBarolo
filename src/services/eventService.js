@@ -22,7 +22,7 @@ const getLocalEvents = () => {
             seen.set(key, item)
           }
         })
-        return Array.from(seen.values())
+        return Array.from(seen.values()).map(unpackEventMeta)
       }
     }
   } catch (e) {
@@ -62,7 +62,9 @@ export const eventService = {
         }
         
         if (data) {
-          const eventsOnly = data.filter(e => !e.calc_code?.startsWith('SYS-') && e.cancellation_reason !== 'CONFIG_STORAGE')
+          const eventsOnly = data
+            .filter(e => !e.calc_code?.startsWith('SYS-') && e.cancellation_reason !== 'CONFIG_STORAGE')
+            .map(unpackEventMeta)
           const sorted = eventsOnly.sort((a, b) => 
             (b.event_date || '').localeCompare(a.event_date || '')
           )
@@ -91,7 +93,9 @@ export const eventService = {
 
       if (error) throw error
       if (data && data.length > 0) {
-        const cleanEvents = data.filter(e => !e.calc_code?.startsWith('SYS-') && e.cancellation_reason !== 'CONFIG_STORAGE')
+        const cleanEvents = data
+          .filter(e => !e.calc_code?.startsWith('SYS-') && e.cancellation_reason !== 'CONFIG_STORAGE')
+          .map(unpackEventMeta)
         saveLocalEvents(cleanEvents)
         return { success: true, count: cleanEvents.length, events: cleanEvents }
       }
@@ -119,7 +123,48 @@ export const eventService = {
 
     if (isSupabaseConfigured() && supabase) {
       try {
-        const payload = { ...eventData }
+        const payload = {}
+        const SUPABASE_EVENT_COLUMNS = new Set([
+          'id', 'calc_code', 'name', 'client_name', 'client_cuit', 'client_contact',
+          'event_date', 'event_time', 'month', 'venue', 'event_type', 'origin',
+          'status', 'agreement_type', 'attendees', 'preventa_qty', 'preventa_price',
+          'general_qty', 'general_price', 'alquiler_espacio', 'contratacion_salon',
+          'extra_incomes', 'ticket_qty', 'ticket_price', 'gross_income',
+          'cost_artistas', 'cost_tecnica', 'cost_disertantes', 'cost_catering',
+          'cost_mobiliario', 'cost_gastronomicos', 'cost_rrhh', 'cost_limpieza',
+          'cost_seguros', 'cost_alquiler_espacio', 'cost_marketing', 'cost_sadaic',
+          'extra_expenses', 'direct_costs', 'indirect_costs', 'total_costs',
+          'net_profit', 'barolo_profit', 'margin_pct', 'payment_method',
+          'invoice_type', 'cancellation_reason', 'notes', 'created_by',
+          'created_at', 'updated_at'
+        ])
+
+        Object.keys(eventData).forEach(key => {
+          if (SUPABASE_EVENT_COLUMNS.has(key)) {
+            payload[key] = eventData[key]
+          }
+        })
+
+        // Empaquetar metadatos extendidos en notes si no son columnas nativas
+        const extendedMeta = {}
+        if (eventData.client_email) extendedMeta.client_email = eventData.client_email
+        if (eventData.contact_date) extendedMeta.contact_date = eventData.contact_date
+        if (eventData.comision_catering) extendedMeta.comision_catering = eventData.comision_catering
+        if (eventData.sensitive_notes) extendedMeta.sensitive_notes = eventData.sensitive_notes
+
+        if (Object.keys(extendedMeta).length > 0) {
+          const currentNotes = payload.notes || ''
+          const metaTagStart = '<!-- PB_EXT_META_START -->'
+          const metaTagEnd = '<!-- PB_EXT_META_END -->'
+          let cleanNotes = currentNotes
+          if (cleanNotes.includes(metaTagStart) && cleanNotes.includes(metaTagEnd)) {
+            const p1 = cleanNotes.split(metaTagStart)
+            const p2 = p1[1].split(metaTagEnd)
+            cleanNotes = (p1[0] + (p2[1] || '')).trim()
+          }
+          payload.notes = `${cleanNotes}\n\n${metaTagStart}\n${JSON.stringify(extendedMeta)}\n${metaTagEnd}`.trim()
+        }
+
         if (isNew || !isUuid) {
           delete payload.id // Dejar que Supabase use/genere el UUID
           const { data, error } = await supabase
@@ -128,15 +173,17 @@ export const eventService = {
             .select()
             .single()
           if (error) throw error
+          const merged = unpackEventMeta({ ...eventData, ...data })
           const locals = getLocalEvents().filter(e => e.calc_code !== data.calc_code)
-          saveLocalEvents([data, ...locals])
-          return { success: true, event: data, source: 'supabase' }
+          saveLocalEvents([merged, ...locals])
+          return { success: true, event: merged, source: 'supabase' }
         } else {
           const { data, error } = await supabase.from('events').update(payload).eq('id', eventData.id).select().single()
           if (error) throw error
-          const locals = getLocalEvents().map(e => e.id === eventData.id ? data : e)
+          const merged = unpackEventMeta({ ...eventData, ...data })
+          const locals = getLocalEvents().map(e => e.id === eventData.id ? merged : e)
           saveLocalEvents(locals)
-          return { success: true, event: data, source: 'supabase' }
+          return { success: true, event: merged, source: 'supabase' }
         }
       } catch (err) {
         console.warn('Supabase save failed, saving to local storage:', err.message)
@@ -297,23 +344,54 @@ export const eventService = {
   }
 }
 
-// Helpers para parsear y serializar notas y comentarios embebidos
+// Helpers para parsear y serializar notas, comentarios y metadatos extendidos
 export function parseNotesAndComments(rawNotes) {
-  if (!rawNotes) return { notes: '', comments: [] }
+  if (!rawNotes) return { notes: '', comments: [], meta: {} }
+  let text = String(rawNotes)
+  let meta = {}
+
+  // Parse Extended Metadata
+  const metaStart = '<!-- PB_EXT_META_START -->'
+  const metaEnd = '<!-- PB_EXT_META_END -->'
+  if (text.includes(metaStart) && text.includes(metaEnd)) {
+    const parts = text.split(metaStart)
+    const before = parts[0]
+    const rest = parts[1].split(metaEnd)
+    try {
+      meta = JSON.parse(rest[0].trim())
+    } catch (e) {}
+    text = (before + (rest[1] || '')).trim()
+  }
+
+  // Parse Comments
   const startTag = '<!-- PB_COMMENTS_START -->'
   const endTag = '<!-- PB_COMMENTS_END -->'
-  if (rawNotes.includes(startTag) && rawNotes.includes(endTag)) {
-    const parts = rawNotes.split(startTag)
-    const notes = parts[0].trim()
-    const commentPart = parts[1].split(endTag)[0].trim()
+  let comments = []
+  if (text.includes(startTag) && text.includes(endTag)) {
+    const parts = text.split(startTag)
+    const before = parts[0]
+    const rest = parts[1].split(endTag)
     try {
-      const comments = JSON.parse(commentPart)
-      return { notes, comments: Array.isArray(comments) ? comments : [] }
-    } catch (e) {
-      return { notes, comments: [] }
-    }
+      comments = JSON.parse(rest[0].trim())
+    } catch (e) {}
+    text = before.trim()
   }
-  return { notes: rawNotes, comments: [] }
+
+  return { notes: text, comments: Array.isArray(comments) ? comments : [], meta }
+}
+
+export function unpackEventMeta(e) {
+  if (!e) return e
+  const { notes, comments, meta } = parseNotesAndComments(e.notes)
+  return {
+    ...e,
+    notes,
+    client_email: e.client_email || meta.client_email || '',
+    contact_date: e.contact_date || meta.contact_date || '',
+    comision_catering: e.comision_catering !== undefined ? Number(e.comision_catering) : (Number(meta.comision_catering) || 0),
+    sensitive_notes: e.sensitive_notes || meta.sensitive_notes || '',
+    comments: comments
+  }
 }
 
 export function serializeNotesAndComments(notes, comments) {
