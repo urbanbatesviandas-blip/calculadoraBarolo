@@ -47,9 +47,11 @@ export default function CommercialProposalModal({ event, onClose, currentUser })
         {/* Modal Toolbar (Oculto al imprimir) */}
         <div className="bg-barolo-navy text-white px-6 py-4 flex items-center justify-between flex-shrink-0 border-b border-barolo-gold/40 print:hidden">
           <div className="flex items-center space-x-2.5">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-barolo-gold to-barolo-gold-dark flex items-center justify-center text-barolo-navy font-bold text-sm shadow">
-              PB
-            </div>
+            <img 
+              src="/logo-barolo.png" 
+              alt="Logo" 
+              className="w-9 h-9 object-contain drop-shadow" 
+            />
             <div>
               <h3 className="font-serif font-bold text-sm sm:text-base text-white">
                 Presupuesto Comercial Formal
@@ -84,9 +86,11 @@ export default function CommercialProposalModal({ event, onClose, currentUser })
           <div className="border-b-2 border-[#1B2A4A] pb-6 flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
             <div>
               <div className="flex items-center space-x-3 mb-2">
-                <div className="w-12 h-12 rounded-xl bg-[#1B2A4A] text-[#D4AF37] font-serif font-bold text-2xl flex items-center justify-center border-2 border-[#D4AF37]">
-                  PB
-                </div>
+                <img 
+                  src="/logo-barolo.png" 
+                  alt="Palacio Barolo Tours" 
+                  className="w-16 h-16 object-contain" 
+                />
                 <div>
                   <h1 className="font-serif font-extrabold text-2xl tracking-wider text-[#1B2A4A] uppercase">
                     Palacio Barolo

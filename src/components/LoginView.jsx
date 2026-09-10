@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { Lock, User, Eye, EyeOff, ShieldCheck, AlertCircle, ArrowRight } from 'lucide-react'
 import { authService } from '../services/authService'
 
@@ -8,6 +8,37 @@ export default function LoginView({ onLoginSuccess }) {
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [errorMsg, setErrorMsg] = useState(null)
+  const [isReadOnly, setIsReadOnly] = useState(true)
+  const userInputRef = useRef(null)
+  const passInputRef = useRef(null)
+
+  // Prevenir que el navegador rellene automáticamente con la URL de Supabase o credenciales viejas
+  useEffect(() => {
+    const clearInputs = () => {
+      if (userInputRef.current) {
+        userInputRef.current.value = ''
+      }
+      if (passInputRef.current) {
+        passInputRef.current.value = ''
+      }
+      setIdentifier('')
+      setPassword('')
+    }
+
+    clearInputs()
+    const timer1 = setTimeout(clearInputs, 50)
+    const timer2 = setTimeout(clearInputs, 150)
+    const timer3 = setTimeout(() => {
+      clearInputs()
+      setIsReadOnly(false)
+    }, 300)
+
+    return () => {
+      clearTimeout(timer1)
+      clearTimeout(timer2)
+      clearTimeout(timer3)
+    }
+  }, [])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -46,9 +77,11 @@ export default function LoginView({ onLoginSuccess }) {
         
         {/* Crest & Header */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-barolo-gold to-barolo-gold-dark shadow-2xl border-2 border-amber-300/50 mb-4 text-barolo-navy font-bold text-3xl tracking-widest select-none transform hover:scale-105 transition-transform duration-300">
-            PB
-          </div>
+          <img 
+            src="/logo-barolo.png" 
+            alt="Palacio Barolo Tours" 
+            className="w-[110px] h-[110px] mx-auto mb-4 object-contain drop-shadow-2xl hover:scale-105 transition-transform duration-300 select-none"
+          />
           <h1 className="font-serif font-bold text-2xl sm:text-3xl text-amber-200 tracking-wider uppercase mb-1">
             Palacio Barolo
           </h1>
@@ -78,7 +111,7 @@ export default function LoginView({ onLoginSuccess }) {
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4" autoComplete="off">
             <div>
               <label className="block text-xs font-bold text-slate-300 mb-1.5 uppercase tracking-wider">
                 Usuario, Nombre o Correo
@@ -88,9 +121,17 @@ export default function LoginView({ onLoginSuccess }) {
                   <User className="w-4 h-4" />
                 </div>
                 <input
+                  ref={userInputRef}
                   type="text"
+                  name="barolo_auth_user_name"
+                  id="barolo_auth_user_name"
+                  autoComplete="off"
+                  autoCorrect="off"
+                  autoCapitalize="none"
+                  spellCheck="false"
+                  readOnly={isReadOnly}
+                  onFocus={() => setIsReadOnly(false)}
                   required
-                  autoFocus
                   value={identifier}
                   onChange={(e) => setIdentifier(e.target.value)}
                   placeholder="ej: admin, pato o tu correo"
@@ -108,7 +149,13 @@ export default function LoginView({ onLoginSuccess }) {
                   <Lock className="w-4 h-4" />
                 </div>
                 <input
+                  ref={passInputRef}
                   type={showPassword ? 'text' : 'password'}
+                  name="barolo_auth_user_pwd"
+                  id="barolo_auth_user_pwd"
+                  autoComplete="new-password"
+                  readOnly={isReadOnly}
+                  onFocus={() => setIsReadOnly(false)}
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}

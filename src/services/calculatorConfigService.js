@@ -1,6 +1,38 @@
 import { supabase, isSupabaseConfigured } from './supabaseClient'
 
+export const DEFAULT_MASTER_COST_CATALOG = [
+  // Costos del Productor
+  { id: 'cost_artistas', key: 'cost_artistas', name: 'Honorarios Artistas / Cachets', category: 'productor', defaultAmount: 0, enabled: true },
+  { id: 'cost_tecnica', key: 'cost_tecnica', name: 'Honorarios Técnica / Sonido / Luces', category: 'productor', defaultAmount: 0, enabled: true },
+  { id: 'cost_disertantes', key: 'cost_disertantes', name: 'Honorarios Disertantes / Speakers', category: 'productor', defaultAmount: 0, enabled: true },
+  { id: 'cost_mobiliario', key: 'cost_mobiliario', name: 'Mobiliario, Vajilla & Ambientación', category: 'productor', defaultAmount: 0, enabled: true },
+  { id: 'cost_rrhh', key: 'cost_rrhh', name: 'RRHH Salón, Personal & Seguridad', category: 'productor', defaultAmount: 0, enabled: true },
+
+  // Costos del Palacio Barolo
+  { id: 'cost_catering', key: 'cost_catering', name: 'Catering, Alimentos & Bebidas', category: 'barolo', defaultAmount: 0, enabled: true },
+  { id: 'cost_limpieza', key: 'cost_limpieza', name: 'Limpieza Integral Post-Evento', category: 'barolo', defaultAmount: 0, enabled: true },
+  { id: 'cost_seguros', key: 'cost_seguros', name: 'Seguros de Responsabilidad Civil', category: 'barolo', defaultAmount: 0, enabled: true },
+  { id: 'cost_alquiler_espacio', key: 'cost_alquiler_espacio', name: 'Alquiler de Espacio Barolo (Costo)', category: 'barolo', defaultAmount: 0, enabled: true },
+  { id: 'cost_gastronomicos', key: 'cost_gastronomicos', name: 'Costos Gastronómicos / Insumos Salón', category: 'barolo', defaultAmount: 0, enabled: true },
+  { id: 'cost_marketing', key: 'cost_marketing', name: 'Marketing, Redes & Publicidad', category: 'barolo', defaultAmount: 0, enabled: true },
+  { id: 'cost_sadaic', key: 'cost_sadaic', name: 'Derechos SADAIC / AADI CAPIF', category: 'barolo', defaultAmount: 0, enabled: true },
+  { id: 'cost_otros_operativos', key: 'cost_otros_operativos', name: 'Otros Gastos Operativos', category: 'barolo', defaultAmount: 0, enabled: true }
+]
+
+export const DEFAULT_MASTER_INCOME_CATALOG = [
+  { id: 'alquiler_espacio', key: 'alquiler_espacio', name: 'Alquiler del Espacio', category: 'locacion', defaultAmount: 0, enabled: true },
+  { id: 'contratacion_salon', key: 'contratacion_salon', name: 'Contratación Salón Adicional', category: 'locacion', defaultAmount: 0, enabled: true },
+  { id: 'comision_catering', key: 'comision_catering', name: 'Comisión por Catering', category: 'gastronomia', defaultAmount: 0, enabled: true },
+  { id: 'barra_tragos', key: 'barra_tragos', name: 'Explotación / Canon Barra de Tragos', category: 'gastronomia', defaultAmount: 0, enabled: true },
+  { id: 'canon_produccion', key: 'canon_produccion', name: 'Canon de Producción / Técnica Externa', category: 'produccion', defaultAmount: 0, enabled: true },
+  { id: 'auspicios_sponsors', key: 'auspicios_sponsors', name: 'Auspicios, Patrocinios & Sponsors', category: 'comercial', defaultAmount: 0, enabled: true },
+  { id: 'merchandising', key: 'merchandising', name: 'Venta de Merchandising / Souvenirs', category: 'comercial', defaultAmount: 0, enabled: true },
+  { id: 'otros_ingresos', key: 'otros_ingresos', name: 'Otros Ingresos Operativos', category: 'varios', defaultAmount: 0, enabled: true }
+]
+
 export const DEFAULT_CALCULATOR_CONFIG = {
+  masterCostCatalog: DEFAULT_MASTER_COST_CATALOG,
+  masterIncomeCatalog: DEFAULT_MASTER_INCOME_CATALOG,
   defaultExpenses: [
     { id: 'exp-pub', concept: 'Publicidad & Pauta en Redes', defaultAmount: 0, enabled: true },
     { id: 'exp-seg', concept: 'Seguridad Especial / Control de Acceso', defaultAmount: 0, enabled: true }
@@ -66,7 +98,13 @@ export const calculatorConfigService = {
             : DEFAULT_CALCULATOR_CONFIG.agreementTypes,
           eventTypes: Array.isArray(parsed.eventTypes) && parsed.eventTypes.length > 0 
             ? parsed.eventTypes 
-            : DEFAULT_CALCULATOR_CONFIG.eventTypes
+            : DEFAULT_CALCULATOR_CONFIG.eventTypes,
+          masterCostCatalog: Array.isArray(parsed.masterCostCatalog) && parsed.masterCostCatalog.length > 0
+            ? parsed.masterCostCatalog
+            : DEFAULT_CALCULATOR_CONFIG.masterCostCatalog,
+          masterIncomeCatalog: Array.isArray(parsed.masterIncomeCatalog) && parsed.masterIncomeCatalog.length > 0
+            ? parsed.masterIncomeCatalog
+            : DEFAULT_CALCULATOR_CONFIG.masterIncomeCatalog
         }
       }
     } catch (e) {

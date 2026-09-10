@@ -64,10 +64,12 @@ export default function Navbar({
             )}
 
             {/* Logo & Palacio Barolo Brand */}
-            <div className="flex items-center space-x-3 cursor-pointer select-none" onClick={() => setCurrentView('calendar')}>
-              <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-barolo-gold to-barolo-gold-dark flex items-center justify-center shadow-lg border border-amber-300/40 text-barolo-navy font-bold text-xl tracking-wider">
-                PB
-              </div>
+            <div className="flex items-center space-x-3 cursor-pointer select-none group" onClick={() => setCurrentView('calendar')}>
+              <img 
+                src="/logo-barolo.png" 
+                alt="Palacio Barolo Tours" 
+                className="w-[51px] h-[51px] object-contain drop-shadow-md group-hover:scale-105 transition-transform"
+              />
               <div>
                 <div className="flex items-center space-x-2">
                   <span className="font-serif font-bold text-base sm:text-lg tracking-wide uppercase text-amber-200">Palacio Barolo</span>

@@ -1,7 +1,7 @@
 import ExcelJS from 'exceljs'
 import { format, parseISO } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { canViewSensitiveData } from './authService'
+import { canViewSensitiveData } from './authService.js'
 
 // Paleta de colores oficial Palacio Barolo
 const COLORS = {
@@ -28,10 +28,31 @@ const COLORS = {
   statusCanceladoText: '991B1B',
 
   // Desglose de costos
-  costHeaderBg: 'FEE2E2',
-  costHeaderText: '991B1B',
-  indirectCostBg: 'FEF3C7',
-  indirectCostText: '92400E'
+  producerCostBg: 'EFF6FF',
+  producerCostText: '1E40AF',
+  baroloCostBg: 'FEF2F2',
+  baroloCostText: '991B1B',
+  kpiBg: 'F1F5F9'
+}
+
+// Formateadores estándar
+const CURRENCY_FORMAT = '"$"#,##0.00'
+const INTEGER_FORMAT = '#,##0'
+const PERCENT_FORMAT = '0.0%'
+
+// Bordes estándar
+const thinBorder = {
+  top: { style: 'thin', color: { argb: COLORS.slateBorder } },
+  left: { style: 'thin', color: { argb: COLORS.slateBorder } },
+  bottom: { style: 'thin', color: { argb: COLORS.slateBorder } },
+  right: { style: 'thin', color: { argb: COLORS.slateBorder } }
+}
+
+const doubleBottomBorder = {
+  top: { style: 'thin', color: { argb: COLORS.slateBorder } },
+  left: { style: 'thin', color: { argb: COLORS.slateBorder } },
+  bottom: { style: 'double', color: { argb: COLORS.navyDark } },
+  right: { style: 'thin', color: { argb: COLORS.slateBorder } }
 }
 
 // Helper para descargar en navegador
@@ -48,31 +69,517 @@ async function saveWorkbook(workbook, filename) {
   window.URL.revokeObjectURL(url)
 }
 
-// Formateador de moneda en ARS
-const CURRENCY_FORMAT = '"$"#,##0'
-const PERCENT_FORMAT = '0.0%'
+// Helper para calcular métricas financieras idénticas a la calculadora
+function computeEventMetrics(e) {
+  const preventaQty = Number(e.preventa_qty) || 0
+  const invitacionesQty = Number(e.invitaciones_qty) || 0
+  const preventaPrice = Number(e.preventa_price) || 0
+  const preventaTotal = preventaQty * preventaPrice
 
-// Borde estándar fino
-const thinBorder = {
-  top: { style: 'thin', color: { argb: COLORS.slateBorder } },
-  left: { style: 'thin', color: { argb: COLORS.slateBorder } },
-  bottom: { style: 'thin', color: { argb: COLORS.slateBorder } },
-  right: { style: 'thin', color: { argb: COLORS.slateBorder } }
-}
+  const generalQty = Number(e.general_qty ?? e.ticket_qty) || 0
+  const generalPrice = Number(e.general_price ?? e.ticket_price) || 0
+  const generalTotal = generalQty * generalPrice
 
-const doubleBottomBorder = {
-  top: { style: 'thin', color: { argb: COLORS.slateBorder } },
-  left: { style: 'thin', color: { argb: COLORS.slateBorder } },
-  bottom: { style: 'double', color: { argb: COLORS.navyDark } },
-  right: { style: 'thin', color: { argb: COLORS.slateBorder } }
+  const ticketGrossIncome = preventaTotal + generalTotal
+  const totalTickets = preventaQty + generalQty
+  const ticketAvgPrice = totalTickets > 0 ? (ticketGrossIncome / totalTickets) : 0
+
+  const alquilerEspacio = Number(e.alquiler_espacio) || 0
+  const contratacionSalon = Number(e.contratacion_salon) || 0
+  const comisionCatering = Number(e.comision_catering) || 0
+  const otrosIngresos = Number(e.otros_ingresos) || 0
+
+  let extraIncomesTotal = 0
+  if (Array.isArray(e.extra_incomes)) {
+    extraIncomesTotal = e.extra_incomes.reduce((acc, i) => acc + (Number(i.amount ?? i.value) || 0), 0)
+  }
+
+  const fixedIncome = alquilerEspacio + contratacionSalon + comisionCatering + otrosIngresos
+  const grossIncome = Number(e.gross_income) || (ticketGrossIncome + fixedIncome + extraIncomesTotal)
+
+  // Costos Productor
+  const costArtistas = Number(e.cost_artistas) || 0
+  const costTecnica = Number(e.cost_tecnica) || 0
+  const costDisertantes = Number(e.cost_disertantes) || 0
+  const costMobiliario = Number(e.cost_mobiliario) || 0
+  const costRrhh = Number(e.cost_rrhh) || 0
+  const subtotalProductor = costArtistas + costTecnica + costDisertantes + costMobiliario + costRrhh
+
+  // Costos Barolo
+  const costCatering = Number(e.cost_catering) || 0
+  const costLimpieza = Number(e.cost_limpieza) || 0
+  const costSeguros = Number(e.cost_seguros) || 0
+  const costAlquilerEspacio = Number(e.cost_alquiler_espacio) || 0
+  const costGastronomicos = Number(e.cost_gastronomicos) || 0
+  const costMarketing = Number(e.cost_marketing) || 0
+  const costSadaic = Number(e.cost_sadaic) || 0
+  const costOtrosOperativos = Number(e.cost_otros_operativos) || 0
+  const subtotalBarolo = costCatering + costLimpieza + costSeguros + costAlquilerEspacio + costGastronomicos + costMarketing + costSadaic + costOtrosOperativos
+
+  let extraExpensesTotal = 0
+  if (Array.isArray(e.extra_expenses)) {
+    extraExpensesTotal = e.extra_expenses.reduce((acc, x) => acc + (Number(x.amount ?? x.value) || 0), 0)
+  }
+
+  const totalCosts = Number(e.total_costs) || (subtotalProductor + subtotalBarolo + extraExpensesTotal)
+  const netMargin = grossIncome - totalCosts
+
+  // Liquidación según convenio
+  const agreement = e.agreement_type || '50% - 50%'
+  let baroloProfit = 0
+  let producerProfit = 0
+  let baroloSplitLabel = '50%'
+  let producerSplitLabel = '50%'
+
+  if (agreement === '100% Barolo' || agreement === 'Solo Alquiler') {
+    baroloProfit = netMargin
+    producerProfit = 0
+    baroloSplitLabel = '100%'
+    producerSplitLabel = '0%'
+  } else if (agreement === '50% - 50%') {
+    baroloProfit = netMargin * 0.50
+    producerProfit = netMargin * 0.50
+    baroloSplitLabel = '50%'
+    producerSplitLabel = '50%'
+  } else if (agreement === '70% Barolo - 30% Productor') {
+    baroloProfit = netMargin * 0.70
+    producerProfit = netMargin * 0.30
+    baroloSplitLabel = '70%'
+    producerSplitLabel = '30%'
+  } else if (agreement === '30% Barolo - 70% Productor') {
+    baroloProfit = netMargin * 0.30
+    producerProfit = netMargin * 0.70
+    baroloSplitLabel = '30%'
+    producerSplitLabel = '70%'
+  } else {
+    baroloProfit = Number(e.barolo_profit) || (netMargin * 0.50)
+    producerProfit = netMargin - baroloProfit
+  }
+
+  const marginPct = grossIncome > 0 ? ((baroloProfit / grossIncome) * 100) : 0
+
+  // Punto de equilibrio
+  const breakEvenTickets = ticketAvgPrice > 0 ? Math.ceil(totalCosts / ticketAvgPrice) : 0
+  const attendees = Number(e.attendees) || totalTickets || 0
+  const breakEvenPct = attendees > 0 ? ((breakEvenTickets / attendees) * 100) : 0
+
+  // Semáforo
+  let breakEvenBadge = '🟢 EXCELENTE (< 70% cupos)'
+  if (totalCosts === 0) breakEvenBadge = '🟢 SIN COSTOS'
+  else if (breakEvenPct > 90) breakEvenBadge = '🔴 RIESGO ALTO (> 90% cupos)'
+  else if (breakEvenPct > 70) breakEvenBadge = '🟡 MODERADO (70% - 90% cupos)'
+
+  // Ratios
+  const gananciaNetaXAsistente = attendees > 0 ? (baroloProfit / attendees) : 0
+  const costoPromedioXAsistente = attendees > 0 ? (totalCosts / attendees) : 0
+  const relacionIngresoCosto = totalCosts > 0 ? (grossIncome / totalCosts) : (grossIncome > 0 ? 99 : 0)
+
+  // Dictamen financiero
+  let financialAdvice = '✅ VIABILIDAD ECONÓMICA APROBADA: Parámetros dentro de los rangos históricos promedio de Barolo.'
+  if (baroloProfit < 0) {
+    financialAdvice = '⚠️ ATENCIÓN: El evento proyecta un margen negativo para Barolo. Se sugiere incrementar el valor de entradas o renegociar costos.'
+  } else if (breakEvenPct > 90) {
+    financialAdvice = '⚠️ RIESGO COMERCIAL ELEVADO: El punto de equilibrio supera el 90% de ocupación. Requiere asegurar preventas firmes.'
+  } else if (marginPct >= 30) {
+    financialAdvice = '⭐ EXCELENTE RENTABILIDAD: Margen superior al 30% con excelente retorno sobre costo.'
+  }
+
+  return {
+    preventaQty, preventaPrice, preventaTotal,
+    invitacionesQty,
+    generalQty, generalPrice, generalTotal,
+    totalTickets, ticketAvgPrice,
+    alquilerEspacio, contratacionSalon, comisionCatering, otrosIngresos,
+    extraIncomesTotal, grossIncome,
+    costArtistas, costTecnica, costDisertantes, costMobiliario, costRrhh, subtotalProductor,
+    costCatering, costLimpieza, costSeguros, costAlquilerEspacio, costGastronomicos, costMarketing, costSadaic, costOtrosOperativos, subtotalBarolo,
+    extraExpensesTotal, totalCosts,
+    netMargin, baroloProfit, producerProfit, baroloSplitLabel, producerSplitLabel, marginPct,
+    breakEvenTickets, attendees, breakEvenPct, breakEvenBadge,
+    gananciaNetaXAsistente, costoPromedioXAsistente, relacionIngresoCosto, financialAdvice
+  }
 }
 
 export const excelExportService = {
 
   // =========================================================================
-  // 1. EXPORTAR TODOS LOS EVENTOS (Histórico Ejecutivo de Lujo)
+  // 1. EXPORTACIÓN EJECUTIVA MAESTRA DE LA CALCULADORA (6 BLOQUES OFICIALES)
   // =========================================================================
-  async exportEventsToExcel(events, filename = 'Palacio_Barolo_Eventos_Completo.xlsx', sheetTitle = 'Eventos Barolo') {
+  async exportCalculatorMatrix(eventData, currentUser) {
+    if (!eventData) {
+      alert('No hay datos para exportar.')
+      return
+    }
+
+    const m = computeEventMetrics(eventData)
+    const canViewSens = canViewSensitiveData(eventData, currentUser)
+    const cleanCode = (eventData.calc_code || 'CALC').replace(/[^a-zA-Z0-9_-]/g, '')
+
+    const wb = new ExcelJS.Workbook()
+    wb.creator = 'Palacio Barolo — Sistema de Cotizaciones & Liquidaciones'
+    wb.created = new Date()
+
+    const ws = wb.addWorksheet('Liquidación Barolo', {
+      views: [{ showGridLines: true }]
+    })
+
+    // Anchos de columna óptimos
+    ws.getColumn(1).width = 28
+    ws.getColumn(2).width = 38
+    ws.getColumn(3).width = 24
+    ws.getColumn(4).width = 38
+
+    // --- ENCABEZADO INSTITUCIONAL ---
+    ws.mergeCells('A1:D1')
+    const h1 = ws.getCell('A1')
+    h1.value = '🏛️ PALACIO BAROLO — MATRIZ EJECUTIVA DE COTIZACIÓN Y LIQUIDACIÓN'
+    h1.font = { name: 'Calibri', size: 15, bold: true, color: { argb: COLORS.goldPrimary } }
+    h1.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.navyDark } }
+    h1.alignment = { vertical: 'middle', horizontal: 'center' }
+    ws.getRow(1).height = 32
+
+    ws.mergeCells('A2:D2')
+    const h2 = ws.getCell('A2')
+    h2.value = `Código Oficial: ${eventData.calc_code || eventData.id || 'COTIZACIÓN'} | Emisión: ${format(new Date(), "dd 'de' MMMM 'de' yyyy, HH:mm", { locale: es })} hs | Estado: ${(eventData.status || 'COTIZADO').toUpperCase()}`
+    h2.font = { name: 'Calibri', size: 10, italic: true, color: { argb: 'CBD5E1' } }
+    h2.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.navyMedium } }
+    h2.alignment = { vertical: 'middle', horizontal: 'center' }
+    ws.getRow(2).height = 20
+
+    // --- TARJETAS KPIS RÁPIDAS ---
+    ws.mergeCells('A4:B4')
+    const kpi1 = ws.getCell('A4')
+    kpi1.value = `💰 FACTURACIÓN BRUTA: $ ${m.grossIncome.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+    kpi1.font = { bold: true, size: 11, color: { argb: COLORS.navyDark } }
+    kpi1.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'E0F2FE' } }
+    kpi1.alignment = { vertical: 'middle', horizontal: 'center' }
+
+    ws.mergeCells('C4:D4')
+    const kpi2 = ws.getCell('C4')
+    kpi2.value = `⭐ GANANCIA PALACIO BAROLO: $ ${m.baroloProfit.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${m.marginPct.toFixed(1)}%)`
+    kpi2.font = { bold: true, size: 11, color: { argb: '166534' } }
+    kpi2.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'DCFCE7' } }
+    kpi2.alignment = { vertical: 'middle', horizontal: 'center' }
+    ws.getRow(4).height = 26
+
+    let rIdx = 6
+
+    // Helper para sección
+    const renderSectionHeader = (title, icon) => {
+      ws.mergeCells(rIdx, 1, rIdx, 4)
+      const cell = ws.getCell(rIdx, 1)
+      cell.value = `${icon} ${title}`
+      cell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: COLORS.goldPrimary } }
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.navyDark } }
+      cell.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 }
+      ws.getRow(rIdx).height = 24
+      rIdx++
+    }
+
+    // Helper para pares clave-valor
+    const addParamRow = (l1, v1, l2, v2, isCurrency = false) => {
+      const row = ws.getRow(rIdx)
+      row.getCell(1).value = l1
+      row.getCell(2).value = v1
+      row.getCell(3).value = l2
+      row.getCell(4).value = v2
+
+      row.getCell(1).font = { bold: true, size: 10, color: { argb: COLORS.slateDark } }
+      row.getCell(3).font = { bold: true, size: 10, color: { argb: COLORS.slateDark } }
+      row.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.slateLight } }
+      row.getCell(3).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.slateLight } }
+      
+      row.getCell(2).font = { size: 10 }
+      row.getCell(4).font = { size: 10 }
+
+      if (isCurrency) {
+        if (typeof v1 === 'number') row.getCell(2).numFmt = CURRENCY_FORMAT
+        if (typeof v2 === 'number') row.getCell(4).numFmt = CURRENCY_FORMAT
+      }
+
+      for (let c = 1; c <= 4; c++) row.getCell(c).border = thinBorder
+      row.height = 21
+      rIdx++
+    }
+
+    // ==========================================
+    // BLOQUE 1: DATOS GENERALES Y DEL CLIENTE
+    // ==========================================
+    renderSectionHeader('1. DATOS GENERALES Y DEL CLIENTE', '📋')
+    addParamRow('Nombre del Evento', eventData.name || '-', 'Código Liquidación', eventData.calc_code || '-')
+    addParamRow('Cliente / Razón Social', eventData.client_name || '-', 'CUIT / DNI', eventData.client_cuit || '-')
+    addParamRow('Teléfono de Contacto', eventData.client_contact || '-', 'Correo Electrónico', eventData.client_email || '-')
+    addParamRow('Fecha del Evento', eventData.event_date || '-', 'Horario / Mes', `${eventData.event_time || '19:00'} hs (${eventData.month || 'Mes'})`)
+    addParamRow('Salón / Espacio', eventData.venue || 'Espacio Barolo', 'Tipo de Evento', eventData.event_type || 'Cultural')
+    addParamRow('Origen del Evento', eventData.origin || 'Fundación', 'Tipo de Factura', eventData.invoice_type || 'Factura A')
+    addParamRow('Medio de Pago', eventData.payment_method || 'Transferencia', 'Convenio / Split', eventData.agreement_type || '50% - 50%')
+    addParamRow('Cupos / Capacidad Total', `${m.attendees} personas`, 'Estado Comercial', (eventData.status || 'cotizado').toUpperCase())
+    rIdx++
+
+    // ==========================================
+    // BLOQUE 2: DETALLE DE INGRESOS BRUTOS
+    // ==========================================
+    renderSectionHeader('2. DETALLE DE FACTURACIÓN E INGRESOS BRUTOS', '💵')
+    
+    // Cabecera tabla ingresos
+    const incHRow = ws.getRow(rIdx)
+    incHRow.values = ['Concepto de Ingreso', 'Detalle / Cupos', 'Precio Unitario ($)', 'Subtotal Facturado ($)']
+    incHRow.eachCell((cell) => {
+      cell.font = { bold: true, color: { argb: COLORS.white }, size: 10 }
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.navyHeader } }
+      cell.alignment = { vertical: 'middle', horizontal: 'center' }
+      cell.border = thinBorder
+    })
+    incHRow.height = 22
+    rIdx++
+
+    const addIncomeItem = (concepto, detalle, pUnit, subtotal) => {
+      const row = ws.getRow(rIdx)
+      row.values = [concepto, detalle, pUnit, subtotal]
+      row.getCell(1).alignment = { horizontal: 'left', vertical: 'middle' }
+      row.getCell(2).alignment = { horizontal: 'center', vertical: 'middle' }
+      row.getCell(3).alignment = { horizontal: 'right', vertical: 'middle' }
+      row.getCell(4).alignment = { horizontal: 'right', vertical: 'middle' }
+      
+      row.getCell(3).numFmt = CURRENCY_FORMAT
+      row.getCell(4).numFmt = CURRENCY_FORMAT
+
+      for (let c = 1; c <= 4; c++) {
+        row.getCell(c).border = thinBorder
+        row.getCell(c).font = { size: 10 }
+      }
+      row.height = 20
+      rIdx++
+    }
+
+    addIncomeItem('Entradas Preventa', `${m.preventaQty} tickets`, m.preventaPrice, m.preventaTotal)
+    addIncomeItem('Invitaciones Sin Cargo', `${m.invitacionesQty} cortesías`, 0, 0)
+    addIncomeItem('Entradas Generales', `${m.generalQty} tickets`, m.generalPrice, m.generalTotal)
+    if (Array.isArray(eventData.event_incomes) && eventData.event_incomes.length > 0) {
+      eventData.event_incomes.forEach((inc) => {
+        const isSens = inc.is_sensitive && !canViewSens
+        const val = Number(inc.amount ?? inc.value) || 0
+        const catName = inc.category === 'locacion' ? 'Canon Locación' :
+          inc.category === 'gastronomia' ? 'Gastronomía / Barra' :
+          inc.category === 'produccion' ? 'Canon Producción' :
+          inc.category === 'comercial' ? 'Comercial / Sponsor' : 'Ingreso Operativo'
+        addIncomeItem(isSens ? '🔒 [Ingreso Confidencial]' : inc.name, catName, val, val)
+      })
+    } else {
+      if (m.alquilerEspacio > 0) addIncomeItem('Alquiler de Espacio', 'Canon locativo base', m.alquilerEspacio, m.alquilerEspacio)
+      if (m.contratacionSalon > 0) addIncomeItem('Contratación de Salón', 'Canon adicional salón', m.contratacionSalon, m.contratacionSalon)
+      if (m.comisionCatering > 0) addIncomeItem('Comisión de Catering', 'Porcentaje acordado', m.comisionCatering, m.comisionCatering)
+      if (m.otrosIngresos > 0) addIncomeItem('Otros Ingresos', 'Conceptos base varios', m.otrosIngresos, m.otrosIngresos)
+    }
+
+    if (Array.isArray(eventData.extra_incomes)) {
+      eventData.extra_incomes.forEach((inc) => {
+        const isSens = inc.is_sensitive && !canViewSens
+        const val = Number(inc.amount ?? inc.value) || 0
+        addIncomeItem(isSens ? '🔒 [Ingreso Confidencial]' : (inc.concept || 'Ingreso Extra'), 'Ingreso Adicional', val, val)
+      })
+    }
+
+    // Fila Total Ingresos
+    const totIncRow = ws.getRow(rIdx)
+    ws.mergeCells(rIdx, 1, rIdx, 3)
+    totIncRow.getCell(1).value = 'TOTAL FACTURACIÓN BRUTA (INGRESOS):'
+    totIncRow.getCell(1).font = { bold: true, size: 11, color: { argb: COLORS.navyDark } }
+    totIncRow.getCell(1).alignment = { horizontal: 'right', vertical: 'middle' }
+    totIncRow.getCell(4).value = m.grossIncome
+    totIncRow.getCell(4).numFmt = CURRENCY_FORMAT
+    totIncRow.getCell(4).font = { bold: true, size: 11, color: { argb: COLORS.navyDark } }
+    totIncRow.getCell(4).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'E0F2FE' } }
+    for (let c = 1; c <= 4; c++) totIncRow.getCell(c).border = doubleBottomBorder
+    totIncRow.height = 24
+    rIdx += 2
+
+    // ==========================================
+    // BLOQUE 3: ESTRUCTURA COMPLETA DE COSTOS
+    // ==========================================
+    renderSectionHeader('3. ESTRUCTURA COMPLETA DE COSTOS (PRODUCTOR VS BAROLO)', '🏷️')
+
+    const costHRow = ws.getRow(rIdx)
+    costHRow.values = ['Clasificación', 'Rubro / Detalle de Gasto', 'Responsable / Asignación', 'Importe ($)']
+    costHRow.eachCell((cell) => {
+      cell.font = { bold: true, color: { argb: COLORS.white }, size: 10 }
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.navyHeader } }
+      cell.alignment = { vertical: 'middle', horizontal: 'center' }
+      cell.border = thinBorder
+    })
+    costHRow.height = 22
+    rIdx++
+
+    const sensitiveCostsList = Array.isArray(eventData.sensitive_costs) ? eventData.sensitive_costs : []
+
+    const addCostItem = (clasif, rubro, resp, monto, bg = COLORS.white, costKey = null) => {
+      const isSens = costKey && sensitiveCostsList.includes(costKey) && !canViewSens
+      const row = ws.getRow(rIdx)
+      row.values = [
+        clasif, 
+        isSens ? `🔒 ${rubro} [CONFIDENCIAL]` : rubro, 
+        resp, 
+        isSens ? '[CONFIDENCIAL]' : monto
+      ]
+      row.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' }
+      row.getCell(2).alignment = { horizontal: 'left', vertical: 'middle' }
+      row.getCell(3).alignment = { horizontal: 'center', vertical: 'middle' }
+      row.getCell(4).alignment = { horizontal: isSens ? 'center' : 'right', vertical: 'middle' }
+
+      if (isSens) {
+        row.getCell(4).font = { italic: true, size: 9, color: { argb: 'DC2626' } }
+      } else {
+        row.getCell(4).numFmt = CURRENCY_FORMAT
+      }
+
+      for (let c = 1; c <= 4; c++) {
+        row.getCell(c).border = thinBorder
+        if (!isSens || c !== 4) row.getCell(c).font = { size: 10 }
+        row.getCell(c).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } }
+      }
+      row.height = 20
+      rIdx++
+    }
+
+    // Costos Productor
+    addCostItem('Costo Productor', 'Honorarios Artistas / Cachets', 'Productor / Tercero', m.costArtistas, COLORS.producerCostBg, 'cost_artistas')
+    addCostItem('Costo Productor', 'Honorarios Técnica / Sonido / Luces', 'Productor / Tercero', m.costTecnica, COLORS.producerCostBg, 'cost_tecnica')
+    addCostItem('Costo Productor', 'Honorarios Disertantes / Speakers', 'Productor / Tercero', m.costDisertantes, COLORS.producerCostBg, 'cost_disertantes')
+    addCostItem('Costo Productor', 'Mobiliario, Vajilla & Ambientación', 'Productor / Tercero', m.costMobiliario, COLORS.producerCostBg, 'cost_mobiliario')
+    addCostItem('Costo Productor', 'RRHH Salón, Personal & Seguridad', 'Productor / Tercero', m.costRrhh, COLORS.producerCostBg, 'cost_rrhh')
+
+    // Subtotal Productor
+    const subProdRow = ws.getRow(rIdx)
+    ws.mergeCells(rIdx, 1, rIdx, 3)
+    subProdRow.getCell(1).value = 'SUBTOTAL COSTOS PRODUCTOR / ARTÍSTICOS:'
+    subProdRow.getCell(1).font = { bold: true, size: 10, color: { argb: '1E40AF' } }
+    subProdRow.getCell(1).alignment = { horizontal: 'right', vertical: 'middle' }
+    subProdRow.getCell(4).value = m.subtotalProductor
+    subProdRow.getCell(4).numFmt = CURRENCY_FORMAT
+    subProdRow.getCell(4).font = { bold: true, size: 10, color: { argb: '1E40AF' } }
+    subProdRow.getCell(4).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'DBEAFE' } }
+    for (let c = 1; c <= 4; c++) subProdRow.getCell(c).border = thinBorder
+    subProdRow.height = 22
+    rIdx++
+
+    // Costos Barolo
+    addCostItem('Costo Barolo', 'Catering, Alimentos & Bebidas', 'Palacio Barolo', m.costCatering, COLORS.baroloCostBg, 'cost_catering')
+    addCostItem('Costo Barolo', 'Limpieza Integral Post-Evento', 'Palacio Barolo', m.costLimpieza, COLORS.baroloCostBg, 'cost_limpieza')
+    addCostItem('Costo Barolo', 'Seguros de Responsabilidad Civil', 'Palacio Barolo', m.costSeguros, COLORS.baroloCostBg, 'cost_seguros')
+    addCostItem('Costo Barolo', 'Alquiler de Espacio Barolo (Costo)', 'Palacio Barolo', m.costAlquilerEspacio, COLORS.baroloCostBg, 'cost_alquiler_espacio')
+    addCostItem('Costo Barolo', 'Gastronómicos / Insumos Salón', 'Palacio Barolo', m.costGastronomicos, COLORS.baroloCostBg, 'cost_gastronomicos')
+    addCostItem('Costo Barolo', 'Marketing, Redes & Publicidad', 'Palacio Barolo', m.costMarketing, COLORS.baroloCostBg, 'cost_marketing')
+    addCostItem('Costo Barolo', 'Derechos SADAIC / AADI CAPIF', 'Palacio Barolo', m.costSadaic, COLORS.baroloCostBg, 'cost_sadaic')
+    addCostItem('Costo Barolo', 'Otros Gastos Operativos', 'Palacio Barolo', m.costOtrosOperativos, COLORS.baroloCostBg, 'cost_otros_operativos')
+
+    if (Array.isArray(eventData.extra_expenses)) {
+      eventData.extra_expenses.forEach((exp) => {
+        const isSens = exp.is_sensitive && !canViewSens
+        const val = Number(exp.amount ?? exp.value) || 0
+        addCostItem('Gasto Adicional', isSens ? '🔒 [Gasto Confidencial]' : (exp.concept || 'Gasto Extra'), 'Operativo', val, COLORS.slateLight)
+      })
+    }
+
+    // Subtotal Barolo
+    const subBaroloRow = ws.getRow(rIdx)
+    ws.mergeCells(rIdx, 1, rIdx, 3)
+    subBaroloRow.getCell(1).value = 'SUBTOTAL COSTOS PALACIO BAROLO / OPERATIVOS:'
+    subBaroloRow.getCell(1).font = { bold: true, size: 10, color: { argb: '991B1B' } }
+    subBaroloRow.getCell(1).alignment = { horizontal: 'right', vertical: 'middle' }
+    subBaroloRow.getCell(4).value = m.subtotalBarolo + m.extraExpensesTotal
+    subBaroloRow.getCell(4).numFmt = CURRENCY_FORMAT
+    subBaroloRow.getCell(4).font = { bold: true, size: 10, color: { argb: '991B1B' } }
+    subBaroloRow.getCell(4).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FEE2E2' } }
+    for (let c = 1; c <= 4; c++) subBaroloRow.getCell(c).border = thinBorder
+    subBaroloRow.height = 22
+    rIdx++
+
+    // Fila TOTAL COSTOS
+    const totCostRow = ws.getRow(rIdx)
+    ws.mergeCells(rIdx, 1, rIdx, 3)
+    totCostRow.getCell(1).value = 'TOTAL COSTOS DEL EVENTO (PRODUCTOR + BAROLO):'
+    totCostRow.getCell(1).font = { bold: true, size: 11, color: { argb: '991B1B' } }
+    totCostRow.getCell(1).alignment = { horizontal: 'right', vertical: 'middle' }
+    totCostRow.getCell(4).value = m.totalCosts
+    totCostRow.getCell(4).numFmt = CURRENCY_FORMAT
+    totCostRow.getCell(4).font = { bold: true, size: 11, color: { argb: '991B1B' } }
+    totCostRow.getCell(4).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FEE2E2' } }
+    for (let c = 1; c <= 4; c++) totCostRow.getCell(c).border = doubleBottomBorder
+    totCostRow.height = 24
+    rIdx += 2
+
+    // ==========================================
+    // BLOQUE 4: LIQUIDACIÓN Y DISTRIBUCIÓN DE GANANCIAS
+    // ==========================================
+    renderSectionHeader('4. LIQUIDACIÓN Y DISTRIBUCIÓN DE MARGEN NETO', '⚖️')
+    addParamRow('Total Facturación Bruta', m.grossIncome, 'Total Costos del Evento', -m.totalCosts, true)
+    addParamRow('Margen Bruto de la Operación', m.netMargin, 'Convenio Aplicado', eventData.agreement_type || '50% - 50%', true)
+    addParamRow(`⭐ GANANCIA NETA PALACIO BAROLO (${m.baroloSplitLabel})`, m.baroloProfit, `🎭 Ganancia Productor / Cliente (${m.producerSplitLabel})`, m.producerProfit, true)
+    rIdx++
+
+    // ==========================================
+    // BLOQUE 5: ANÁLISIS DE PUNTO DE EQUILIBRIO (BREAK-EVEN)
+    // ==========================================
+    renderSectionHeader('5. ANÁLISIS DEL PUNTO DE EQUILIBRIO (BREAK-EVEN)', '🎯')
+    addParamRow('Costos Fijos a Cubrir ($)', m.totalCosts, 'Precio Promedio x Entrada ($)', m.ticketAvgPrice, true)
+    addParamRow('Entradas Necesarias (PE)', `${m.breakEvenTickets} tickets`, 'Capacidad / Cupos Totales', `${m.attendees} personas`)
+    addParamRow('% Ocupación Necesaria para PE', `${m.breakEvenPct.toFixed(1)}%`, 'Semáforo de Viabilidad', m.breakEvenBadge)
+    rIdx++
+
+    // ==========================================
+    // BLOQUE 6: EVALUACIÓN FINANCIERA & RATIOS
+    // ==========================================
+    renderSectionHeader('6. EVALUACIÓN FINANCIERA & RATIOS POR ASISTENTE', '📊')
+    addParamRow('Margen % sobre Facturación', `${m.marginPct.toFixed(1)}%`, 'Relación Ingreso / Costo', `${m.relacionIngresoCosto.toFixed(2)}x`)
+    addParamRow('Ganancia Neta x Asistente ($)', m.gananciaNetaXAsistente, 'Costo Promedio x Asistente ($)', m.costoPromedioXAsistente, true)
+
+    // Dictamen oficial
+    ws.mergeCells(rIdx, 1, rIdx, 4)
+    const dictCell = ws.getCell(rIdx, 1)
+    dictCell.value = `DIAGNOSTICO FINANCIERO OFICIAL: ${m.financialAdvice}`
+    dictCell.font = { bold: true, size: 10, color: { argb: COLORS.navyDark } }
+    dictCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.goldLight } }
+    dictCell.alignment = { vertical: 'middle', horizontal: 'left', wrapText: true, indent: 1 }
+    for (let c = 1; c <= 4; c++) ws.getCell(rIdx, c).border = thinBorder
+    ws.getRow(rIdx).height = 28
+    rIdx += 2
+
+    // ==========================================
+    // NOTAS Y CONDICIONES
+    // ==========================================
+    renderSectionHeader('NOTAS COMERCIALES & OPERATIVAS', '📝')
+    ws.mergeCells(rIdx, 1, rIdx + 2, 4)
+    const notesCell = ws.getCell(rIdx, 1)
+    const cleanNotes = eventData.notes ? eventData.notes.replace(/<!--[\s\S]*?-->/g, '').trim() : 'Sin notas registradas.'
+    notesCell.value = cleanNotes
+    notesCell.font = { size: 10, italic: true }
+    notesCell.alignment = { vertical: 'top', horizontal: 'left', wrapText: true }
+    for (let r = rIdx; r <= rIdx + 2; r++) {
+      for (let c = 1; c <= 4; c++) ws.getCell(r, c).border = thinBorder
+    }
+    rIdx += 3
+
+    if (canViewSens && eventData.sensitive_notes) {
+      rIdx++
+      renderSectionHeader('NOTAS CONFIDENCIALES / PRIVADAS (RESTRINGIDO)', '🔒')
+      ws.mergeCells(rIdx, 1, rIdx + 1, 4)
+      const sensCell = ws.getCell(rIdx, 1)
+      sensCell.value = eventData.sensitive_notes
+      sensCell.font = { size: 10, italic: true, color: { argb: '991B1B' } }
+      sensCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FEF2F2' } }
+      sensCell.alignment = { vertical: 'top', horizontal: 'left', wrapText: true }
+      for (let r = rIdx; r <= rIdx + 1; r++) {
+        for (let c = 1; c <= 4; c++) ws.getCell(r, c).border = thinBorder
+      }
+    }
+
+    await saveWorkbook(wb, `Palacio_Barolo_Liquidacion_${cleanCode}.xlsx`)
+  },
+
+  // =========================================================================
+  // 2. EXPORTACIÓN MAESTRA DE TODOS LOS EVENTOS (MULTI-PESTAÑA CON 34+ CAMPOS)
+  // =========================================================================
+  async exportEventsToExcel(events, filename = 'Palacio_Barolo_Eventos_Completo.xlsx', sheetTitle = 'Matriz General') {
     if (!events || events.length === 0) {
       alert('No hay eventos para exportar.')
       return
@@ -82,204 +589,345 @@ export const excelExportService = {
     wb.creator = 'Palacio Barolo — Sistema de Gestión Comercial'
     wb.created = new Date()
 
-    const ws = wb.addWorksheet(sheetTitle.substring(0, 31), {
-      views: [{ state: 'frozen', ySplit: 7 }] // Congelar cabeceras
+    // -----------------------------------------------------------------------
+    // PESTAÑA 1: MATRIZ GENERAL COMPLETA (34+ COLUMNAS ANALÍTICAS)
+    // -----------------------------------------------------------------------
+    const ws1 = wb.addWorksheet(sheetTitle.substring(0, 31), {
+      views: [{ state: 'frozen', xSplit: 2, ySplit: 7 }]
     })
 
-    // Métricas para el banner
     const totalGross = events.reduce((sum, e) => sum + (Number(e.gross_income) || 0), 0)
     const totalCosts = events.reduce((sum, e) => sum + (Number(e.total_costs) || 0), 0)
     const totalProfit = events.reduce((sum, e) => sum + (Number(e.barolo_profit) || 0), 0)
     const avgMargin = totalGross > 0 ? (totalProfit / totalGross) : 0
 
-    // --- FILA 1: BANNER TITULAR PALACIO BAROLO ---
-    ws.mergeCells('A1:O1')
-    const titleCell = ws.getCell('A1')
-    titleCell.value = '🏛️ PALACIO BAROLO — REPORTE OFICIAL DE EVENTOS & RENTABILIDAD'
+    // Banner titular
+    ws1.mergeCells('A1:R1')
+    const titleCell = ws1.getCell('A1')
+    titleCell.value = '🏛️ PALACIO BAROLO — BASE MAESTRA HISTÓRICA DE EVENTOS & LIQUIDACIONES'
     titleCell.font = { name: 'Calibri', size: 16, bold: true, color: { argb: COLORS.goldPrimary } }
     titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.navyDark } }
     titleCell.alignment = { vertical: 'middle', horizontal: 'center' }
-    ws.getRow(1).height = 32
+    ws1.getRow(1).height = 32
 
-    // --- FILA 2: SUBTÍTULO CON FECHA Y RESUMEN ---
-    ws.mergeCells('A2:O2')
-    const subCell = ws.getCell('A2')
-    subCell.value = `Generado el ${format(new Date(), "dd 'de' MMMM 'de' yyyy, HH:mm", { locale: es })} hs | Base Total: ${events.length} eventos registrados`
+    ws1.mergeCells('A2:R2')
+    const subCell = ws1.getCell('A2')
+    subCell.value = `Generado el ${format(new Date(), "dd 'de' MMMM 'de' yyyy, HH:mm", { locale: es })} hs | Total de eventos: ${events.length}`
     subCell.font = { name: 'Calibri', size: 10, italic: true, color: { argb: 'CBD5E1' } }
     subCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.navyMedium } }
     subCell.alignment = { vertical: 'middle', horizontal: 'center' }
-    ws.getRow(2).height = 20
+    ws1.getRow(2).height = 20
 
-    // --- FILAS 3 Y 4: TARJETAS KPIS RESUMEN EJECUTIVO ---
-    ws.mergeCells('B4:D4')
-    ws.mergeCells('F4:H4')
-    ws.mergeCells('J4:L4')
-    ws.mergeCells('M4:O4')
+    // Tarjetas KPIs
+    ws1.mergeCells('B4:D4')
+    ws1.mergeCells('F4:H4')
+    ws1.mergeCells('J4:L4')
+    ws1.mergeCells('N4:P4')
 
-    ws.getCell('B4').value = `🎟️ Total Eventos: ${events.length}`
-    ws.getCell('B4').font = { bold: true, size: 11, color: { argb: COLORS.navyDark } }
-    ws.getCell('B4').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'E2E8F0' } }
-    ws.getCell('B4').alignment = { horizontal: 'center', vertical: 'middle' }
+    ws1.getCell('B4').value = `🎟️ Eventos Registrados: ${events.length}`
+    ws1.getCell('B4').font = { bold: true, size: 11, color: { argb: COLORS.navyDark } }
+    ws1.getCell('B4').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'E2E8F0' } }
+    ws1.getCell('B4').alignment = { horizontal: 'center', vertical: 'middle' }
 
-    ws.getCell('F4').value = `💰 Facturación: $ ${totalGross.toLocaleString('es-AR')}`
-    ws.getCell('F4').font = { bold: true, size: 11, color: { argb: COLORS.navyDark } }
-    ws.getCell('F4').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'E0F2FE' } }
-    ws.getCell('F4').alignment = { horizontal: 'center', vertical: 'middle' }
+    ws1.getCell('F4').value = `💰 Facturación: $ ${totalGross.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+    ws1.getCell('F4').font = { bold: true, size: 11, color: { argb: COLORS.navyDark } }
+    ws1.getCell('F4').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'E0F2FE' } }
+    ws1.getCell('F4').alignment = { horizontal: 'center', vertical: 'middle' }
 
-    ws.getCell('J4').value = `🎭 Costos: $ ${totalCosts.toLocaleString('es-AR')}`
-    ws.getCell('J4').font = { bold: true, size: 11, color: { argb: '991B1B' } }
-    ws.getCell('J4').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FEE2E2' } }
-    ws.getCell('J4').alignment = { horizontal: 'center', vertical: 'middle' }
+    ws1.getCell('J4').value = `🎭 Costos Totales: $ ${totalCosts.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+    ws1.getCell('J4').font = { bold: true, size: 11, color: { argb: '991B1B' } }
+    ws1.getCell('J4').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FEE2E2' } }
+    ws1.getCell('J4').alignment = { horizontal: 'center', vertical: 'middle' }
 
-    ws.getCell('M4').value = `⭐ Ganancia: $ ${totalProfit.toLocaleString('es-AR')} (${(avgMargin * 100).toFixed(1)}%)`
-    ws.getCell('M4').font = { bold: true, size: 11, color: { argb: '166534' } }
-    ws.getCell('M4').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'DCFCE7' } }
-    ws.getCell('M4').alignment = { horizontal: 'center', vertical: 'middle' }
-    ws.getRow(4).height = 24
+    ws1.getCell('N4').value = `⭐ Ganancia Barolo: $ ${totalProfit.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${(avgMargin * 100).toFixed(1)}%)`
+    ws1.getCell('N4').font = { bold: true, size: 11, color: { argb: '166534' } }
+    ws1.getCell('N4').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'DCFCE7' } }
+    ws1.getCell('N4').alignment = { horizontal: 'center', vertical: 'middle' }
+    ws1.getRow(4).height = 24
+    ws1.getRow(5).height = 10
 
-    ws.getRow(5).height = 10 // Espaciador
-
-    // --- FILA 6: CABECERAS DE TABLA ---
-    const headers = [
+    // Columnas completas de la matriz analítica
+    const masterHeaders = [
+      { header: 'Código ID', key: 'calc_code', width: 14, align: 'center' },
       { header: 'Nombre del Evento', key: 'name', width: 34, align: 'left' },
-      { header: 'Cliente', key: 'client_name', width: 22, align: 'left' },
-      { header: 'Estado', key: 'status', width: 15, align: 'center' },
-      { header: 'Fecha', key: 'event_date', width: 13, align: 'center' },
+      { header: 'Cliente / Empresa', key: 'client_name', width: 25, align: 'left' },
+      { header: 'CUIT / DNI', key: 'client_cuit', width: 16, align: 'center' },
+      { header: 'Contacto Tel.', key: 'client_contact', width: 18, align: 'center' },
+      { header: 'Email Cliente', key: 'client_email', width: 25, align: 'left' },
+      { header: 'Estado', key: 'status', width: 14, align: 'center' },
+      { header: 'Fecha Evento', key: 'event_date', width: 13, align: 'center' },
+      { header: 'Horario', key: 'event_time', width: 11, align: 'center' },
+      { header: 'Mes', key: 'month', width: 13, align: 'center' },
       { header: 'Salón', key: 'venue', width: 22, align: 'left' },
-      { header: 'Tipo', key: 'event_type', width: 15, align: 'center' },
-      { header: 'Convenio', key: 'agreement_type', width: 16, align: 'left' },
-      { header: 'Asistentes', key: 'attendees', width: 12, align: 'right', numFmt: '#,##0' },
-      { header: 'Facturación ($)', key: 'gross_income', width: 18, align: 'right', numFmt: CURRENCY_FORMAT },
-      { header: 'Costos Directos ($)', key: 'direct_costs', width: 18, align: 'right', numFmt: CURRENCY_FORMAT },
-      { header: 'Costos Indirectos ($)', key: 'indirect_costs', width: 18, align: 'right', numFmt: CURRENCY_FORMAT },
-      { header: 'Costo Total ($)', key: 'total_costs', width: 18, align: 'right', numFmt: CURRENCY_FORMAT },
-      { header: 'Ganancia Barolo ($)', key: 'barolo_profit', width: 19, align: 'right', numFmt: CURRENCY_FORMAT },
-      { header: 'Margen (%)', key: 'margin_pct', width: 13, align: 'right', numFmt: PERCENT_FORMAT },
-      { header: 'Código ID', key: 'calc_code', width: 13, align: 'center' },
-      { header: 'Medio de Pago', key: 'payment_method', width: 16, align: 'center' }
+      { header: 'Tipo Evento', key: 'event_type', width: 16, align: 'center' },
+      { header: 'Origen', key: 'origin', width: 16, align: 'center' },
+      { header: 'Facturación', key: 'invoice_type', width: 16, align: 'center' },
+      { header: 'Medio Pago', key: 'payment_method', width: 18, align: 'center' },
+      { header: 'Convenio / Split', key: 'agreement_type', width: 20, align: 'left' },
+      { header: 'Cupos / Pax', key: 'attendees', width: 12, align: 'right', numFmt: INTEGER_FORMAT },
+      { header: 'Tickets Preventa', key: 'preventa_qty', width: 14, align: 'right', numFmt: INTEGER_FORMAT },
+      { header: 'Precio Preventa ($)', key: 'preventa_price', width: 16, align: 'right', numFmt: CURRENCY_FORMAT },
+      { header: 'Invitaciones Sin Cargo', key: 'invitaciones_qty', width: 18, align: 'right', numFmt: INTEGER_FORMAT },
+      { header: 'Tickets General', key: 'general_qty', width: 14, align: 'right', numFmt: INTEGER_FORMAT },
+      { header: 'Precio General ($)', key: 'general_price', width: 16, align: 'right', numFmt: CURRENCY_FORMAT },
+      { header: 'Total Facturación ($)', key: 'gross_income', width: 20, align: 'right', numFmt: CURRENCY_FORMAT },
+      { header: 'Costos Productor ($)', key: 'subtotal_productor', width: 19, align: 'right', numFmt: CURRENCY_FORMAT },
+      { header: 'Costos Barolo ($)', key: 'subtotal_barolo', width: 19, align: 'right', numFmt: CURRENCY_FORMAT },
+      { header: 'Costos Totales ($)', key: 'total_costs', width: 19, align: 'right', numFmt: CURRENCY_FORMAT },
+      { header: 'Margen Bruto ($)', key: 'net_margin', width: 19, align: 'right', numFmt: CURRENCY_FORMAT },
+      { header: 'Ganancia Barolo ($)', key: 'barolo_profit', width: 20, align: 'right', numFmt: CURRENCY_FORMAT },
+      { header: 'Ganancia Productor ($)', key: 'producer_profit', width: 20, align: 'right', numFmt: CURRENCY_FORMAT },
+      { header: 'Margen Barolo (%)', key: 'margin_pct', width: 16, align: 'right', numFmt: PERCENT_FORMAT },
+      { header: 'PE Tickets', key: 'break_even_tickets', width: 13, align: 'right', numFmt: INTEGER_FORMAT },
+      { header: 'PE Ocupación (%)', key: 'break_even_pct', width: 16, align: 'right', numFmt: PERCENT_FORMAT },
+      { header: 'Ganancia x Pax ($)', key: 'profit_per_pax', width: 18, align: 'right', numFmt: CURRENCY_FORMAT },
+      { header: 'Costo x Pax ($)', key: 'cost_per_pax', width: 18, align: 'right', numFmt: CURRENCY_FORMAT },
+      { header: 'Ratio Ingreso/Costo', key: 'ratio_ic', width: 18, align: 'right' }
     ]
 
-    const headerRow = ws.getRow(6)
-    headers.forEach((h, idx) => {
-      const cell = headerRow.getCell(idx + 1)
+    const hRow = ws1.getRow(6)
+    masterHeaders.forEach((h, idx) => {
+      const cell = hRow.getCell(idx + 1)
       cell.value = h.header
-      cell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: COLORS.white } }
+      cell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: COLORS.white } }
       cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.navyHeader } }
-      cell.alignment = { vertical: 'middle', horizontal: 'center' }
+      cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true }
       cell.border = thinBorder
-      ws.getColumn(idx + 1).width = h.width
+      ws1.getColumn(idx + 1).width = h.width
     })
-    headerRow.height = 28
+    hRow.height = 28
 
-    // --- FILAS DE DATOS ---
-    let currentRowIdx = 7
-    events.forEach((e, idx) => {
-      const row = ws.getRow(currentRowIdx)
+    let rowIdx = 7
+    events.forEach((ev, idx) => {
+      const m = computeEventMetrics(ev)
+      const row = ws1.getRow(rowIdx)
       const isEven = idx % 2 === 0
       const rowBg = isEven ? COLORS.white : COLORS.slateLight
 
-      const statusUpper = (e.status || '').toUpperCase()
-      const gross = Number(e.gross_income) || 0
-      const direct = Number(e.direct_costs) || 0
-      const indirect = Number(e.indirect_costs) || 0
-      const totalCost = Number(e.total_costs) || 0
-      const profit = Number(e.barolo_profit) || 0
-      const margin = gross > 0 ? (profit / gross) : 0
-
       row.values = [
-        e.name || '',
-        e.client_name || 'Particular',
-        statusUpper,
-        e.event_date || '',
-        e.venue || '',
-        e.event_type || '',
-        e.agreement_type || '100% Barolo',
-        Number(e.attendees) || 0,
-        gross,
-        direct,
-        indirect,
-        totalCost,
-        profit,
-        margin,
-        e.calc_code || `CALC-${String(idx + 1).padStart(3, '0')}`,
-        e.payment_method || 'Transferencia'
+        ev.calc_code || ev.id || '-',
+        ev.name || '',
+        ev.client_name || 'Particular',
+        ev.client_cuit || '-',
+        ev.client_contact || '-',
+        ev.client_email || '-',
+        (ev.status || 'cotizado').toUpperCase(),
+        ev.event_date || '',
+        ev.event_time || '19:00',
+        ev.month || '',
+        ev.venue || '',
+        ev.event_type || '',
+        ev.origin || '',
+        ev.invoice_type || '',
+        ev.payment_method || '',
+        ev.agreement_type || '',
+        m.attendees,
+        m.preventaQty,
+        m.preventaPrice,
+        m.invitacionesQty,
+        m.generalQty,
+        m.generalPrice,
+        m.grossIncome,
+        m.subtotalProductor,
+        m.subtotalBarolo + m.extraExpensesTotal,
+        m.totalCosts,
+        m.netMargin,
+        m.baroloProfit,
+        m.producerProfit,
+        m.marginPct / 100,
+        m.breakEvenTickets,
+        m.breakEvenPct / 100,
+        m.gananciaNetaXAsistente,
+        m.costoPromedioXAsistente,
+        `${m.relacionIngresoCosto.toFixed(2)}x`
       ]
 
-      // Estilos celda por celda
-      row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
-        const colDef = headers[colNumber - 1]
-        cell.font = { name: 'Calibri', size: 10, color: { argb: COLORS.slateDark } }
-        cell.border = thinBorder
+      masterHeaders.forEach((h, colIdx) => {
+        const cell = row.getCell(colIdx + 1)
+        cell.font = { name: 'Calibri', size: 10 }
         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: rowBg } }
-        cell.alignment = { vertical: 'middle', horizontal: colDef?.align || 'left' }
-
-        if (colDef?.numFmt) {
-          cell.numFmt = colDef.numFmt
-        }
-
-        // Semáforo Estado
-        if (colNumber === 3) {
-          cell.font = { bold: true, size: 9 }
-          if (statusUpper === 'CONTRATADO') {
-            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.statusContratadoBg } }
-            cell.font = { bold: true, color: { argb: COLORS.statusContratadoText } }
-          } else if (statusUpper === 'RESERVADO') {
-            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.statusReservadoBg } }
-            cell.font = { bold: true, color: { argb: COLORS.statusReservadoText } }
-          } else if (statusUpper === 'COTIZADO') {
-            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.statusCotizadoBg } }
-            cell.font = { bold: true, color: { argb: COLORS.statusCotizadoText } }
-          } else if (statusUpper === 'CANCELADO') {
-            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.statusCanceladoBg } }
-            cell.font = { bold: true, color: { argb: COLORS.statusCanceladoText } }
-          }
-        }
-
-        // Ganancia destacada
-        if (colNumber === 13) {
-          cell.font = { bold: true, color: { argb: '15803D' } } // Verde oscuro
-        }
+        cell.border = thinBorder
+        cell.alignment = { vertical: 'middle', horizontal: h.align || 'left' }
+        if (h.numFmt) cell.numFmt = h.numFmt
       })
 
-      row.height = 22
-      currentRowIdx++
-    })
-
-    // --- FILA FINAL: TOTALES Y PROMEDIOS ---
-    const totalRow = ws.getRow(currentRowIdx)
-    totalRow.getCell(1).value = 'TOTALES'
-    totalRow.getCell(2).value = `${events.length} EVENTOS REGISTRADOS`
-    totalRow.getCell(8).value = events.reduce((sum, e) => sum + (Number(e.attendees) || 0), 0)
-    totalRow.getCell(9).value = totalGross
-    totalRow.getCell(10).value = events.reduce((sum, e) => sum + (Number(e.direct_costs) || 0), 0)
-    totalRow.getCell(11).value = events.reduce((sum, e) => sum + (Number(e.indirect_costs) || 0), 0)
-    totalRow.getCell(12).value = totalCosts
-    totalRow.getCell(13).value = totalProfit
-    totalRow.getCell(14).value = avgMargin
-
-    totalRow.eachCell({ includeEmpty: true }, (cell, colNumber) => {
-      cell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: COLORS.navyDark } }
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.goldLight } }
-      cell.border = doubleBottomBorder
-      const colDef = headers[colNumber - 1]
-      cell.alignment = { vertical: 'middle', horizontal: colDef?.align || 'left' }
-      if (colDef?.numFmt) {
-        cell.numFmt = colDef.numFmt
+      // Semáforo Estado
+      const stCell = row.getCell(7)
+      const st = (ev.status || '').toLowerCase()
+      if (st === 'contratado') {
+        stCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.statusContratadoBg } }
+        stCell.font = { bold: true, color: { argb: COLORS.statusContratadoText }, size: 9 }
+      } else if (st === 'reservado') {
+        stCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.statusReservadoBg } }
+        stCell.font = { bold: true, color: { argb: COLORS.statusReservadoText }, size: 9 }
+      } else if (st === 'cancelado') {
+        stCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.statusCanceladoBg } }
+        stCell.font = { bold: true, color: { argb: COLORS.statusCanceladoText }, size: 9 }
+      } else {
+        stCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.statusCotizadoBg } }
+        stCell.font = { bold: true, color: { argb: COLORS.statusCotizadoText }, size: 9 }
       }
+
+      row.height = 20
+      rowIdx++
     })
-    totalRow.height = 26
+
+    // -----------------------------------------------------------------------
+    // PESTAÑA 2: RESUMEN Y RENTABILIDAD POR SALÓN
+    // -----------------------------------------------------------------------
+    const ws2 = wb.addWorksheet('Rentabilidad por Salón', {
+      views: [{ showGridLines: true }]
+    })
+
+    ws2.getColumn(1).width = 28
+    ws2.getColumn(2).width = 16
+    ws2.getColumn(3).width = 22
+    ws2.getColumn(4).width = 22
+    ws2.getColumn(5).width = 22
+    ws2.getColumn(6).width = 16
+    ws2.getColumn(7).width = 16
+
+    ws2.mergeCells('A1:G1')
+    ws2.getCell('A1').value = '🏛️ PALACIO BAROLO — CONSOLIDADO DE RENDIMIENTO POR SALÓN'
+    ws2.getCell('A1').font = { size: 14, bold: true, color: { argb: COLORS.goldPrimary } }
+    ws2.getCell('A1').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.navyDark } }
+    ws2.getCell('A1').alignment = { vertical: 'middle', horizontal: 'center' }
+    ws2.getRow(1).height = 30
+
+    const venueHeaders = ['Espacio / Salón', 'Total Eventos', 'Facturación Total ($)', 'Costos Totales ($)', 'Ganancia Barolo ($)', 'Margen Prom. (%)', 'Asistentes Total']
+    const vHRow = ws2.getRow(3)
+    vHRow.values = venueHeaders
+    vHRow.eachCell((cell) => {
+      cell.font = { bold: true, color: { argb: COLORS.white }, size: 10 }
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.navyHeader } }
+      cell.alignment = { vertical: 'middle', horizontal: 'center' }
+      cell.border = thinBorder
+    })
+    vHRow.height = 24
+
+    // Agrupación por salón
+    const venueMap = new Map()
+    events.forEach(e => {
+      const v = e.venue || 'Sin Asignar'
+      if (!venueMap.has(v)) {
+        venueMap.set(v, { count: 0, gross: 0, costs: 0, profit: 0, attendees: 0 })
+      }
+      const data = venueMap.get(v)
+      data.count++
+      data.gross += Number(e.gross_income) || 0
+      data.costs += Number(e.total_costs) || 0
+      data.profit += Number(e.barolo_profit) || 0
+      data.attendees += Number(e.attendees) || 0
+    })
+
+    let vIdx = 4
+    venueMap.forEach((val, key) => {
+      const row = ws2.getRow(vIdx)
+      const avgM = val.gross > 0 ? (val.profit / val.gross) : 0
+      row.values = [key, val.count, val.gross, val.costs, val.profit, avgM, val.attendees]
+      row.getCell(1).alignment = { horizontal: 'left', vertical: 'middle' }
+      row.getCell(2).alignment = { horizontal: 'center', vertical: 'middle' }
+      row.getCell(3).alignment = { horizontal: 'right', vertical: 'middle' }
+      row.getCell(4).alignment = { horizontal: 'right', vertical: 'middle' }
+      row.getCell(5).alignment = { horizontal: 'right', vertical: 'middle' }
+      row.getCell(6).alignment = { horizontal: 'right', vertical: 'middle' }
+      row.getCell(7).alignment = { horizontal: 'right', vertical: 'middle' }
+
+      row.getCell(3).numFmt = CURRENCY_FORMAT
+      row.getCell(4).numFmt = CURRENCY_FORMAT
+      row.getCell(5).numFmt = CURRENCY_FORMAT
+      row.getCell(6).numFmt = PERCENT_FORMAT
+      row.getCell(7).numFmt = INTEGER_FORMAT
+
+      for (let c = 1; c <= 7; c++) {
+        row.getCell(c).border = thinBorder
+        row.getCell(c).font = { size: 10 }
+        row.getCell(c).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: vIdx % 2 === 0 ? COLORS.white : COLORS.slateLight } }
+      }
+      row.height = 20
+      vIdx++
+    })
+
+    // -----------------------------------------------------------------------
+    // PESTAÑA 3: ESTRUCTURA ACUMULADA DE COSTOS
+    // -----------------------------------------------------------------------
+    const ws3 = wb.addWorksheet('Estructura de Costos', {
+      views: [{ showGridLines: true }]
+    })
+
+    ws3.getColumn(1).width = 34
+    ws3.getColumn(2).width = 24
+    ws3.getColumn(3).width = 20
+    ws3.getColumn(4).width = 20
+
+    ws3.mergeCells('A1:D1')
+    ws3.getCell('A1').value = '🏛️ PALACIO BAROLO — ESTRUCTURA HISTÓRICA POR RUBRO DE COSTO'
+    ws3.getCell('A1').font = { size: 14, bold: true, color: { argb: COLORS.goldPrimary } }
+    ws3.getCell('A1').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.navyDark } }
+    ws3.getCell('A1').alignment = { vertical: 'middle', horizontal: 'center' }
+    ws3.getRow(1).height = 30
+
+    const costCatHeaders = ['Rubro de Costo', 'Gasto Acumulado ($)', '% s/ Costo Total', 'Promedio x Evento ($)']
+    const cHRow = ws3.getRow(3)
+    cHRow.values = costCatHeaders
+    cHRow.eachCell((cell) => {
+      cell.font = { bold: true, color: { argb: COLORS.white }, size: 10 }
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.navyHeader } }
+      cell.alignment = { vertical: 'middle', horizontal: 'center' }
+      cell.border = thinBorder
+    })
+    cHRow.height = 24
+
+    const costCats = [
+      { name: 'Honorarios Artistas / Cachets', key: 'cost_artistas' },
+      { name: 'Honorarios Técnica / Sonido', key: 'cost_tecnica' },
+      { name: 'Honorarios Disertantes', key: 'cost_disertantes' },
+      { name: 'Mobiliario & Montaje', key: 'cost_mobiliario' },
+      { name: 'RRHH Salón & Seguridad', key: 'cost_rrhh' },
+      { name: 'Catering & Bebidas', key: 'cost_catering' },
+      { name: 'Limpieza Integral Post-Evento', key: 'cost_limpieza' },
+      { name: 'Seguros de Responsabilidad Civil', key: 'cost_seguros' },
+      { name: 'Alquiler de Espacio Barolo (Costo)', key: 'cost_alquiler_espacio' },
+      { name: 'Gastronómicos / Insumos Salón', key: 'cost_gastronomicos' },
+      { name: 'Marketing & Publicidad', key: 'cost_marketing' },
+      { name: 'Derechos SADAIC / AADI CAPIF', key: 'cost_sadaic' },
+      { name: 'Otros Operativos', key: 'cost_otros_operativos' }
+    ]
+
+    let cIdx = 4
+    costCats.forEach(cat => {
+      const sum = events.reduce((acc, e) => acc + (Number(e[cat.key]) || 0), 0)
+      const pct = totalCosts > 0 ? (sum / totalCosts) : 0
+      const avg = events.length > 0 ? (sum / events.length) : 0
+      const row = ws3.getRow(cIdx)
+      row.values = [cat.name, sum, pct, avg]
+      row.getCell(1).alignment = { horizontal: 'left', vertical: 'middle' }
+      row.getCell(2).alignment = { horizontal: 'right', vertical: 'middle' }
+      row.getCell(3).alignment = { horizontal: 'right', vertical: 'middle' }
+      row.getCell(4).alignment = { horizontal: 'right', vertical: 'middle' }
+
+      row.getCell(2).numFmt = CURRENCY_FORMAT
+      row.getCell(3).numFmt = PERCENT_FORMAT
+      row.getCell(4).numFmt = CURRENCY_FORMAT
+
+      for (let c = 1; c <= 4; c++) {
+        row.getCell(c).border = thinBorder
+        row.getCell(c).font = { size: 10 }
+        row.getCell(c).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: cIdx % 2 === 0 ? COLORS.white : COLORS.slateLight } }
+      }
+      row.height = 20
+      cIdx++
+    })
 
     await saveWorkbook(wb, filename)
   },
 
-  // Alias para exportación general
+  // Alias
   exportAllEvents(events) {
-    this.exportEventsToExcel(events, 'Palacio_Barolo_Eventos_Completo.xlsx', 'Todos los Eventos')
+    this.exportEventsToExcel(events, 'Palacio_Barolo_Eventos_Completo.xlsx', 'Matriz General')
   },
 
-  // =========================================================================
-  // 2. EXPORTAR MES ESPECÍFICO
-  // =========================================================================
+  // Exportar Mes Específico
   async exportMonthToExcel(events, monthDate = new Date()) {
     let monthKey = ''
     let monthLabel = ''
@@ -312,8 +960,12 @@ export const excelExportService = {
     await this.exportEventsToExcel(inMonth, filename, title)
   },
 
+  exportMonthEvents(events, monthDate) {
+    this.exportMonthToExcel(events, monthDate)
+  },
+
   // =========================================================================
-  // 3. COMPARATIVA DE EVENTOS LADO A LADO (Con Costos Asociados Desglosados)
+  // 3. COMPARATIVA LADO A LADO ENRIQUECIDA
   // =========================================================================
   async exportComparisonToExcel(selectedEvents) {
     if (!selectedEvents || selectedEvents.length < 2) {
@@ -326,360 +978,130 @@ export const excelExportService = {
     wb.created = new Date()
 
     const ws = wb.addWorksheet('Comparativa de Eventos', {
-      views: [{ state: 'frozen', xSplit: 2, ySplit: 6 }]
+      views: [{ state: 'frozen', xSplit: 2, ySplit: 5 }]
     })
 
-    const eventCols = selectedEvents.map((e, idx) => ({
-      index: idx + 1,
-      colNumber: idx + 3,
-      event: e,
-      headerTitle: `${e.calc_code || 'CALC'}\n${e.name || ''}`
-    }))
+    const totalCols = selectedEvents.length + 2
 
-    const totalCols = eventCols.length + 2
-
-    // --- BANNER TITULAR ---
     ws.mergeCells(1, 1, 1, totalCols)
-    const titleCell = ws.getCell(1, 1)
-    titleCell.value = '⚖️ PALACIO BAROLO — MATRIZ COMPARATIVA DE EVENTOS & COSTOS ASOCIADOS'
-    titleCell.font = { name: 'Calibri', size: 15, bold: true, color: { argb: COLORS.goldPrimary } }
-    titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.navyDark } }
-    titleCell.alignment = { vertical: 'middle', horizontal: 'center' }
+    ws.getCell(1, 1).value = '⚖️ PALACIO BAROLO — MATRIZ COMPARATIVA DE EVENTOS & COSTOS ASOCIADOS'
+    ws.getCell(1, 1).font = { name: 'Calibri', size: 15, bold: true, color: { argb: COLORS.goldPrimary } }
+    ws.getCell(1, 1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.navyDark } }
+    ws.getCell(1, 1).alignment = { vertical: 'middle', horizontal: 'center' }
     ws.getRow(1).height = 32
 
-    // Subtítulo
     ws.mergeCells(2, 1, 2, totalCols)
-    const subCell = ws.getCell(2, 1)
-    subCell.value = `Análisis comparativo de ${selectedEvents.length} eventos | Generado el ${format(new Date(), "dd/MM/yyyy HH:mm")} hs`
-    subCell.font = { name: 'Calibri', size: 10, italic: true, color: { argb: 'CBD5E1' } }
-    subCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.navyMedium } }
-    subCell.alignment = { vertical: 'middle', horizontal: 'center' }
+    ws.getCell(2, 1).value = `Análisis comparativo de ${selectedEvents.length} eventos | Generado el ${format(new Date(), "dd/MM/yyyy HH:mm")} hs`
+    ws.getCell(2, 1).font = { name: 'Calibri', size: 10, italic: true, color: { argb: 'CBD5E1' } }
+    ws.getCell(2, 1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.navyMedium } }
+    ws.getCell(2, 1).alignment = { vertical: 'middle', horizontal: 'center' }
     ws.getRow(2).height = 20
+    ws.getRow(3).height = 10
 
-    ws.getRow(3).height = 10 // Espaciador
+    ws.getColumn(1).width = 22
+    ws.getColumn(2).width = 30
 
-    // Anchos de columna fijos
-    ws.getColumn(1).width = 24 // Categoría
-    ws.getColumn(2).width = 32 // Métrica / Rubro de Costo
-    eventCols.forEach(col => {
-      ws.getColumn(col.colNumber).width = 26
-    })
+    const headerRow = ws.getRow(5)
+    headerRow.getCell(1).value = 'Rubro / Categoría'
+    headerRow.getCell(2).value = 'Parámetro Financiero'
+    headerRow.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.navyHeader } }
+    headerRow.getCell(2).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.navyHeader } }
+    headerRow.getCell(1).font = { bold: true, color: { argb: COLORS.white }, size: 10 }
+    headerRow.getCell(2).font = { bold: true, color: { argb: COLORS.white }, size: 10 }
+    headerRow.getCell(1).border = thinBorder
+    headerRow.getCell(2).border = thinBorder
 
-    // --- FILA 5 Y 6: ENCABEZADOS DE COLUMNA DE EVENTOS ---
-    ws.mergeCells('A5:B6')
-    const cornerCell = ws.getCell('A5')
-    cornerCell.value = 'PARÁMETRO / RUBRO ECONÓMICO'
-    cornerCell.font = { bold: true, size: 11, color: { argb: COLORS.white } }
-    cornerCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.navyHeader } }
-    cornerCell.alignment = { vertical: 'middle', horizontal: 'center' }
-    cornerCell.border = thinBorder
-
-    eventCols.forEach(col => {
-      const cell = ws.getCell(5, col.colNumber)
-      cell.value = col.event.name || `Evento ${col.index}`
-      cell.font = { bold: true, size: 10, color: { argb: COLORS.white } }
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.navyDark } }
+    selectedEvents.forEach((e, idx) => {
+      const col = idx + 3
+      ws.getColumn(col).width = 26
+      const cell = headerRow.getCell(col)
+      cell.value = `${e.calc_code || 'CALC'}\n${e.name || ''}`
+      cell.font = { bold: true, color: { argb: COLORS.white }, size: 10 }
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.navyHeader } }
       cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true }
       cell.border = thinBorder
-
-      const subHeader = ws.getCell(6, col.colNumber)
-      subHeader.value = `${col.event.client_name || 'Particular'} (${col.event.calc_code || 'CALC'})`
-      subHeader.font = { bold: false, size: 9, color: { argb: COLORS.goldLight } }
-      subHeader.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.navyHeader } }
-      subHeader.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true }
-      subHeader.border = thinBorder
     })
-    ws.getRow(5).height = 24
-    ws.getRow(6).height = 24
+    headerRow.height = 36
 
-    // Helper para insertar sección de tabla
-    let curRow = 7
+    const compMetrics = selectedEvents.map(computeEventMetrics)
 
-    const addSectionHeader = (title, bgArgb, textArgb) => {
-      ws.mergeCells(curRow, 1, curRow, totalCols)
-      const cell = ws.getCell(curRow, 1)
-      cell.value = title
-      cell.font = { bold: true, size: 11, color: { argb: textArgb } }
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bgArgb } }
-      cell.alignment = { vertical: 'middle', horizontal: 'left' }
-      cell.border = thinBorder
-      ws.getRow(curRow).height = 24
-      curRow++
-    }
+    const params = [
+      { cat: 'GENERAL', label: 'Cliente / Empresa', getter: (e) => e.client_name || '-' },
+      { cat: 'GENERAL', label: 'Fecha de Realización', getter: (e) => e.event_date || '-' },
+      { cat: 'GENERAL', label: 'Salón Asignado', getter: (e) => e.venue || '-' },
+      { cat: 'GENERAL', label: 'Tipo de Evento', getter: (e) => e.event_type || '-' },
+      { cat: 'GENERAL', label: 'Convenio / Split', getter: (e) => e.agreement_type || '-' },
+      { cat: 'GENERAL', label: 'Cupos / Asistentes', getter: (e, m) => m.attendees, numFmt: INTEGER_FORMAT },
 
-    const addRow = (category, metricLabel, getValueFn, numFmt = null, isBold = false, rowBg = COLORS.white) => {
-      const row = ws.getRow(curRow)
-      row.getCell(1).value = category
-      row.getCell(2).value = metricLabel
+      { cat: 'INGRESOS', label: 'Tickets Preventa (Qty x $)', getter: (e, m) => `${m.preventaQty} x $${m.preventaPrice.toLocaleString('es-AR')}` },
+      { cat: 'INGRESOS', label: 'Tickets Generales (Qty x $)', getter: (e, m) => `${m.generalQty} x $${m.generalPrice.toLocaleString('es-AR')}` },
+      { cat: 'INGRESOS', label: 'Alquiler de Espacio ($)', getter: (e, m) => m.alquilerEspacio, numFmt: CURRENCY_FORMAT },
+      { cat: 'INGRESOS', label: 'Facturación Bruta Total ($)', getter: (e, m) => m.grossIncome, numFmt: CURRENCY_FORMAT, bold: true, bg: 'E0F2FE' },
 
-      row.getCell(1).font = { size: 10, bold: isBold, color: { argb: COLORS.slateDark } }
-      row.getCell(2).font = { size: 10, bold: isBold, color: { argb: COLORS.slateDark } }
-      row.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: rowBg } }
-      row.getCell(2).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: rowBg } }
+      { cat: 'COSTOS', label: 'Artistas / Cachets ($)', getter: (e, m) => m.costArtistas, numFmt: CURRENCY_FORMAT },
+      { cat: 'COSTOS', label: 'Técnica / Sonido ($)', getter: (e, m) => m.costTecnica, numFmt: CURRENCY_FORMAT },
+      { cat: 'COSTOS', label: 'Mobiliario & Montaje ($)', getter: (e, m) => m.costMobiliario, numFmt: CURRENCY_FORMAT },
+      { cat: 'COSTOS', label: 'RRHH Salón ($)', getter: (e, m) => m.costRrhh, numFmt: CURRENCY_FORMAT },
+      { cat: 'COSTOS', label: 'Catering ($)', getter: (e, m) => m.costCatering, numFmt: CURRENCY_FORMAT },
+      { cat: 'COSTOS', label: 'Limpieza Integral ($)', getter: (e, m) => m.costLimpieza, numFmt: CURRENCY_FORMAT },
+      { cat: 'COSTOS', label: 'Seguros ($)', getter: (e, m) => m.costSeguros, numFmt: CURRENCY_FORMAT },
+      { cat: 'COSTOS', label: 'Gastronómicos Salón ($)', getter: (e, m) => m.costGastronomicos, numFmt: CURRENCY_FORMAT },
+      { cat: 'COSTOS', label: 'Costos Subtotal Productor ($)', getter: (e, m) => m.subtotalProductor, numFmt: CURRENCY_FORMAT, bold: true },
+      { cat: 'COSTOS', label: 'Costos Subtotal Barolo ($)', getter: (e, m) => m.subtotalBarolo + m.extraExpensesTotal, numFmt: CURRENCY_FORMAT, bold: true },
+      { cat: 'COSTOS', label: 'Costos Totales del Evento ($)', getter: (e, m) => m.totalCosts, numFmt: CURRENCY_FORMAT, bold: true, bg: 'FEE2E2' },
+
+      { cat: 'LIQUIDACIÓN', label: 'Margen Bruto Operación ($)', getter: (e, m) => m.netMargin, numFmt: CURRENCY_FORMAT, bold: true },
+      { cat: 'LIQUIDACIÓN', label: 'Ganancia Neta Barolo ($)', getter: (e, m) => m.baroloProfit, numFmt: CURRENCY_FORMAT, bold: true, bg: 'DCFCE7' },
+      { cat: 'LIQUIDACIÓN', label: 'Ganancia Productor ($)', getter: (e, m) => m.producerProfit, numFmt: CURRENCY_FORMAT },
+      { cat: 'LIQUIDACIÓN', label: 'Margen Rentabilidad (%)', getter: (e, m) => m.marginPct / 100, numFmt: PERCENT_FORMAT, bold: true },
+
+      { cat: 'RATIOS', label: 'Punto de Equilibrio (Tickets)', getter: (e, m) => `${m.breakEvenTickets} tickets` },
+      { cat: 'RATIOS', label: 'Punto de Equilibrio (Ocupación)', getter: (e, m) => m.breakEvenPct / 100, numFmt: PERCENT_FORMAT },
+      { cat: 'RATIOS', label: 'Ganancia Neta x Asistente ($)', getter: (e, m) => m.gananciaNetaXAsistente, numFmt: CURRENCY_FORMAT },
+      { cat: 'RATIOS', label: 'Costo Promedio x Asistente ($)', getter: (e, m) => m.costoPromedioXAsistente, numFmt: CURRENCY_FORMAT },
+      { cat: 'RATIOS', label: 'Relación Ingreso / Costo', getter: (e, m) => `${m.relacionIngresoCosto.toFixed(2)}x` }
+    ]
+
+    let cRowIdx = 6
+    params.forEach((p, idx) => {
+      const row = ws.getRow(cRowIdx)
+      row.getCell(1).value = p.cat
+      row.getCell(2).value = p.label
+      row.getCell(1).font = { bold: true, size: 9, color: { argb: COLORS.navyDark } }
+      row.getCell(2).font = { bold: p.bold || false, size: 10, color: { argb: COLORS.slateDark } }
+      row.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.slateLight } }
+      row.getCell(2).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: p.bg || (idx % 2 === 0 ? COLORS.white : COLORS.slateLight) } }
       row.getCell(1).border = thinBorder
       row.getCell(2).border = thinBorder
-      row.getCell(1).alignment = { vertical: 'middle', horizontal: 'left' }
-      row.getCell(2).alignment = { vertical: 'middle', horizontal: 'left' }
 
-      eventCols.forEach(col => {
-        const val = getValueFn(col.event)
-        const cell = row.getCell(col.colNumber)
-        cell.value = val !== undefined && val !== null ? val : '-'
-        cell.font = { size: 10, bold: isBold, color: { argb: COLORS.slateDark } }
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: rowBg } }
+      selectedEvents.forEach((ev, evIdx) => {
+        const col = evIdx + 3
+        const m = compMetrics[evIdx]
+        const cell = row.getCell(col)
+        cell.value = p.getter(ev, m)
+        cell.font = { bold: p.bold || false, size: 10 }
+        if (p.numFmt) cell.numFmt = p.numFmt
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: p.bg || (idx % 2 === 0 ? COLORS.white : COLORS.slateLight) } }
+        cell.alignment = { vertical: 'middle', horizontal: p.numFmt ? 'right' : 'center' }
         cell.border = thinBorder
-        cell.alignment = { vertical: 'middle', horizontal: typeof val === 'number' ? 'right' : 'center' }
-        if (numFmt && typeof val === 'number') {
-          cell.numFmt = numFmt
-        }
       })
 
-      row.height = 22
-      curRow++
-    }
-
-    // --- SECCIÓN 1: DATOS GENERALES ---
-    addSectionHeader('📋 1. PARÁMETROS GENERALES DEL EVENTO', 'E2E8F0', COLORS.navyDark)
-    addRow('General', 'Nombre del Evento', e => e.name || '-', null, true)
-    addRow('General', 'Cliente / Organizador', e => e.client_name || 'Particular', null, true)
-    addRow('General', 'Código ID', e => e.calc_code || 'CALC')
-    addRow('General', 'Estado Comercial', e => (e.status || '').toUpperCase(), null, true)
-    addRow('General', 'Fecha del Evento', e => e.event_date || '-')
-    addRow('General', 'Salón / Espacio', e => e.venue || '-')
-    addRow('General', 'Tipo de Evento', e => e.event_type || '-')
-    addRow('General', 'Modalidad de Convenio', e => e.agreement_type || '100% Barolo')
-    addRow('General', 'Cantidad de Asistentes (Pax)', e => Number(e.attendees) || 0, '#,##0', true)
-
-    // --- SECCIÓN 2: TOTALES FINANCIEROS CONSOLIDADOS ---
-    addSectionHeader('💰 2. TOTALES FINANCIEROS CONSOLIDADOS', 'FEF3C7', '92400E')
-    addRow('Financiero', 'Facturación Bruta Total ($)', e => Number(e.gross_income) || 0, CURRENCY_FORMAT, true, 'FEF9C3')
-    addRow('Financiero', 'Costos Directos Totales ($)', e => Number(e.direct_costs) || 0, CURRENCY_FORMAT)
-    addRow('Financiero', 'Costos Indirectos Totales ($)', e => Number(e.indirect_costs) || 0, CURRENCY_FORMAT)
-    addRow('Financiero', 'Costo Total Operativo ($)', e => Number(e.total_costs) || 0, CURRENCY_FORMAT, true, 'FEE2E2')
-    addRow('Financiero', 'Ganancia Neta Final Barolo ($)', e => Number(e.barolo_profit) || 0, CURRENCY_FORMAT, true, 'DCFCE7')
-    addRow('Financiero', 'Margen de Rentabilidad (%)', e => (Number(e.gross_income) > 0 ? (Number(e.barolo_profit) / Number(e.gross_income)) : 0), PERCENT_FORMAT, true, 'DCFCE7')
-
-    // --- SECCIÓN 3: DESGLOSE DE COSTOS ASOCIADOS (LO PEDIDO POR EL USUARIO) ---
-    addSectionHeader('📦 3. DESGLOSE DETALLADO DE COSTOS ASOCIADOS (RUBRO POR RUBRO)', 'FEE2E2', '991B1B')
-    addRow('Costo Asociado Directo', '🎭 Artistas, Shows & Honorarios ($)', e => Number(e.cost_artistas) || 0, CURRENCY_FORMAT)
-    addRow('Costo Asociado Directo', '🔊 Técnica, Luces & Sonido ($)', e => Number(e.cost_tecnica) || 0, CURRENCY_FORMAT)
-    addRow('Costo Asociado Directo', '🎤 Disertantes & Conferencistas ($)', e => Number(e.cost_disertantes) || 0, CURRENCY_FORMAT)
-    addRow('Costo Asociado Directo', '🍽️ Catering, Bebidas & Servicio ($)', e => Number(e.cost_catering) || 0, CURRENCY_FORMAT)
-    addRow('Costo Asociado Directo', '🪑 Mobiliario & Montaje Especial ($)', e => Number(e.cost_mobiliario) || 0, CURRENCY_FORMAT)
-    addRow('Costo Asociado Directo', '🍷 Gastronómicos Varios ($)', e => Number(e.cost_gastronomicos) || 0, CURRENCY_FORMAT)
-    addRow('Costo Asociado Indirecto', '👥 Personal RRHH, Salón & Seguridad ($)', e => Number(e.cost_rrhh) || 0, CURRENCY_FORMAT)
-    addRow('Costo Asociado Indirecto', '🧹 Limpieza Integral Salón ($)', e => Number(e.cost_limpieza) || 0, CURRENCY_FORMAT)
-    addRow('Costo Asociado Indirecto', '🛡️ Seguros Obligatorios de Evento ($)', e => Number(e.cost_seguros) || 0, CURRENCY_FORMAT)
-    addRow('Costo Asociado Indirecto', '🏢 Canon / Alquiler Espacio Barolo ($)', e => Number(e.cost_alquiler_espacio) || 0, CURRENCY_FORMAT)
-    addRow('Costo Asociado Indirecto', '📢 Marketing, Pauta & Publicidad ($)', e => Number(e.cost_marketing) || 0, CURRENCY_FORMAT)
-    addRow('Costo Asociado Indirecto', '🎵 SADAIC / AADI CAPIF / Permisos ($)', e => Number(e.cost_sadaic) || 0, CURRENCY_FORMAT)
-    
-    // Otros Gastos dinámicos
-    addRow('Costo Asociado Extra', '🏷️ Otros Gastos Adicionales Dinámicos ($)', e => {
-      const extras = Array.isArray(e.extra_expenses) ? e.extra_expenses : []
-      return extras.reduce((sum, item) => sum + (Number(item.value) || 0), 0)
-      return extras.reduce((sum, item) => sum + (Number(item.amount ?? item.value) || 0), 0)
-    }, CURRENCY_FORMAT)
-
-    // --- SECCIÓN 4: EFICIENCIA UNITARIA POR ASISTENTE (PAX) ---
-    addSectionHeader('👥 4. EFICIENCIA FINANCIERA POR ASISTENTE (POR PAX)', 'E0F2FE', '0369A1')
-    addRow('Unitario', 'Facturación Bruta x Pax ($)', e => e.attendees > 0 ? Math.round((Number(e.gross_income) || 0) / e.attendees) : 0, CURRENCY_FORMAT)
-    addRow('Unitario', 'Costo Operativo x Pax ($)', e => e.attendees > 0 ? Math.round((Number(e.total_costs) || 0) / e.attendees) : 0, CURRENCY_FORMAT)
-    addRow('Unitario', 'Ganancia Barolo x Pax ($)', e => e.attendees > 0 ? Math.round((Number(e.barolo_profit) || 0) / e.attendees) : 0, CURRENCY_FORMAT, true, 'DCFCE7')
+      row.height = 20
+      cRowIdx++
+    })
 
     await saveWorkbook(wb, 'Palacio_Barolo_Comparativa_Eventos.xlsx')
   },
 
-  // Alias
   exportComparison(selectedEvents) {
     this.exportComparisonToExcel(selectedEvents)
   },
 
-  // =========================================================================
-  // 4. EXPORTAR FICHA INDIVIDUAL DE UN EVENTO (Resumen + Desglose)
-  // =========================================================================
+  // Exportar Detalle de Evento Individual (Ahora usa la Matriz Oficial de 6 Bloques)
   async exportEventDetailToExcel(event, currentUser) {
-    if (!event) return
-
-    const wb = new ExcelJS.Workbook()
-    wb.creator = 'Palacio Barolo'
-    const canViewSens = canViewSensitiveData(event, currentUser)
-    const cleanCode = (event.calc_code || 'CALC').replace(/[^a-zA-Z0-9_-]/g, '')
-
-    // --- HOJA 1: RESUMEN EJECUTIVO ---
-    const ws1 = wb.addWorksheet('Resumen Ejecutivo', { views: [{ showGridLines: true }] })
-    ws1.getColumn(1).width = 24
-    ws1.getColumn(2).width = 40
-    ws1.getColumn(3).width = 18
-    ws1.getColumn(4).width = 30
-
-    // Banner
-    ws1.mergeCells('A1:D1')
-    ws1.getCell('A1').value = `🏛️ PALACIO BAROLO — FICHA FINANCIERA EJECUTIVA: ${event.calc_code || 'CALC'}`
-    ws1.getCell('A1').font = { name: 'Calibri', size: 14, bold: true, color: { argb: COLORS.goldPrimary } }
-    ws1.getCell('A1').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.navyDark } }
-    ws1.getCell('A1').alignment = { vertical: 'middle', horizontal: 'center' }
-    ws1.getRow(1).height = 30
-
-    ws1.mergeCells('A2:D2')
-    ws1.getCell('A2').value = `Evento: ${event.name || ''} | Estado: ${(event.status || '').toUpperCase()} | Fecha: ${event.event_date || ''} | Salón: ${event.venue || ''}`
-    ws1.getCell('A2').font = { size: 10, italic: true, color: { argb: 'CBD5E1' } }
-    ws1.getCell('A2').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.navyMedium } }
-    ws1.getCell('A2').alignment = { vertical: 'middle', horizontal: 'center' }
-    ws1.getRow(2).height = 20
-
-    // Tarjetas KPIs
-    const gross = Number(event.gross_income) || 0
-    const totalCost = Number(event.total_costs) || 0
-    const profit = Number(event.barolo_profit) || 0
-    const margin = gross > 0 ? (profit / gross) : 0
-
-    ws1.mergeCells('A4:B4')
-    ws1.getCell('A4').value = `💰 FACTURACIÓN BRUTA: $ ${gross.toLocaleString('es-AR')}`
-    ws1.getCell('A4').font = { bold: true, size: 11, color: { argb: COLORS.navyDark } }
-    ws1.getCell('A4').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'E0F2FE' } }
-    ws1.getCell('A4').alignment = { vertical: 'middle', horizontal: 'center' }
-
-    ws1.mergeCells('C4:D4')
-    ws1.getCell('C4').value = `⭐ GANANCIA BAROLO: $ ${profit.toLocaleString('es-AR')} (${(margin * 100).toFixed(1)}%)`
-    ws1.getCell('C4').font = { bold: true, size: 11, color: { argb: '166534' } }
-    ws1.getCell('C4').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'DCFCE7' } }
-    ws1.getCell('C4').alignment = { vertical: 'middle', horizontal: 'center' }
-    ws1.getRow(4).height = 26
-
-    // Tabla de Parámetros
-    const addRowH1 = (rIdx, label1, val1, label2, val2) => {
-      const row = ws1.getRow(rIdx)
-      row.getCell(1).value = label1
-      row.getCell(2).value = val1
-      row.getCell(3).value = label2
-      row.getCell(4).value = val2
-
-      row.getCell(1).font = { bold: true, size: 10, color: { argb: COLORS.slateDark } }
-      row.getCell(3).font = { bold: true, size: 10, color: { argb: COLORS.slateDark } }
-      row.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.slateLight } }
-      row.getCell(3).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.slateLight } }
-      row.getCell(1).border = thinBorder
-      row.getCell(2).border = thinBorder
-      row.getCell(3).border = thinBorder
-      row.getCell(4).border = thinBorder
-      row.height = 22
-    }
-
-    addRowH1(6, 'Cliente', event.client_name || '-', 'CUIT', event.client_cuit || '-')
-    addRowH1(7, 'Contacto', event.client_contact || '-', 'Convenio', event.agreement_type || '100% Barolo')
-    addRowH1(8, 'Tipo de Evento', event.event_type || '-', 'Origen', event.origin || 'Externo')
-    addRowH1(9, 'Horario', event.event_time || '19:00', 'Asistentes (Pax)', Number(event.attendees) || 0)
-    addRowH1(10, 'Forma de Pago', event.payment_method || 'Transferencia', 'Factura', event.invoice_type || 'Factura A')
-    addRowH1(11, 'Costos Directos', `$ ${Number(event.direct_costs || 0).toLocaleString('es-AR')}`, 'Costos Indirectos', `$ ${Number(event.indirect_costs || 0).toLocaleString('es-AR')}`)
-
-    // Notas Comerciales
-    ws1.mergeCells('A13:D13')
-    ws1.getCell('A13').value = '📝 NOTAS COMERCIALES & OPERATIVAS'
-    ws1.getCell('A13').font = { bold: true, size: 10, color: { argb: COLORS.navyDark } }
-    ws1.getCell('A13').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.goldLight } }
-
-    ws1.mergeCells('A14:D16')
-    const noteText = event.notes ? event.notes.replace(/<!--[\s\S]*?-->/g, '').trim() : 'Sin notas registradas.'
-    ws1.getCell('A14').value = noteText
-    ws1.getCell('A14').font = { size: 10, italic: true }
-    ws1.getCell('A14').alignment = { vertical: 'top', horizontal: 'left', wrapText: true }
-    ws1.getCell('A14').border = thinBorder
-
-    // --- HOJA 2: DESGLOSE ECONÓMICO DETALLADO ---
-    const ws2 = wb.addWorksheet('Desglose Económico', { views: [{ showGridLines: true }] })
-    ws2.getColumn(1).width = 20
-    ws2.getColumn(2).width = 42
-    ws2.getColumn(3).width = 22
-
-    ws2.mergeCells('A1:C1')
-    ws2.getCell('A1').value = `📦 DESGLOSE DE INGRESOS Y COSTOS ASOCIADOS — ${event.calc_code || 'CALC'}`
-    ws2.getCell('A1').font = { size: 13, bold: true, color: { argb: COLORS.goldPrimary } }
-    ws2.getCell('A1').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.navyDark } }
-    ws2.getCell('A1').alignment = { vertical: 'middle', horizontal: 'center' }
-    ws2.getRow(1).height = 28
-
-    // Cabecera tabla
-    ws2.getRow(3).values = ['Tipo de Rubro', 'Concepto / Ítem', 'Importe ($)']
-    ws2.getRow(3).eachCell((cell) => {
-      cell.font = { bold: true, color: { argb: COLORS.white }, size: 10 }
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.navyHeader } }
-      cell.alignment = { vertical: 'middle', horizontal: 'center' }
-      cell.border = thinBorder
-    })
-    ws2.getRow(3).height = 24
-
-    const breakdownItems = [
-      { tipo: 'Ingreso', concepto: 'Entradas Preventa', val: (Number(event.preventa_qty) || 0) * (Number(event.preventa_price) || 0) },
-      { tipo: 'Ingreso', concepto: 'Entradas Generales', val: (Number(event.general_qty) || Number(event.ticket_qty) || 0) * (Number(event.general_price) || Number(event.ticket_price) || 0) },
-      { tipo: 'Ingreso', concepto: 'Alquiler de Espacio', val: Number(event.alquiler_espacio) || 0 },
-      { tipo: 'Ingreso', concepto: 'Contratación / Canon de Salón', val: Number(event.contratacion_salon) || 0 },
-      
-      { tipo: 'Costo Directo', concepto: '🎭 Artistas, Shows & Honorarios', val: Number(event.cost_artistas) || 0 },
-      { tipo: 'Costo Directo', concepto: '🔊 Técnica, Iluminación & Sonido', val: Number(event.cost_tecnica) || 0 },
-      { tipo: 'Costo Directo', concepto: '🎤 Disertantes & Conferencistas', val: Number(event.cost_disertantes) || 0 },
-      { tipo: 'Costo Directo', concepto: '🍽️ Catering, Gastronomía & Bebidas', val: Number(event.cost_catering) || 0 },
-      { tipo: 'Costo Directo', concepto: '🪑 Mobiliario, Vajilla & Ambientación', val: Number(event.cost_mobiliario) || 0 },
-      { tipo: 'Costo Directo', concepto: '🍷 Gastronómicos Varios', val: Number(event.cost_gastronomicos) || 0 },
-
-      { tipo: 'Costo Indirecto', concepto: '👥 RRHH Salón, Personal & Seguridad', val: Number(event.cost_rrhh) || 0 },
-      { tipo: 'Costo Indirecto', concepto: '🧹 Limpieza Integral Post-Evento', val: Number(event.cost_limpieza) || 0 },
-      { tipo: 'Costo Indirecto', concepto: '🛡️ Seguros de Responsabilidad Civil', val: Number(event.cost_seguros) || 0 },
-      { tipo: 'Costo Indirecto', concepto: '🏢 Alquiler de Espacio Barolo', val: Number(event.cost_alquiler_espacio) || 0 },
-      { tipo: 'Costo Indirecto', concepto: '📢 Marketing, Redes & Publicidad', val: Number(event.cost_marketing) || 0 },
-      { tipo: 'Costo Indirecto', concepto: '🎵 Derechos SADAIC / AADI CAPIF', val: Number(event.cost_sadaic) || 0 }
-    ]
-
-    // Añadir extra incomes
-    if (Array.isArray(event.extra_incomes)) {
-      event.extra_incomes.forEach((inc) => {
-        const isSens = inc.is_sensitive && !canViewSens
-        breakdownItems.push({
-          tipo: 'Ingreso Adicional',
-          concepto: isSens ? '🔒 [Ingreso Confidencial]' : (inc.concept || 'Ingreso Extra'),
-          val: Number(inc.amount ?? inc.value) || 0
-        })
-      })
-    }
-
-    // Añadir extra expenses
-    if (Array.isArray(event.extra_expenses)) {
-      event.extra_expenses.forEach((exp) => {
-        const isSens = exp.is_sensitive && !canViewSens
-        breakdownItems.push({
-          tipo: 'Gasto Adicional',
-          concepto: isSens ? '🔒 [Gasto Confidencial]' : (exp.concept || 'Gasto Extra'),
-          val: Number(exp.amount ?? exp.value) || 0
-        })
-      })
-    }
-
-    let bRowIdx = 4
-    breakdownItems.forEach((item, idx) => {
-      if (item.val === 0 && !item.tipo.includes('Adicional')) return // Omitir ceros standard para limpieza visual
-      const row = ws2.getRow(bRowIdx)
-      const isEven = idx % 2 === 0
-      const rowBg = isEven ? COLORS.white : COLORS.slateLight
-
-      row.values = [item.tipo, item.concepto, item.val]
-      row.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' }
-      row.getCell(2).alignment = { horizontal: 'left', vertical: 'middle' }
-      row.getCell(3).alignment = { horizontal: 'right', vertical: 'middle' }
-      row.getCell(3).numFmt = CURRENCY_FORMAT
-
-      row.eachCell({ includeEmpty: true }, (cell) => {
-        cell.font = { name: 'Calibri', size: 10 }
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: rowBg } }
-        cell.border = thinBorder
-      })
-      row.height = 20
-      bRowIdx++
-    })
-
-    await saveWorkbook(wb, `Palacio_Barolo_Evento_${cleanCode}.xlsx`)
+    await this.exportCalculatorMatrix(event, currentUser)
   },
 
-  // Alias
   exportSingleEvent(event, currentUser) {
     this.exportEventDetailToExcel(event, currentUser)
   }

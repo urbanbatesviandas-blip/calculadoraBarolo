@@ -3,11 +3,12 @@ import {
   Calculator, Plus, Trash2, Save, CheckCircle2, RotateCcw, 
   Sparkles, DollarSign, Users, Calendar, MapPin, Building, AlertCircle, FileText, 
   ArrowRight, BookmarkCheck, Sliders, Lock, EyeOff, ShieldAlert, ChevronRight,
-  TrendingUp, Percent, Award, Info, Scale, Check, RefreshCw, Layers, Printer
+  TrendingUp, Percent, Award, Info, Scale, Check, RefreshCw, Layers, Printer, FileSpreadsheet, Search, X
 } from 'lucide-react'
 import confetti from 'canvas-confetti'
 import { canCreateEvent, canEditEvent, canChangeStatus, isAdmin, canViewSensitiveData } from '../services/authService'
-import { calculatorConfigService } from '../services/calculatorConfigService'
+import { calculatorConfigService, DEFAULT_MASTER_COST_CATALOG, DEFAULT_MASTER_INCOME_CATALOG } from '../services/calculatorConfigService'
+import { excelExportService } from '../services/excelExportService'
 import CommercialProposalModal from './CommercialProposalModal'
 
 // Helper formatters
@@ -44,57 +45,19 @@ const formatPct = (val) => {
   return `${num.toFixed(1)}%`
 }
 
+// Lista estándar de meses en español
 const MONTHS_LIST = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
   'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
 ]
 
-// Plantilla oficial precargada: LC-076 Jam de Dibujo (Edición Especial)
-const OFFICIAL_LC076_DATA = {
-  id: 'LC-076',
-  calc_code: 'LC-076',
-  name: 'Jam de Dibujo (Edición Especial)',
-  client_name: 'Camila Ocampo',
-  client_cuit: '27-35894120-4',
-  client_contact: '+54 9 11 5842-9901',
-  client_email: 'camila.arte@gmail.com',
-  contact_date: '2026-04-15',
-  event_date: '2026-05-09',
-  event_time: '19:00',
-  month: 'Mayo',
-  venue: 'Espacio Barolo',
-  event_type: 'Cultural',
-  origin: 'Fundación',
-  invoice_type: 'Factura A',
-  payment_method: 'Transferencia',
-  agreement_type: '50% - 50%',
-  status: 'contratado',
-  attendees: 35,
-  notes: 'Jam de Dibujo (Edición Especial) - Matriz oficial de liquidación Palacio Barolo',
-  sensitive_notes: '',
-  preventa_qty: 15,
-  preventa_price: 30000,
-  general_qty: 20,
-  general_price: 35000,
-  alquiler_espacio: 0,
-  contratacion_salon: 0,
-  comision_catering: 0,
-  otros_ingresos: 0,
-  extra_incomes: [],
-  cost_artistas: 367500,
-  cost_tecnica: 0,
-  cost_disertantes: 0,
-  cost_mobiliario: 16000,
-  cost_rrhh: 40000,
-  cost_catering: 0,
-  cost_limpieza: 16000,
-  cost_seguros: 40351.70,
-  cost_alquiler_espacio: 0,
-  cost_gastronomicos: 71503.16,
-  cost_marketing: 0,
-  cost_sadaic: 0,
-  cost_otros_operativos: 0,
-  extra_expenses: []
+// Helper para obtener fecha local en formato YYYY-MM-DD sin desfase horario
+const getTodayLocalString = () => {
+  const d = new Date()
+  const year = d.getFullYear()
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
 }
 
 export default function CalculatorView({ initialEventData, onSaveEvent, onSwitchView, currentUser, allEvents = [] }) {
@@ -120,33 +83,23 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
 
   // Helper para generar el estado inicial a partir de la configuración maestra
   const getCleanStateFromConfig = (cfg) => {
-    const defaultExps = (cfg?.defaultExpenses || [])
-      .filter(e => e.enabled !== false && e.concept?.trim())
-      .map((e, idx) => ({ 
-        id: `exp-init-${idx + 1}-${Date.now()}`, 
-        concept: e.concept, 
-        amount: Number(e.defaultAmount) || 0 
-      }))
-      
-    const defaultIncs = (cfg?.defaultIncomes || [])
-      .filter(i => i.enabled !== false && i.concept?.trim())
-      .map((i, idx) => ({ 
-        id: `inc-init-${idx + 1}-${Date.now()}`, 
-        concept: i.concept, 
-        amount: Number(i.defaultAmount) || 0 
-      }))
-
     return {
       venue: cfg?.venues?.[0]?.name || 'Espacio Barolo',
       eventType: cfg?.eventTypes?.[0] || 'Cultural',
       agreementType: cfg?.agreementTypes?.[0] || '50% - 50%',
-      attendees: cfg?.defaultAttendees || 35,
-      extraExpenses: defaultExps.length > 0 ? defaultExps : [],
-      extraIncomes: defaultIncs.length > 0 ? defaultIncs : []
+      attendees: '',
+      extraExpenses: [],
+      extraIncomes: []
     }
   }
 
-  const activeInitial = initialEventData?.isBlank ? null : (initialEventData || OFFICIAL_LC076_DATA)
+  // Solo si se pasa explícitamente un evento existente con ID para analizar/editar
+  const activeInitial = (initialEventData && !initialEventData.isBlank && initialEventData.id) ? initialEventData : null
+
+  // Fechas iniciales por defecto: DÍA ACTUAL LOCAL
+  const todayLocal = getTodayLocalString()
+  const initialContactDate = activeInitial?.contact_date || todayLocal
+  const initialEventDate = activeInitial?.event_date || initialEventData?.event_date || todayLocal
 
   // ==========================================
   // ESTADOS - BLOQUE 1: DATOS GENERALES Y CLIENTE
@@ -158,22 +111,22 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
   const [clientCuit, setClientCuit] = useState(activeInitial?.client_cuit || '')
   const [clientContact, setClientContact] = useState(activeInitial?.client_contact || '')
   const [clientEmail, setClientEmail] = useState(activeInitial?.client_email || '')
-  const [contactDate, setContactDate] = useState(activeInitial?.contact_date || new Date().toISOString().substring(0, 10))
-  const [eventDate, setEventDate] = useState(activeInitial?.event_date || new Date().toISOString().substring(0, 10))
+  const [contactDate, setContactDate] = useState(initialContactDate)
+  const [eventDate, setEventDate] = useState(initialEventDate)
   const [eventTime, setEventTime] = useState(activeInitial?.event_time || '19:00')
   const [month, setMonth] = useState(() => {
     if (activeInitial?.month) return activeInitial.month
-    const d = new Date()
-    return MONTHS_LIST[d.getMonth()] || 'Mayo'
+    const d = new Date(initialEventDate + 'T12:00:00')
+    return MONTHS_LIST[d.getMonth()] || 'Enero'
   })
-  const [venue, setVenue] = useState(activeInitial?.venue || templateConfig.venues?.[0]?.name || 'Espacio Barolo')
-  const [eventType, setEventType] = useState(activeInitial?.event_type || templateConfig.eventTypes?.[0] || 'Cultural')
-  const [origin, setOrigin] = useState(activeInitial?.origin || 'Fundación')
+  const [venue, setVenue] = useState(activeInitial?.venue || templateConfig?.venues?.[0]?.name || 'Espacio Barolo')
+  const [eventType, setEventType] = useState(activeInitial?.event_type || templateConfig?.eventTypes?.[0] || 'Cultural')
+  const [origin, setOrigin] = useState(activeInitial?.origin || 'Externo')
   const [invoiceType, setInvoiceType] = useState(activeInitial?.invoice_type || 'Factura A')
   const [paymentMethod, setPaymentMethod] = useState(activeInitial?.payment_method || 'Transferencia')
-  const [agreementType, setAgreementType] = useState(activeInitial?.agreement_type || templateConfig.agreementTypes?.[0] || '50% - 50%')
-  const [eventStatus, setEventStatus] = useState(activeInitial?.status || 'contratado')
-  const [attendees, setAttendees] = useState(activeInitial?.attendees !== undefined ? activeInitial.attendees : 35)
+  const [agreementType, setAgreementType] = useState(activeInitial?.agreement_type || templateConfig?.agreementTypes?.[0] || '50% - 50%')
+  const [eventStatus, setEventStatus] = useState(activeInitial?.status || 'cotizado')
+  const [attendees, setAttendees] = useState(activeInitial?.attendees !== undefined ? activeInitial.attendees : '')
   const [notes, setNotes] = useState(activeInitial?.notes || '')
   const [sensitiveNotes, setSensitiveNotes] = useState(activeInitial?.sensitive_notes || '')
 
@@ -196,10 +149,55 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
   // ==========================================
   // ESTADOS - BLOQUE 2: DETALLE DE INGRESOS
   // ==========================================
-  const [preventaQty, setPreventaQty] = useState(activeInitial?.preventa_qty ?? 15)
-  const [preventaPrice, setPreventaPrice] = useState(activeInitial?.preventa_price ?? 30000)
-  const [generalQty, setGeneralQty] = useState(activeInitial?.general_qty ?? 20)
-  const [generalPrice, setGeneralPrice] = useState(activeInitial?.general_price ?? 35000)
+  const [preventaQty, setPreventaQty] = useState(activeInitial?.preventa_qty ?? 0)
+  const [preventaPrice, setPreventaPrice] = useState(activeInitial?.preventa_price ?? 0)
+  const [invitacionesQty, setInvitacionesQty] = useState(activeInitial?.invitaciones_qty ?? 0)
+  const [generalQty, setGeneralQty] = useState(activeInitial?.general_qty ?? 0)
+  const [generalPrice, setGeneralPrice] = useState(activeInitial?.general_price ?? 0)
+
+  // Handlers para cálculo automático y reactivo de cupos de entradas:
+  // Capacidad Total = Preventa + Invitaciones Sin Cargo + Generales (Remanente)
+  const handleAttendeesChange = (val) => {
+    const num = val === '' ? '' : Number(val)
+    setAttendees(num)
+    const cap = Number(num) || 0
+    const prev = Number(preventaQty) || 0
+    const inv = Number(invitacionesQty) || 0
+    setGeneralQty(Math.max(0, cap - prev - inv))
+  }
+
+  const handlePreventaQtyChange = (val) => {
+    const num = val === '' ? '' : Number(val)
+    setPreventaQty(num)
+    const cap = Number(attendees) || 0
+    const prev = Number(num) || 0
+    const inv = Number(invitacionesQty) || 0
+    if (cap > 0) {
+      setGeneralQty(Math.max(0, cap - prev - inv))
+    }
+  }
+
+  const handleInvitacionesQtyChange = (val) => {
+    const num = val === '' ? '' : Number(val)
+    setInvitacionesQty(num)
+    const cap = Number(attendees) || 0
+    const prev = Number(preventaQty) || 0
+    const inv = Number(num) || 0
+    if (cap > 0) {
+      setGeneralQty(Math.max(0, cap - prev - inv))
+    }
+  }
+
+  const handleGeneralQtyChange = (val) => {
+    const num = val === '' ? '' : Number(val)
+    setGeneralQty(num)
+    const gen = Number(num) || 0
+    const prev = Number(preventaQty) || 0
+    const inv = Number(invitacionesQty) || 0
+    if (gen + prev + inv > 0) {
+      setAttendees(gen + prev + inv)
+    }
+  }
   const [alquilerEspacio, setAlquilerEspacio] = useState(activeInitial?.alquiler_espacio ?? 0)
   const [contratacionSalon, setContratacionSalon] = useState(activeInitial?.contratacion_salon ?? 0)
   const [comisionCatering, setComisionCatering] = useState(activeInitial?.comision_catering ?? 0)
@@ -216,16 +214,16 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
   // ==========================================
   // ESTADOS - BLOQUE 3: COSTOS DEL EVENTO (Desglose exacto Excel)
   // ==========================================
-  const [costArtistas, setCostArtistas] = useState(activeInitial?.cost_artistas ?? 367500)
+  const [costArtistas, setCostArtistas] = useState(activeInitial?.cost_artistas ?? 0)
   const [costTecnica, setCostTecnica] = useState(activeInitial?.cost_tecnica ?? 0)
   const [costDisertantes, setCostDisertantes] = useState(activeInitial?.cost_disertantes ?? 0)
-  const [costMobiliario, setCostMobiliario] = useState(activeInitial?.cost_mobiliario ?? 16000)
-  const [costRrhh, setCostRrhh] = useState(activeInitial?.cost_rrhh ?? 40000)
+  const [costMobiliario, setCostMobiliario] = useState(activeInitial?.cost_mobiliario ?? 0)
+  const [costRrhh, setCostRrhh] = useState(activeInitial?.cost_rrhh ?? 0)
   const [costCatering, setCostCatering] = useState(activeInitial?.cost_catering ?? 0)
-  const [costLimpieza, setCostLimpieza] = useState(activeInitial?.cost_limpieza ?? 16000)
-  const [costSeguros, setCostSeguros] = useState(activeInitial?.cost_seguros ?? 40351.70)
+  const [costLimpieza, setCostLimpieza] = useState(activeInitial?.cost_limpieza ?? 0)
+  const [costSeguros, setCostSeguros] = useState(activeInitial?.cost_seguros ?? 0)
   const [costAlquilerEspacio, setCostAlquilerEspacio] = useState(activeInitial?.cost_alquiler_espacio ?? 0)
-  const [costGastronomicos, setCostGastronomicos] = useState(activeInitial?.cost_gastronomicos ?? 71503.16)
+  const [costGastronomicos, setCostGastronomicos] = useState(activeInitial?.cost_gastronomicos ?? 0)
   const [costMarketing, setCostMarketing] = useState(activeInitial?.cost_marketing ?? 0)
   const [costSadaic, setCostSadaic] = useState(activeInitial?.cost_sadaic ?? 0)
   const [costOtrosOperativos, setCostOtrosOperativos] = useState(activeInitial?.cost_otros_operativos ?? 0)
@@ -237,6 +235,145 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
     }
     return []
   })
+
+  // Modal de selección de rubros de ingresos del catálogo
+  const [isIncomeModalOpen, setIsIncomeModalOpen] = useState(false)
+  const [incomeModalSearch, setIncomeModalSearch] = useState('')
+  const [incomeModalCategoryFilter, setIncomeModalCategoryFilter] = useState('all')
+
+  // Rubros de ingreso seleccionados para este evento
+  const [selectedIncomes, setSelectedIncomes] = useState(() => {
+    if (Array.isArray(activeInitial?.event_incomes)) {
+      return activeInitial.event_incomes
+    }
+    if (activeInitial && !activeInitial.isBlank) {
+      const list = []
+      const catalog = templateConfig?.masterIncomeCatalog || DEFAULT_MASTER_INCOME_CATALOG
+      catalog.forEach(item => {
+        const val = Number(activeInitial[item.key]) || 0
+        if (val > 0) {
+          list.push({
+            id: item.id,
+            key: item.key,
+            name: item.name,
+            category: item.category,
+            amount: val,
+            is_sensitive: Array.isArray(activeInitial.sensitive_incomes) && activeInitial.sensitive_incomes.includes(item.key)
+          })
+        }
+      })
+      return list
+    }
+    return []
+  })
+
+  // Helpers de gestión de rubros de ingreso del evento
+  const toggleIncomeInEvent = (catalogItem) => {
+    setSelectedIncomes(prev => {
+      const exists = prev.some(i => i.key === catalogItem.key)
+      if (exists) {
+        return prev.filter(i => i.key !== catalogItem.key)
+      } else {
+        return [...prev, {
+          id: catalogItem.id,
+          key: catalogItem.key,
+          name: catalogItem.name,
+          category: catalogItem.category,
+          amount: catalogItem.defaultAmount || 0,
+          is_sensitive: false
+        }]
+      }
+    })
+  }
+
+  const updateSelectedIncome = (key, field, val) => {
+    setSelectedIncomes(prev => prev.map(i => i.key === key ? { ...i, [field]: val } : i))
+  }
+
+  const removeSelectedIncome = (key) => {
+    setSelectedIncomes(prev => prev.filter(i => i.key !== key))
+  }
+
+  const toggleSelectedIncomeSensitivity = (key) => {
+    setSelectedIncomes(prev => prev.map(i => i.key === key ? { ...i, is_sensitive: !i.is_sensitive } : i))
+  }
+
+  const getIncomeVal = (key) => {
+    const found = selectedIncomes.find(i => i.key === key)
+    if (found) return Number(found.amount) || 0
+    if (key === 'alquiler_espacio') return Number(alquilerEspacio) || 0
+    if (key === 'contratacion_salon') return Number(contratacionSalon) || 0
+    if (key === 'comision_catering') return Number(comisionCatering) || 0
+    if (key === 'otros_ingresos') return Number(otrosIngresos) || 0
+    return 0
+  }
+
+  // Modal de selección de costos del catálogo
+  const [isCostModalOpen, setIsCostModalOpen] = useState(false)
+  const [costModalSearch, setCostModalSearch] = useState('')
+  const [costModalCategoryFilter, setCostModalCategoryFilter] = useState('all')
+
+  // Costos activos seleccionados para este evento
+  const [selectedCosts, setSelectedCosts] = useState(() => {
+    if (Array.isArray(activeInitial?.event_costs)) {
+      return activeInitial.event_costs
+    }
+    if (activeInitial && !activeInitial.isBlank) {
+      const list = []
+      const catalog = templateConfig?.masterCostCatalog || DEFAULT_MASTER_COST_CATALOG
+      catalog.forEach(item => {
+        const val = Number(activeInitial[item.key]) || 0
+        if (val > 0) {
+          list.push({
+            id: item.id,
+            key: item.key,
+            name: item.name,
+            category: item.category,
+            amount: val,
+            is_sensitive: Array.isArray(activeInitial.sensitive_costs) && activeInitial.sensitive_costs.includes(item.key)
+          })
+        }
+      })
+      return list
+    }
+    return []
+  })
+
+  // Helpers de gestión de costos del evento
+  const toggleCostInEvent = (catalogItem) => {
+    setSelectedCosts(prev => {
+      const exists = prev.some(c => c.key === catalogItem.key)
+      if (exists) {
+        return prev.filter(c => c.key !== catalogItem.key)
+      } else {
+        return [...prev, {
+          id: catalogItem.id,
+          key: catalogItem.key,
+          name: catalogItem.name,
+          category: catalogItem.category,
+          amount: catalogItem.defaultAmount || 0,
+          is_sensitive: false
+        }]
+      }
+    })
+  }
+
+  const updateSelectedCost = (key, field, val) => {
+    setSelectedCosts(prev => prev.map(c => c.key === key ? { ...c, [field]: val } : c))
+  }
+
+  const removeSelectedCost = (key) => {
+    setSelectedCosts(prev => prev.filter(c => c.key !== key))
+  }
+
+  const toggleSelectedCostSensitivity = (key) => {
+    setSelectedCosts(prev => prev.map(c => c.key === key ? { ...c, is_sensitive: !c.is_sensitive } : c))
+  }
+
+  const getCostVal = (key) => {
+    const found = selectedCosts.find(c => c.key === key)
+    return found ? (Number(found.amount) || 0) : 0
+  }
 
   // Helper unificado para cargar cualquier objeto de evento al estado
   const loadEventDataIntoState = (data) => {
@@ -264,6 +401,7 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
     setSensitiveNotes(data.sensitive_notes || '')
     setPreventaQty(Number(data.preventa_qty) || 0)
     setPreventaPrice(Number(data.preventa_price) || 0)
+    setInvitacionesQty(Number(data.invitaciones_qty) || 0)
     setGeneralQty(Number(data.general_qty) || 0)
     setGeneralPrice(Number(data.general_price) || 0)
     setAlquilerEspacio(Number(data.alquiler_espacio) || 0)
@@ -285,66 +423,118 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
     setCostSadaic(Number(data.cost_sadaic) || 0)
     setCostOtrosOperativos(Number(data.cost_otros_operativos) || 0)
     setExtraExpenses(Array.isArray(data.extra_expenses) ? data.extra_expenses : [])
+
+    if (Array.isArray(data.event_incomes)) {
+      setSelectedIncomes(data.event_incomes)
+    } else {
+      const incCatalog = templateConfig?.masterIncomeCatalog || DEFAULT_MASTER_INCOME_CATALOG
+      const incList = []
+      incCatalog.forEach(item => {
+        const val = Number(data[item.key]) || 0
+        if (val > 0) {
+          incList.push({
+            id: item.id,
+            key: item.key,
+            name: item.name,
+            category: item.category,
+            amount: val,
+            is_sensitive: Array.isArray(data.sensitive_incomes) && data.sensitive_incomes.includes(item.key)
+          })
+        }
+      })
+      setSelectedIncomes(incList)
+    }
+
+    if (Array.isArray(data.event_costs)) {
+      setSelectedCosts(data.event_costs)
+    } else {
+      const catalog = templateConfig?.masterCostCatalog || DEFAULT_MASTER_COST_CATALOG
+      const list = []
+      catalog.forEach(item => {
+        const val = Number(data[item.key]) || 0
+        if (val > 0) {
+          list.push({
+            id: item.id,
+            key: item.key,
+            name: item.name,
+            category: item.category,
+            amount: val,
+            is_sensitive: Array.isArray(data.sensitive_costs) && data.sensitive_costs.includes(item.key)
+          })
+        }
+      })
+      setSelectedCosts(list)
+    }
   }
 
   // ==========================================
-  // RESTAURAR DATOS AL ABRIR UN EVENTO
+  // RESTAURAR DATOS AL ABRIR UN EVENTO O NUEVA COTIZACIÓN
   // ==========================================
+  const loadCleanBlankState = (customEventDate) => {
+    const today = getTodayLocalString()
+    const targetEventDate = customEventDate || today
+    const d = new Date(targetEventDate + 'T12:00:00')
+    const mName = MONTHS_LIST[d.getMonth()] || 'Enero'
+
+    setEventId(null)
+    setCalcCode('')
+    setEventName('')
+    setClientName('')
+    setClientCuit('')
+    setClientContact('')
+    setClientEmail('')
+    setContactDate(today)
+    setEventDate(targetEventDate)
+    setEventTime('19:00')
+    setMonth(mName)
+    setVenue(templateConfig?.venues?.[0]?.name || 'Espacio Barolo')
+    setEventType(templateConfig?.eventTypes?.[0] || 'Cultural')
+    setOrigin('Externo')
+    setInvoiceType('Factura A')
+    setPaymentMethod('Transferencia')
+    setAgreementType(templateConfig?.agreementTypes?.[0] || '50% - 50%')
+    setEventStatus('cotizado')
+    setAttendees('')
+    setNotes('')
+    setSensitiveNotes('')
+    setPreventaQty(0)
+    setPreventaPrice(0)
+    setInvitacionesQty(0)
+    setGeneralQty(0)
+    setGeneralPrice(0)
+    setAlquilerEspacio(0)
+    setContratacionSalon(0)
+    setComisionCatering(0)
+    setOtrosIngresos(0)
+    setExtraIncomes([])
+    setCostArtistas(0)
+    setCostTecnica(0)
+    setCostDisertantes(0)
+    setCostMobiliario(0)
+    setCostRrhh(0)
+    setCostCatering(0)
+    setCostLimpieza(0)
+    setCostSeguros(0)
+    setCostAlquilerEspacio(0)
+    setCostGastronomicos(0)
+    setCostMarketing(0)
+    setCostSadaic(0)
+    setCostOtrosOperativos(0)
+    setExtraExpenses([])
+    setSelectedCosts([])
+    setSelectedIncomes([])
+  }
+
   useEffect(() => {
-    if (initialEventData) {
-      if (initialEventData.isBlank) {
-        const cfg = calculatorConfigService.getConfig()
-        const clean = getCleanStateFromConfig(cfg)
-        const d = new Date()
-        loadEventDataIntoState({
-          ...clean,
-          id: null,
-          calc_code: '',
-          name: '',
-          client_name: '',
-          client_cuit: '',
-          client_contact: '',
-          client_email: '',
-          contact_date: initialEventData.event_date || d.toISOString().substring(0, 10),
-          event_date: initialEventData.event_date || d.toISOString().substring(0, 10),
-          event_time: '19:00',
-          month: initialEventData.event_date ? (MONTHS_LIST[parseInt(initialEventData.event_date.split('-')[1], 10) - 1] || 'Enero') : 'Enero',
-          origin: 'Externo',
-          invoice_type: 'Factura A',
-          payment_method: 'Transferencia',
-          status: 'cotizado',
-          notes: '',
-          sensitive_notes: '',
-          preventa_qty: 0,
-          preventa_price: 0,
-          general_qty: 0,
-          general_price: 0,
-          alquiler_espacio: 0,
-          contratacion_salon: 0,
-          comision_catering: 0,
-          otros_ingresos: 0,
-          extra_incomes: [],
-          cost_artistas: 0,
-          cost_tecnica: 0,
-          cost_disertantes: 0,
-          cost_mobiliario: 0,
-          cost_rrhh: 0,
-          cost_catering: 0,
-          cost_limpieza: 0,
-          cost_seguros: 0,
-          cost_alquiler_espacio: 0,
-          cost_gastronomicos: 0,
-          cost_marketing: 0,
-          cost_sadaic: 0,
-          cost_otros_operativos: 0,
-          extra_expenses: []
-        })
-      } else {
-        loadEventDataIntoState(initialEventData)
-      }
-    } else {
-      // Default: Cargar la información oficial de la calculadora LC-076
-      loadEventDataIntoState(OFFICIAL_LC076_DATA)
+    if (initialEventData && initialEventData.id && !initialEventData.isBlank) {
+      // El usuario abrió un evento en particular para analizar/editar
+      loadEventDataIntoState(initialEventData)
+    } else if (initialEventData?.event_date && !initialEventData.id) {
+      // El usuario hizo clic en una fecha específica del calendario para cotizar
+      loadCleanBlankState(initialEventData.event_date)
+    } else if (initialEventData?.isBlank) {
+      // El usuario forzó explícitamente una nueva cotización en blanco
+      loadCleanBlankState()
     }
   }, [initialEventData])
 
@@ -414,38 +604,31 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
     ? (totalTicketing / totalTicketsVendidos) 
     : (Number(generalPrice) || Number(preventaPrice) || 0)
 
+  // Subtotal de rubros de ingresos seleccionados del catálogo
+  const subtotalSelectedIncomes = selectedIncomes.reduce((acc, i) => acc + (Number(i.amount) || 0), 0)
+
   // Extra incomes sum
   const totalExtraIncomes = extraIncomes.reduce((acc, i) => acc + (Number(i.amount) || 0), 0)
 
   // TOTAL INGRESOS
   const totalGrossIncome = totalTicketing + 
-    (Number(alquilerEspacio) || 0) + 
-    (Number(contratacionSalon) || 0) + 
-    (Number(comisionCatering) || 0) + 
-    (Number(otrosIngresos) || 0) + 
+    subtotalSelectedIncomes + 
     totalExtraIncomes
 
   // Extra expenses sum
   const totalExtraExpenses = extraExpenses.reduce((acc, e) => acc + (Number(e.amount) || 0), 0)
 
-  // Suma Rubro por Rubro de Costos
-  const totalDirectCosts = 
-    (Number(costArtistas) || 0) + 
-    (Number(costTecnica) || 0) + 
-    (Number(costDisertantes) || 0) + 
-    (Number(costMobiliario) || 0) + 
-    (Number(costCatering) || 0) + 
-    (Number(costGastronomicos) || 0)
+  // Suma de Costos Dinámicos Seleccionados
+  const subtotalProductor = selectedCosts
+    .filter(c => c.category === 'productor')
+    .reduce((acc, c) => acc + (Number(c.amount) || 0), 0)
 
-  const totalIndirectCosts = 
-    (Number(costRrhh) || 0) + 
-    (Number(costLimpieza) || 0) + 
-    (Number(costSeguros) || 0) + 
-    (Number(costAlquilerEspacio) || 0) + 
-    (Number(costMarketing) || 0) + 
-    (Number(costSadaic) || 0) + 
-    (Number(costOtrosOperativos) || 0) + 
-    totalExtraExpenses
+  const subtotalBarolo = selectedCosts
+    .filter(c => c.category === 'barolo')
+    .reduce((acc, c) => acc + (Number(c.amount) || 0), 0)
+
+  const totalDirectCosts = subtotalProductor
+  const totalIndirectCosts = subtotalBarolo + totalExtraExpenses
 
   // TOTAL COSTOS
   const totalCosts = totalDirectCosts + totalIndirectCosts
@@ -456,7 +639,7 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
   // PARTICIPACIÓN Y GANANCIA NETA BAROLO
   let baroloProfit = 0
   let baroloPctLabel = '50%'
-  if (agreementType === '100% Barolo') {
+  if (agreementType === '100% Barolo' || agreementType === 'Solo Alquiler') {
     baroloProfit = netMargin
     baroloPctLabel = '100%'
   } else if (agreementType === '50% - 50%') {
@@ -468,9 +651,6 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
   } else if (agreementType === '30% Barolo - 70% Productor') {
     baroloProfit = netMargin * 0.30
     baroloPctLabel = '30%'
-  } else if (agreementType === 'Solo Alquiler') {
-    baroloProfit = (Number(alquilerEspacio) || 0) + (Number(contratacionSalon) || 0)
-    baroloPctLabel = 'Fijo Alquiler'
   } else {
     baroloProfit = netMargin * 0.50
     baroloPctLabel = '50%'
@@ -521,53 +701,7 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
   // Limpiar calculadora
   const handleReset = () => {
     if (confirm('¿Deseas vaciar la calculadora para preparar una nueva cotización en blanco?')) {
-      const cfg = calculatorConfigService.getConfig()
-      const clean = getCleanStateFromConfig(cfg)
-      const today = new Date().toISOString().substring(0, 10)
-      const d = new Date()
-      loadEventDataIntoState({
-        ...clean,
-        id: null,
-        calc_code: '',
-        name: '',
-        client_name: '',
-        client_cuit: '',
-        client_contact: '',
-        client_email: '',
-        contact_date: today,
-        event_date: today,
-        event_time: '19:00',
-        month: MONTHS_LIST[d.getMonth()] || 'Enero',
-        origin: 'Externo',
-        invoice_type: 'Factura A',
-        payment_method: 'Transferencia',
-        status: 'cotizado',
-        notes: '',
-        sensitive_notes: '',
-        preventa_qty: 0,
-        preventa_price: 0,
-        general_qty: 0,
-        general_price: 0,
-        alquiler_espacio: 0,
-        contratacion_salon: 0,
-        comision_catering: 0,
-        otros_ingresos: 0,
-        extra_incomes: [],
-        cost_artistas: 0,
-        cost_tecnica: 0,
-        cost_disertantes: 0,
-        cost_mobiliario: 0,
-        cost_rrhh: 0,
-        cost_catering: 0,
-        cost_limpieza: 0,
-        cost_seguros: 0,
-        cost_alquiler_espacio: 0,
-        cost_gastronomicos: 0,
-        cost_marketing: 0,
-        cost_sadaic: 0,
-        cost_otros_operativos: 0,
-        extra_expenses: []
-      })
+      loadCleanBlankState()
     }
   }
 
@@ -619,28 +753,34 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
       attendees: Number(attendees) || 35,
       preventa_qty: Number(preventaQty) || 0,
       preventa_price: Number(preventaPrice) || 0,
+      invitaciones_qty: Number(invitacionesQty) || 0,
       general_qty: Number(generalQty) || 0,
       general_price: Number(generalPrice) || 0,
       ticket_qty: totalTicketsVendidos,
       ticket_price: ticketAvgPrice,
-      alquiler_espacio: Number(alquilerEspacio) || 0,
-      contratacion_salon: Number(contratacionSalon) || 0,
-      comision_catering: Number(comisionCatering) || 0,
-      otros_ingresos: Number(otrosIngresos) || 0,
+      alquiler_espacio: getIncomeVal('alquiler_espacio'),
+      contratacion_salon: getIncomeVal('contratacion_salon'),
+      comision_catering: getIncomeVal('comision_catering'),
+      otros_ingresos: getIncomeVal('otros_ingresos'),
+      event_incomes: selectedIncomes,
+      subtotal_incomes: subtotalSelectedIncomes,
       extra_incomes: finalExtraIncomes,
-      cost_artistas: Number(costArtistas) || 0,
-      cost_tecnica: Number(costTecnica) || 0,
-      cost_disertantes: Number(costDisertantes) || 0,
-      cost_mobiliario: Number(costMobiliario) || 0,
-      cost_rrhh: Number(costRrhh) || 0,
-      cost_catering: Number(costCatering) || 0,
-      cost_limpieza: Number(costLimpieza) || 0,
-      cost_seguros: Number(costSeguros) || 0,
-      cost_alquiler_espacio: Number(costAlquilerEspacio) || 0,
-      cost_gastronomicos: Number(costGastronomicos) || 0,
-      cost_marketing: Number(costMarketing) || 0,
-      cost_sadaic: Number(costSadaic) || 0,
-      cost_otros_operativos: Number(costOtrosOperativos) || 0,
+      cost_artistas: getCostVal('cost_artistas'),
+      cost_tecnica: getCostVal('cost_tecnica'),
+      cost_disertantes: getCostVal('cost_disertantes'),
+      cost_mobiliario: getCostVal('cost_mobiliario'),
+      cost_rrhh: getCostVal('cost_rrhh'),
+      cost_catering: getCostVal('cost_catering'),
+      cost_limpieza: getCostVal('cost_limpieza'),
+      cost_seguros: getCostVal('cost_seguros'),
+      cost_alquiler_espacio: getCostVal('cost_alquiler_espacio'),
+      cost_gastronomicos: getCostVal('cost_gastronomicos'),
+      cost_marketing: getCostVal('cost_marketing'),
+      cost_sadaic: getCostVal('cost_sadaic'),
+      cost_otros_operativos: getCostVal('cost_otros_operativos'),
+      event_costs: selectedCosts,
+      subtotal_productor: subtotalProductor,
+      subtotal_barolo: subtotalBarolo,
       extra_expenses: finalExtraExpenses,
       gross_income: totalGrossIncome,
       direct_costs: totalDirectCosts,
@@ -649,7 +789,7 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
       net_profit: netMargin,
       barolo_profit: baroloProfit,
       margin_pct: marginPct,
-      has_sensitive_data: finalExtraExpenses.some(e => e.is_sensitive) || finalExtraIncomes.some(i => i.is_sensitive) || Boolean(finalSensitiveNotes),
+      has_sensitive_data: finalExtraExpenses.some(e => e.is_sensitive) || finalExtraIncomes.some(i => i.is_sensitive) || selectedCosts.some(c => c.is_sensitive) || selectedIncomes.some(i => i.is_sensitive) || Boolean(finalSensitiveNotes),
       sensitive_notes: finalSensitiveNotes || undefined,
       created_by_user_id: eventId ? (initialEventData?.created_by_user_id || currentUser?.id) : currentUser?.id,
       created_by_name: eventId ? (initialEventData?.created_by_name || currentUser?.displayName || currentUser?.name) : (currentUser?.displayName || currentUser?.name),
@@ -681,6 +821,10 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
     onSaveEvent(payload, 'contratado')
   }
 
+  const handleExportExcel = () => {
+    excelExportService.exportCalculatorMatrix(buildPayload(), currentUser)
+  }
+
   // Detección de solapamiento de salón en la misma fecha
   const venueConflicts = useMemo(() => {
     if (!eventDate || !venue || !Array.isArray(allEvents)) return []
@@ -708,8 +852,12 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
 
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <div className="flex items-center space-x-2.5">
-              <span className="text-2xl sm:text-3xl">🏛️</span>
+            <div className="flex items-center space-x-3">
+              <img 
+                src="/logo-barolo.png" 
+                alt="Palacio Barolo" 
+                className="w-[46px] h-[46px] sm:w-14 sm:h-14 object-contain drop-shadow-md" 
+              />
               <div>
                 <h1 className="text-lg sm:text-2xl font-serif font-bold tracking-tight text-white flex items-center gap-2">
                   <span>PALACIO BAROLO</span>
@@ -725,68 +873,7 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
             </div>
           </div>
 
-          {/* Sub-bar / Acciones rápidas de guardado */}
-          <div className="flex flex-wrap items-center gap-2 pt-2 md:pt-0">
-            <button
-              onClick={handleReset}
-              className="flex items-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-300 bg-slate-800 hover:bg-slate-700 hover:text-white transition-all border border-slate-700"
-              title="Limpiar campos para nueva cotización"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-              <span>Limpiar</span>
-            </button>
 
-            <button
-              onClick={() => loadEventDataIntoState(OFFICIAL_LC076_DATA)}
-              className="flex items-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-bold text-amber-300 bg-amber-950/60 hover:bg-amber-900/80 border border-amber-500/40 transition-all cursor-pointer"
-              title="Restaurar datos oficiales de LC-076: Jam de Dibujo (Edición Especial)"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-              <span>🏛️ LC-076 Oficial</span>
-            </button>
-
-            <button
-              onClick={() => setIsProposalModalOpen(true)}
-              className="flex items-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-semibold text-amber-200 bg-amber-950/60 hover:bg-amber-900/80 border border-amber-500/40 transition-all cursor-pointer"
-              title="Generar Presupuesto Formal con membrete para el cliente (PDF / Imprimir)"
-            >
-              <Printer className="w-3.5 h-3.5 text-amber-400" />
-              <span>📄 Presupuesto PDF</span>
-            </button>
-
-            {(userCanCreate || userCanEdit) && (
-              <button
-                onClick={handleSaveAsQuote}
-                className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl font-bold text-xs bg-amber-400 hover:bg-amber-300 text-slate-950 shadow-lg shadow-amber-400/20 transition-all cursor-pointer"
-                title="Guardar como Cotización preliminar"
-              >
-                <FileText className="w-3.5 h-3.5" />
-                <span>📝 Cotización</span>
-              </button>
-            )}
-
-            {userCanChange && (
-              <>
-                <button
-                  onClick={handleSaveAsReserved}
-                  className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl font-bold text-xs bg-sky-500 hover:bg-sky-400 text-white shadow-lg shadow-sky-500/25 transition-all cursor-pointer"
-                  title="Guardar como Fecha Reservada"
-                >
-                  <BookmarkCheck className="w-3.5 h-3.5" />
-                  <span>🔵 Reservado</span>
-                </button>
-
-                <button
-                  onClick={handleConfirmAndSave}
-                  className="flex items-center space-x-1.5 px-4 py-2 rounded-xl font-bold text-xs bg-emerald-500 hover:bg-emerald-400 text-white shadow-lg shadow-emerald-500/30 transition-all cursor-pointer"
-                  title="Confirmar en firme como Evento Contratado"
-                >
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>💾 Confirmar Evento</span>
-                </button>
-              </>
-            )}
-          </div>
         </div>
 
         {/* Sub-bar con Estado, N° de Calculadora y Leyenda de Celdas */}
@@ -818,8 +905,8 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
                 type="text"
                 value={calcCode}
                 onChange={(e) => setCalcCode(e.target.value)}
-                placeholder="Ej: LC-076"
-                className="w-24 bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1 text-amber-300 font-mono font-bold text-xs text-center focus:border-amber-400 outline-none"
+                placeholder="Ej: CALC-001"
+                className="w-28 bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1 text-amber-300 font-mono font-bold text-xs text-center focus:border-amber-400 outline-none"
               />
             </div>
           </div>
@@ -969,8 +1056,10 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
                 </div>
 
                 {/* Fecha de Contacto */}
+                {/* Fecha de Cotización */}
                 <div>
                   <label className="font-bold text-slate-700 block mb-1">Fecha de Contacto</label>
+                  <label className="font-bold text-slate-700 block mb-1">Fecha de Cotización</label>
                   <input
                     type="date"
                     value={contactDate}
@@ -1096,7 +1185,7 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
                     type="number"
                     min="1"
                     value={attendees}
-                    onChange={(e) => setAttendees(e.target.value)}
+                    onChange={(e) => handleAttendeesChange(e.target.value)}
                     className="w-full bg-[#fef9c3] hover:bg-[#fef08a] focus:bg-white border border-[#fde047] focus:border-amber-500 rounded-lg px-3 py-2 text-slate-900 font-bold text-right outline-none transition-colors"
                   />
                   <p className="text-[11px] text-slate-500 mt-0.5">
@@ -1145,7 +1234,7 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
                           type="number"
                           min="0"
                           value={preventaQty}
-                          onChange={(e) => setPreventaQty(e.target.value)}
+                          onChange={(e) => handlePreventaQtyChange(e.target.value)}
                           className="w-full bg-[#fef9c3] border border-[#fde047] focus:bg-white rounded-lg px-2 py-1.5 text-right font-medium outline-none"
                         />
                       </td>
@@ -1166,15 +1255,54 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
                       </td>
                     </tr>
 
+                    {/* Invitaciones Sin Cargo */}
+                    <tr className="hover:bg-slate-50/60 bg-blue-50/30">
+                      <td className="py-2.5 px-2 font-bold text-slate-800">
+                        <div className="flex items-center space-x-1.5">
+                          <span>Invitaciones Sin Cargo</span>
+                          <span className="text-[10px] bg-blue-100 text-blue-800 border border-blue-200 px-1.5 py-0.2 rounded font-bold">
+                            Protocolo / Prensa
+                          </span>
+                        </div>
+                      </td>
+                      <td className="py-2 px-2">
+                        <input
+                          type="number"
+                          min="0"
+                          value={invitacionesQty}
+                          onChange={(e) => handleInvitacionesQtyChange(e.target.value)}
+                          placeholder="0"
+                          className="w-full bg-[#fef9c3] border border-[#fde047] focus:bg-white rounded-lg px-2 py-1.5 text-right font-medium outline-none"
+                        />
+                      </td>
+                      <td className="py-2 px-2 text-right">
+                        <div className="bg-slate-100 border border-slate-200 rounded-lg px-2.5 py-1.5 text-right text-xs font-mono text-slate-500">
+                          $0.00
+                        </div>
+                      </td>
+                      <td className="py-2 px-2 text-right">
+                        <div className="bg-slate-100 border border-slate-200 rounded-lg px-2.5 py-1.5 font-bold text-slate-400">
+                          $0.00
+                        </div>
+                      </td>
+                    </tr>
+
                     {/* Entradas General */}
                     <tr className="hover:bg-slate-50/60">
-                      <td className="py-2.5 px-2 font-bold text-slate-800">Entradas General</td>
+                      <td className="py-2.5 px-2 font-bold text-slate-800">
+                        <div className="flex items-center justify-between pr-2">
+                          <span>Entradas General</span>
+                          <span className="text-[10px] text-slate-400 font-mono hidden sm:inline">
+                            (Remanente cupos)
+                          </span>
+                        </div>
+                      </td>
                       <td className="py-2 px-2">
                         <input
                           type="number"
                           min="0"
                           value={generalQty}
-                          onChange={(e) => setGeneralQty(e.target.value)}
+                          onChange={(e) => handleGeneralQtyChange(e.target.value)}
                           className="w-full bg-[#fef9c3] border border-[#fde047] focus:bg-white rounded-lg px-2 py-1.5 text-right font-medium outline-none"
                         />
                       </td>
@@ -1217,143 +1345,225 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
                       </td>
                     </tr>
 
-                    {/* Alquiler del Espacio ($) */}
-                    <tr className="hover:bg-slate-50/60">
-                      <td className="py-2.5 px-2 font-bold text-slate-800" colSpan={2}>
-                        Alquiler del Espacio ($)
-                      </td>
-                      <td className="py-2 px-2 text-slate-400 text-right italic text-[11px]">—</td>
-                      <td className="py-2 px-2 text-right">
-                        <input
-                          type="number"
-                          min="0"
-                          step="1000"
-                          value={alquilerEspacio}
-                          onChange={(e) => setAlquilerEspacio(e.target.value)}
-                          className="w-full bg-[#fef9c3] border border-[#fde047] focus:bg-white rounded-lg px-2.5 py-1.5 text-right font-semibold outline-none"
-                        />
-                      </td>
-                    </tr>
-
-                    {/* Contratación Salón ($) */}
-                    <tr className="hover:bg-slate-50/60">
-                      <td className="py-2.5 px-2 font-bold text-slate-800" colSpan={2}>
-                        Contratación Salón ($)
-                      </td>
-                      <td className="py-2 px-2 text-slate-400 text-right italic text-[11px]">—</td>
-                      <td className="py-2 px-2 text-right">
-                        <input
-                          type="number"
-                          min="0"
-                          step="1000"
-                          value={contratacionSalon}
-                          onChange={(e) => setContratacionSalon(e.target.value)}
-                          className="w-full bg-[#fef9c3] border border-[#fde047] focus:bg-white rounded-lg px-2.5 py-1.5 text-right font-semibold outline-none"
-                        />
-                      </td>
-                    </tr>
-
-                    {/* Comisión Catering ($) */}
-                    <tr className="hover:bg-slate-50/60">
-                      <td className="py-2.5 px-2 font-bold text-slate-800" colSpan={2}>
-                        Comisión Catering ($)
-                      </td>
-                      <td className="py-2 px-2 text-slate-400 text-right italic text-[11px]">—</td>
-                      <td className="py-2 px-2 text-right">
-                        <input
-                          type="number"
-                          min="0"
-                          step="1000"
-                          value={comisionCatering}
-                          onChange={(e) => setComisionCatering(e.target.value)}
-                          className="w-full bg-[#fef9c3] border border-[#fde047] focus:bg-white rounded-lg px-2.5 py-1.5 text-right font-semibold outline-none"
-                        />
-                      </td>
-                    </tr>
-
-                    {/* Otros Ingresos Fijos ($) */}
-                    <tr className="hover:bg-slate-50/60">
-                      <td className="py-2.5 px-2 font-bold text-slate-800" colSpan={2}>
-                        Otros Ingresos ($)
-                      </td>
-                      <td className="py-2 px-2 text-slate-400 text-right italic text-[11px]">—</td>
-                      <td className="py-2 px-2 text-right">
-                        <input
-                          type="number"
-                          min="0"
-                          step="1000"
-                          value={otrosIngresos}
-                          onChange={(e) => setOtrosIngresos(e.target.value)}
-                          className="w-full bg-[#fef9c3] border border-[#fde047] focus:bg-white rounded-lg px-2.5 py-1.5 text-right font-semibold outline-none"
-                        />
-                      </td>
-                    </tr>
-
-                    {/* Filas dinámicas extras de ingresos si se configuran */}
-                    {extraIncomes.map((inc) => {
-                      const isVisible = canViewSensitiveData(inc, currentUser)
-                      return (
-                        <tr key={inc.id} className="hover:bg-slate-50/60 bg-amber-50/30">
-                          <td className="py-2 px-2" colSpan={2}>
-                            <div className="flex items-center space-x-1.5">
-                              <input
-                                type="text"
-                                value={isVisible ? inc.concept : '••••••'}
-                                disabled={!isVisible}
-                                onChange={(e) => updateExtraIncome(inc.id, 'concept', e.target.value)}
-                                placeholder="Concepto de ingreso extra..."
-                                className="w-full bg-[#fef9c3] border border-[#fde047] rounded-lg px-2.5 py-1 text-xs outline-none"
-                              />
-                              <button
-                                type="button"
-                                onClick={() => toggleIncomeSensitive(inc.id)}
-                                title={inc.is_sensitive ? 'Ítem confidencial' : 'Hacer confidencial'}
-                                className={`p-1 rounded ${inc.is_sensitive ? 'text-amber-600 bg-amber-100' : 'text-slate-400 hover:text-slate-600'}`}
-                              >
-                                <Lock className="w-3 h-3" />
-                              </button>
-                            </div>
-                          </td>
-                          <td className="py-2 px-2 text-center">
-                            <button
-                              type="button"
-                              onClick={() => removeExtraIncome(inc.id)}
-                              className="text-rose-500 hover:text-rose-700 p-1 rounded"
-                              title="Eliminar fila"
-                            >
-                              <Trash2 className="w-3.5 h-3.5 mx-auto" />
-                            </button>
-                          </td>
-                          <td className="py-2 px-2 text-right">
-                            <input
-                              type="number"
-                              min="0"
-                              value={inc.amount}
-                              onChange={(e) => updateExtraIncome(inc.id, 'amount', e.target.value)}
-                              className="w-full bg-[#fef9c3] border border-[#fde047] rounded-lg px-2.5 py-1.5 text-right font-semibold outline-none"
-                            />
-                          </td>
-                        </tr>
-                      )
-                    })}
-
                   </tbody>
                 </table>
               </div>
 
-              {/* Botón para agregar ingreso dinámico */}
-              <div className="flex justify-start">
-                <button
-                  type="button"
-                  onClick={addExtraIncome}
-                  className="flex items-center space-x-1 text-xs text-amber-700 hover:text-amber-900 font-bold px-2.5 py-1 rounded-lg border border-dashed border-amber-300 hover:bg-amber-50 transition-colors"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>+ Agregar Otro Ingreso Adicional</span>
-                </button>
+              {/* ======================================================= */}
+              {/* SECCIÓN DINÁMICA: RUBROS DE INGRESO ADICIONALES */}
+              {/* ======================================================= */}
+              <div className="pt-2 border-t border-slate-200 space-y-4">
+                <div className="flex items-center justify-between pb-1 border-b border-amber-200">
+                  <div className="flex items-center space-x-2">
+                    <DollarSign className="w-4 h-4 text-amber-600" />
+                    <span className="text-xs font-serif font-bold uppercase tracking-wider text-amber-950">
+                      Conceptos & Rubros de Ingreso Adicionales ({selectedIncomes.length} {selectedIncomes.length === 1 ? 'activo' : 'activos'})
+                    </span>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsIncomeModalOpen(true)}
+                    className="flex items-center space-x-1.5 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-white font-bold text-xs px-3 py-1.5 rounded-lg shadow transition-all active:scale-95 cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Gestionar / Seleccionar Ingresos</span>
+                  </button>
+                </div>
+
+                {/* Si no hay rubros adicionales seleccionados */}
+                {selectedIncomes.length === 0 ? (
+                  <div className="bg-amber-50/40 border-2 border-dashed border-amber-200/80 rounded-2xl p-6 text-center space-y-2">
+                    <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center mx-auto">
+                      <DollarSign className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h4 className="font-serif font-bold text-slate-800 text-xs">Sin conceptos de facturación fijos adicionales</h4>
+                      <p className="text-[11px] text-slate-500 max-w-md mx-auto mt-0.5">
+                        Si el evento incluye Alquiler de Espacio, Comisión Catering, Barra de Tragos, Sponsors o Merchandising, abrí el catálogo para sumarlos.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setIsIncomeModalOpen(true)}
+                      className="inline-flex items-center space-x-1.5 bg-gradient-to-r from-amber-500 to-barolo-gold hover:from-amber-400 text-barolo-navy font-bold text-xs px-4 py-2 rounded-xl shadow transition-all active:scale-95 cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>➕ Seleccionar Ingresos del Catálogo</span>
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between pb-1">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600">
+                        Detalle de Rubros Seleccionados
+                      </span>
+                      <span className="text-xs font-mono font-bold text-amber-900">
+                        Subtotal: {formatARSWithDecimals(subtotalSelectedIncomes)}
+                      </span>
+                    </div>
+
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs text-left">
+                        <tbody className="divide-y divide-slate-100">
+                          {selectedIncomes.map((inc) => {
+                            const isSens = Boolean(inc.is_sensitive)
+                            const isVis = !isSens || canViewSensitiveData(initialEventData, currentUser)
+                            const catLabel = inc.category === 'locacion' ? '🏛️ Locación' :
+                              inc.category === 'gastronomia' ? '🍽️ Gastronomía / Barra' :
+                              inc.category === 'produccion' ? '🎬 Producción' :
+                              inc.category === 'comercial' ? '💎 Comercial / Sponsor' : '📦 Otros'
+                            
+                            return (
+                              <tr key={inc.key} className={`hover:bg-amber-50/30 ${isSens ? 'bg-rose-50/20' : ''}`}>
+                                <td className="py-2 px-2 font-medium text-slate-800">
+                                  <div className="flex items-center justify-between pr-2">
+                                    <div className="flex items-center space-x-2">
+                                      {isSens && <Lock className="w-3 h-3 text-rose-600 flex-shrink-0" />}
+                                      <span className={isSens ? 'font-bold text-rose-950' : ''}>{inc.name}</span>
+                                      <span className="text-[9px] bg-amber-100 text-amber-900 px-1.5 py-0.2 rounded font-semibold">
+                                        {catLabel}
+                                      </span>
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={() => toggleSelectedIncomeSensitivity(inc.key)}
+                                      title={isSens ? 'Ingreso confidencial (visible sólo admin/autor)' : 'Marcar como confidencial'}
+                                      className={`p-1 rounded transition-colors ${
+                                        isSens ? 'text-rose-600 bg-rose-100' : 'text-slate-300 hover:text-slate-500'
+                                      }`}
+                                    >
+                                      <Lock className="w-3 h-3" />
+                                    </button>
+                                  </div>
+                                </td>
+                                <td className="py-2 px-2 text-right w-44">
+                                  {isVis ? (
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      step="any"
+                                      value={inc.amount}
+                                      onChange={(e) => updateSelectedIncome(inc.key, 'amount', e.target.value)}
+                                      className="w-full bg-[#fef9c3] border border-[#fde047] focus:bg-white rounded-lg px-2.5 py-1.5 text-right font-semibold outline-none"
+                                    />
+                                  ) : (
+                                    <input
+                                      type="text"
+                                      disabled
+                                      value="••••••"
+                                      className="w-full bg-slate-100 border border-slate-200 rounded-lg px-2.5 py-1.5 text-right font-mono font-bold text-slate-400 cursor-not-allowed"
+                                    />
+                                  )}
+                                </td>
+                                <td className="py-2 px-1 text-center w-10">
+                                  <button
+                                    type="button"
+                                    onClick={() => removeSelectedIncome(inc.key)}
+                                    className="text-slate-400 hover:text-rose-600 p-1 rounded transition-colors cursor-pointer"
+                                    title="Quitar este concepto del evento"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </td>
+                              </tr>
+                            )
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* Gastos / Ingresos Extras Dinámicos */}
+                {extraIncomes.length > 0 && (
+                  <div className="space-y-2 pt-2 border-t border-slate-100">
+                    <div className="flex items-center justify-between pb-1">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-amber-800">
+                        ✨ Ingresos Adicionales Extras
+                      </span>
+                      <span className="text-xs font-mono font-bold text-amber-950">
+                        Subtotal: {formatARSWithDecimals(totalExtraIncomes)}
+                      </span>
+                    </div>
+                    <table className="w-full text-xs text-left">
+                      <tbody className="divide-y divide-slate-100">
+                        {extraIncomes.map((inc) => {
+                          const isVisible = canViewSensitiveData(inc, currentUser)
+                          return (
+                            <tr key={inc.id} className="hover:bg-slate-50/60 bg-amber-50/30">
+                              <td className="py-2 px-2">
+                                <div className="flex items-center space-x-1.5">
+                                  <input
+                                    type="text"
+                                    value={isVisible ? inc.concept : '••••••'}
+                                    disabled={!isVisible}
+                                    onChange={(e) => updateExtraIncome(inc.id, 'concept', e.target.value)}
+                                    placeholder="Concepto de ingreso extra..."
+                                    className="w-full bg-[#fef9c3] border border-[#fde047] rounded-lg px-2.5 py-1 text-xs outline-none"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleIncomeSensitive(inc.id)}
+                                    title={inc.is_sensitive ? 'Ítem confidencial' : 'Hacer confidencial'}
+                                    className={`p-1 rounded ${inc.is_sensitive ? 'text-amber-600 bg-amber-100' : 'text-slate-400 hover:text-slate-600'}`}
+                                  >
+                                    <Lock className="w-3 h-3" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => removeExtraIncome(inc.id)}
+                                    className="text-rose-500 hover:text-rose-700 p-1 rounded"
+                                    title="Eliminar fila"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5 mx-auto" />
+                                  </button>
+                                </div>
+                              </td>
+                              <td className="py-2 px-2 text-right w-44">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  value={inc.amount}
+                                  onChange={(e) => updateExtraIncome(inc.id, 'amount', e.target.value)}
+                                  className="w-full bg-[#fef9c3] border border-[#fde047] rounded-lg px-2.5 py-1.5 text-right font-semibold outline-none"
+                                />
+                              </td>
+                              <td className="w-10"></td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {/* Botones de acción al pie de ingresos */}
+                {/* Botón de acción al pie de ingresos */}
+                <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+                  <div className="flex items-center space-x-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsIncomeModalOpen(true)}
+                      className="flex items-center space-x-1.5 text-xs text-amber-900 bg-amber-50 hover:bg-amber-100 font-bold px-3 py-1.5 rounded-xl border border-amber-300 transition-colors shadow-sm cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Seleccionar / Modificar Rubros del Catálogo</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={addExtraIncome}
+                      className="flex items-center space-x-1 text-xs text-slate-600 hover:text-slate-800 font-bold px-2.5 py-1.5 rounded-xl border border-dashed border-slate-300 hover:bg-slate-50 transition-colors cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>+ Ingreso Extra</span>
+                    </button>
+                  </div>
+                </div>
               </div>
 
-              {/* TOTAL INGRESOS (BARRA DORADA RESALTADA) */}
+                            {/* TOTAL INGRESOS (BARRA DORADA RESALTADA) */}
               <div className="bg-gradient-to-r from-amber-400 via-amber-500 to-amber-400 text-slate-950 font-bold p-3.5 rounded-xl flex items-center justify-between shadow-md">
                 <div className="flex items-center space-x-2">
                   <span className="text-lg">👉</span>
@@ -1373,293 +1583,300 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
           {/* BLOQUE 3: COSTOS DEL EVENTO */}
           {/* ======================================================================= */}
           <div className="bg-white rounded-2xl shadow-luxury border border-slate-200 overflow-hidden">
-            {/* Header del bloque */}
+            {/* Header del bloque con botón directo para abrir catálogo */}
             <div className="bg-[#0f172a] text-white px-4 py-3 flex items-center justify-between border-b border-slate-800">
               <div className="flex items-center space-x-2">
                 <Layers className="w-4 h-4 text-rose-400" />
                 <h2 className="font-serif font-bold text-xs uppercase tracking-wider text-rose-300">
-                  3. COSTOS DEL EVENTO
+                  3. COSTOS DEL EVENTO ({selectedCosts.length} {selectedCosts.length === 1 ? 'rubro activo' : 'rubros activos'})
                 </h2>
               </div>
-              <span className="text-[10px] text-slate-400 font-mono">DESGLOSE RUBRO POR RUBRO</span>
+              
+              <button
+                type="button"
+                onClick={() => setIsCostModalOpen(true)}
+                className="flex items-center space-x-1.5 bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-500 hover:to-amber-500 text-white font-bold text-xs px-3 py-1.5 rounded-lg shadow transition-all active:scale-95 cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Gestionar / Seleccionar Costos</span>
+              </button>
             </div>
 
-            {/* Tabla de Costos */}
-            <div className="p-4 sm:p-5 space-y-4">
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs text-left">
-                  <thead>
-                    <tr className="border-b border-slate-200 text-slate-500 font-bold uppercase text-[10px]">
-                      <th className="py-2 px-2">Rubro / Detalle de Gasto</th>
-                      <th className="py-2 px-2 text-right w-40">Importe ($)</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    
-                    {/* Honorarios Artistas */}
-                    <tr className="hover:bg-slate-50/60">
-                      <td className="py-2 px-2 font-medium text-slate-800">Honorarios Artistas</td>
-                      <td className="py-2 px-2 text-right">
-                        <input
-                          type="number"
-                          min="0"
-                          step="any"
-                          value={costArtistas}
-                          onChange={(e) => setCostArtistas(e.target.value)}
-                          className="w-full bg-[#fef9c3] border border-[#fde047] focus:bg-white rounded-lg px-2.5 py-1.5 text-right font-semibold outline-none"
-                        />
-                      </td>
-                    </tr>
+            <div className="p-4 sm:p-5 space-y-5">
 
-                    {/* Honorarios Técnica / Sonido */}
-                    <tr className="hover:bg-slate-50/60">
-                      <td className="py-2 px-2 font-medium text-slate-800">Honorarios Técnica / Sonido</td>
-                      <td className="py-2 px-2 text-right">
-                        <input
-                          type="number"
-                          min="0"
-                          step="any"
-                          value={costTecnica}
-                          onChange={(e) => setCostTecnica(e.target.value)}
-                          className="w-full bg-[#fef9c3] border border-[#fde047] focus:bg-white rounded-lg px-2.5 py-1.5 text-right font-semibold outline-none"
-                        />
-                      </td>
-                    </tr>
+              {/* Si no hay ningún costo seleccionado, mostrar panel limpio */}
+              {selectedCosts.length === 0 ? (
+                <div className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl p-8 text-center space-y-3">
+                  <div className="w-12 h-12 rounded-2xl bg-amber-100 text-amber-800 flex items-center justify-center mx-auto">
+                    <Layers className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h4 className="font-serif font-bold text-slate-800 text-sm">Sin costos cargados para este evento</h4>
+                    <p className="text-xs text-slate-500 max-w-md mx-auto mt-1">
+                      Cada evento es único. Abrí el catálogo para seleccionar únicamente los rubros (del Productor o del Barolo) que aplican a esta cotización.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsCostModalOpen(true)}
+                    className="inline-flex items-center space-x-2 bg-gradient-to-r from-amber-500 to-barolo-gold hover:from-amber-400 hover:to-amber-300 text-barolo-navy font-bold text-xs px-5 py-2.5 rounded-xl shadow-md transition-all active:scale-95 cursor-pointer"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>➕ Seleccionar Costos del Catálogo</span>
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  
+                  {/* Costos del Productor */}
+                  {selectedCosts.some(c => c.category === 'productor') && (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between pb-1 border-b border-blue-100">
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-blue-800 flex items-center space-x-1">
+                          <span>👤 Costos del Productor / Terceros</span>
+                        </span>
+                        <span className="text-xs font-mono font-bold text-blue-900">
+                          Subtotal: {formatARSWithDecimals(subtotalProductor)}
+                        </span>
+                      </div>
 
-                    {/* Honorarios Disertantes */}
-                    <tr className="hover:bg-slate-50/60">
-                      <td className="py-2 px-2 font-medium text-slate-800">Honorarios Disertantes</td>
-                      <td className="py-2 px-2 text-right">
-                        <input
-                          type="number"
-                          min="0"
-                          step="any"
-                          value={costDisertantes}
-                          onChange={(e) => setCostDisertantes(e.target.value)}
-                          className="w-full bg-[#fef9c3] border border-[#fde047] focus:bg-white rounded-lg px-2.5 py-1.5 text-right font-semibold outline-none"
-                        />
-                      </td>
-                    </tr>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-xs text-left">
+                          <tbody className="divide-y divide-slate-100">
+                            {selectedCosts.filter(c => c.category === 'productor').map((c) => {
+                              const isSens = Boolean(c.is_sensitive)
+                              const isVis = !isSens || canViewSensitiveData(initialEventData, currentUser)
+                              return (
+                                <tr key={c.key} className={`hover:bg-blue-50/30 ${isSens ? 'bg-rose-50/20' : ''}`}>
+                                  <td className="py-2 px-2 font-medium text-slate-800">
+                                    <div className="flex items-center justify-between pr-2">
+                                      <div className="flex items-center space-x-1.5">
+                                        {isSens && <Lock className="w-3 h-3 text-rose-600 flex-shrink-0" />}
+                                        <span className={isSens ? 'font-bold text-rose-950' : ''}>{c.name}</span>
+                                      </div>
+                                      <button
+                                        type="button"
+                                        onClick={() => toggleSelectedCostSensitivity(c.key)}
+                                        title={isSens ? 'Costo confidencial (visible sólo admin/autor)' : 'Marcar como confidencial'}
+                                        className={`p-1 rounded transition-colors ${
+                                          isSens ? 'text-rose-600 bg-rose-100' : 'text-slate-300 hover:text-slate-500'
+                                        }`}
+                                      >
+                                        <Lock className="w-3 h-3" />
+                                      </button>
+                                    </div>
+                                  </td>
+                                  <td className="py-2 px-2 text-right w-44">
+                                    {isVis ? (
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        step="any"
+                                        value={c.amount}
+                                        onChange={(e) => updateSelectedCost(c.key, 'amount', e.target.value)}
+                                        className="w-full bg-[#fef9c3] border border-[#fde047] focus:bg-white rounded-lg px-2.5 py-1.5 text-right font-semibold outline-none"
+                                      />
+                                    ) : (
+                                      <input
+                                        type="text"
+                                        disabled
+                                        value="••••••"
+                                        className="w-full bg-slate-100 border border-slate-200 rounded-lg px-2.5 py-1.5 text-right font-mono font-bold text-slate-400 cursor-not-allowed"
+                                      />
+                                    )}
+                                  </td>
+                                  <td className="py-2 px-1 text-center w-10">
+                                    <button
+                                      type="button"
+                                      onClick={() => removeSelectedCost(c.key)}
+                                      className="text-slate-400 hover:text-rose-600 p-1 rounded transition-colors cursor-pointer"
+                                      title="Quitar este costo del evento"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </td>
+                                </tr>
+                              )
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
 
-                    {/* Mobiliario / Ambientación */}
-                    <tr className="hover:bg-slate-50/60">
-                      <td className="py-2 px-2 font-medium text-slate-800">Mobiliario / Ambientación</td>
-                      <td className="py-2 px-2 text-right">
-                        <input
-                          type="number"
-                          min="0"
-                          step="any"
-                          value={costMobiliario}
-                          onChange={(e) => setCostMobiliario(e.target.value)}
-                          className="w-full bg-[#fef9c3] border border-[#fde047] focus:bg-white rounded-lg px-2.5 py-1.5 text-right font-semibold outline-none"
-                        />
-                      </td>
-                    </tr>
+                  {/* Costos del Palacio Barolo */}
+                  {selectedCosts.some(c => c.category === 'barolo') && (
+                    <div className="space-y-2 pt-2">
+                      <div className="flex items-center justify-between pb-1 border-b border-amber-200">
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-amber-900 flex items-center space-x-1">
+                          <span>🏛️ Costos del Palacio Barolo</span>
+                        </span>
+                        <span className="text-xs font-mono font-bold text-amber-950">
+                          Subtotal: {formatARSWithDecimals(subtotalBarolo)}
+                        </span>
+                      </div>
 
-                    {/* RRHH LS y Salón */}
-                    <tr className="hover:bg-slate-50/60">
-                      <td className="py-2 px-2 font-medium text-slate-800">RRHH LS y Salón</td>
-                      <td className="py-2 px-2 text-right">
-                        <input
-                          type="number"
-                          min="0"
-                          step="any"
-                          value={costRrhh}
-                          onChange={(e) => setCostRrhh(e.target.value)}
-                          className="w-full bg-[#fef9c3] border border-[#fde047] focus:bg-white rounded-lg px-2.5 py-1.5 text-right font-semibold outline-none"
-                        />
-                      </td>
-                    </tr>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-xs text-left">
+                          <tbody className="divide-y divide-slate-100">
+                            {selectedCosts.filter(c => c.category === 'barolo').map((c) => {
+                              const isSens = Boolean(c.is_sensitive)
+                              const isVis = !isSens || canViewSensitiveData(initialEventData, currentUser)
+                              return (
+                                <tr key={c.key} className={`hover:bg-amber-50/30 ${isSens ? 'bg-rose-50/20' : ''}`}>
+                                  <td className="py-2 px-2 font-medium text-slate-800">
+                                    <div className="flex items-center justify-between pr-2">
+                                      <div className="flex items-center space-x-1.5">
+                                        {isSens && <Lock className="w-3 h-3 text-rose-600 flex-shrink-0" />}
+                                        <span className={isSens ? 'font-bold text-rose-950' : ''}>{c.name}</span>
+                                      </div>
+                                      <button
+                                        type="button"
+                                        onClick={() => toggleSelectedCostSensitivity(c.key)}
+                                        title={isSens ? 'Costo confidencial (visible sólo admin/autor)' : 'Marcar como confidencial'}
+                                        className={`p-1 rounded transition-colors ${
+                                          isSens ? 'text-rose-600 bg-rose-100' : 'text-slate-300 hover:text-slate-500'
+                                        }`}
+                                      >
+                                        <Lock className="w-3 h-3" />
+                                      </button>
+                                    </div>
+                                  </td>
+                                  <td className="py-2 px-2 text-right w-44">
+                                    {isVis ? (
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        step="any"
+                                        value={c.amount}
+                                        onChange={(e) => updateSelectedCost(c.key, 'amount', e.target.value)}
+                                        className="w-full bg-[#fef9c3] border border-[#fde047] focus:bg-white rounded-lg px-2.5 py-1.5 text-right font-semibold outline-none"
+                                      />
+                                    ) : (
+                                      <input
+                                        type="text"
+                                        disabled
+                                        value="••••••"
+                                        className="w-full bg-slate-100 border border-slate-200 rounded-lg px-2.5 py-1.5 text-right font-mono font-bold text-slate-400 cursor-not-allowed"
+                                      />
+                                    )}
+                                  </td>
+                                  <td className="py-2 px-1 text-center w-10">
+                                    <button
+                                      type="button"
+                                      onClick={() => removeSelectedCost(c.key)}
+                                      className="text-slate-400 hover:text-rose-600 p-1 rounded transition-colors cursor-pointer"
+                                      title="Quitar este costo del evento"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </td>
+                                </tr>
+                              )
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
 
-                    {/* Catering / Gastronomía */}
-                    <tr className="hover:bg-slate-50/60">
-                      <td className="py-2 px-2 font-medium text-slate-800">Catering / Gastronomía</td>
-                      <td className="py-2 px-2 text-right">
-                        <input
-                          type="number"
-                          min="0"
-                          step="any"
-                          value={costCatering}
-                          onChange={(e) => setCostCatering(e.target.value)}
-                          className="w-full bg-[#fef9c3] border border-[#fde047] focus:bg-white rounded-lg px-2.5 py-1.5 text-right font-semibold outline-none"
-                        />
-                      </td>
-                    </tr>
+                  {/* Gastos Adicionales Extras */}
+                  {extraExpenses.length > 0 && (
+                    <div className="space-y-2 pt-2">
+                      <div className="flex items-center justify-between pb-1 border-b border-rose-200">
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-rose-800">
+                          📦 Gastos Extras Adicionales
+                        </span>
+                        <span className="text-xs font-mono font-bold text-rose-900">
+                          Subtotal: {formatARSWithDecimals(totalExtraExpenses)}
+                        </span>
+                      </div>
+                      <table className="w-full text-xs text-left">
+                        <tbody className="divide-y divide-slate-100">
+                          {extraExpenses.map((exp) => {
+                            const isVisible = canViewSensitiveData(exp, currentUser)
+                            return (
+                              <tr key={exp.id} className="hover:bg-slate-50/60 bg-rose-50/30">
+                                <td className="py-2 px-2">
+                                  <div className="flex items-center space-x-1.5">
+                                    <input
+                                      type="text"
+                                      value={isVisible ? exp.concept : '••••••'}
+                                      disabled={!isVisible}
+                                      onChange={(e) => updateExtraExpense(exp.id, 'concept', e.target.value)}
+                                      placeholder="Concepto de gasto adicional..."
+                                      className="w-full bg-[#fef9c3] border border-[#fde047] rounded-lg px-2.5 py-1 text-xs outline-none"
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={() => toggleExpenseSensitive(exp.id)}
+                                      title={exp.is_sensitive ? 'Gasto confidencial' : 'Hacer confidencial'}
+                                      className={`p-1 rounded ${exp.is_sensitive ? 'text-rose-600 bg-rose-100' : 'text-slate-400 hover:text-slate-600'}`}
+                                    >
+                                      <Lock className="w-3 h-3" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => removeExtraExpense(exp.id)}
+                                      className="text-rose-500 hover:text-rose-700 p-1 rounded"
+                                      title="Eliminar fila"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                </td>
+                                <td className="py-2 px-2 text-right w-44">
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    step="any"
+                                    value={exp.amount}
+                                    onChange={(e) => updateExtraExpense(exp.id, 'amount', e.target.value)}
+                                    className="w-full bg-[#fef9c3] border border-[#fde047] rounded-lg px-2.5 py-1.5 text-right font-semibold outline-none"
+                                  />
+                                </td>
+                                <td className="w-10"></td>
+                              </tr>
+                            )
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
 
-                    {/* Limpieza */}
-                    <tr className="hover:bg-slate-50/60">
-                      <td className="py-2 px-2 font-medium text-slate-800">Limpieza</td>
-                      <td className="py-2 px-2 text-right">
-                        <input
-                          type="number"
-                          min="0"
-                          step="any"
-                          value={costLimpieza}
-                          onChange={(e) => setCostLimpieza(e.target.value)}
-                          className="w-full bg-[#fef9c3] border border-[#fde047] focus:bg-white rounded-lg px-2.5 py-1.5 text-right font-semibold outline-none"
-                        />
-                      </td>
-                    </tr>
+                </div>
+              )}
 
-                    {/* Seguros */}
-                    <tr className="hover:bg-slate-50/60">
-                      <td className="py-2 px-2 font-medium text-slate-800">Seguros</td>
-                      <td className="py-2 px-2 text-right">
-                        <input
-                          type="number"
-                          min="0"
-                          step="any"
-                          value={costSeguros}
-                          onChange={(e) => setCostSeguros(e.target.value)}
-                          className="w-full bg-[#fef9c3] border border-[#fde047] focus:bg-white rounded-lg px-2.5 py-1.5 text-right font-semibold outline-none"
-                        />
-                      </td>
-                    </tr>
+              {/* Botones de acción al pie de costos */}
+              {/* Botón de acción al pie de costos */}
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-100">
+                <div className="flex items-center space-x-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsCostModalOpen(true)}
+                    className="flex items-center space-x-1.5 text-xs text-amber-900 bg-amber-50 hover:bg-amber-100 font-bold px-3 py-1.5 rounded-xl border border-amber-300 transition-colors shadow-sm cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Seleccionar / Modificar Rubros del Catálogo</span>
+                  </button>
 
-                    {/* Alquiler de Espacio (costo) */}
-                    <tr className="hover:bg-slate-50/60">
-                      <td className="py-2 px-2 font-medium text-slate-800">Alquiler de Espacio (costo)</td>
-                      <td className="py-2 px-2 text-right">
-                        <input
-                          type="number"
-                          min="0"
-                          step="any"
-                          value={costAlquilerEspacio}
-                          onChange={(e) => setCostAlquilerEspacio(e.target.value)}
-                          className="w-full bg-[#fef9c3] border border-[#fde047] focus:bg-white rounded-lg px-2.5 py-1.5 text-right font-semibold outline-none"
-                        />
-                      </td>
-                    </tr>
-
-                    {/* Costos Gastronómicos / Insumos */}
-                    <tr className="hover:bg-slate-50/60">
-                      <td className="py-2 px-2 font-medium text-slate-800">Costos Gastronómicos / Insumos</td>
-                      <td className="py-2 px-2 text-right">
-                        <input
-                          type="number"
-                          min="0"
-                          step="any"
-                          value={costGastronomicos}
-                          onChange={(e) => setCostGastronomicos(e.target.value)}
-                          className="w-full bg-[#fef9c3] border border-[#fde047] focus:bg-white rounded-lg px-2.5 py-1.5 text-right font-semibold outline-none"
-                        />
-                      </td>
-                    </tr>
-
-                    {/* Publicidad / Marketing */}
-                    <tr className="hover:bg-slate-50/60">
-                      <td className="py-2 px-2 font-medium text-slate-800">Publicidad / Marketing</td>
-                      <td className="py-2 px-2 text-right">
-                        <input
-                          type="number"
-                          min="0"
-                          step="any"
-                          value={costMarketing}
-                          onChange={(e) => setCostMarketing(e.target.value)}
-                          className="w-full bg-[#fef9c3] border border-[#fde047] focus:bg-white rounded-lg px-2.5 py-1.5 text-right font-semibold outline-none"
-                        />
-                      </td>
-                    </tr>
-
-                    {/* SADAIC / AADI Capif */}
-                    <tr className="hover:bg-slate-50/60">
-                      <td className="py-2 px-2 font-medium text-slate-800">SADAIC / AADI Capif</td>
-                      <td className="py-2 px-2 text-right">
-                        <input
-                          type="number"
-                          min="0"
-                          step="any"
-                          value={costSadaic}
-                          onChange={(e) => setCostSadaic(e.target.value)}
-                          className="w-full bg-[#fef9c3] border border-[#fde047] focus:bg-white rounded-lg px-2.5 py-1.5 text-right font-semibold outline-none"
-                        />
-                      </td>
-                    </tr>
-
-                    {/* Otros Costos Operativos */}
-                    <tr className="hover:bg-slate-50/60">
-                      <td className="py-2 px-2 font-medium text-slate-800">Otros Costos Operativos</td>
-                      <td className="py-2 px-2 text-right">
-                        <input
-                          type="number"
-                          min="0"
-                          step="any"
-                          value={costOtrosOperativos}
-                          onChange={(e) => setCostOtrosOperativos(e.target.value)}
-                          className="w-full bg-[#fef9c3] border border-[#fde047] focus:bg-white rounded-lg px-2.5 py-1.5 text-right font-semibold outline-none"
-                        />
-                      </td>
-                    </tr>
-
-                    {/* Filas dinámicas extras de gastos */}
-                    {extraExpenses.map((exp) => {
-                      const isVisible = canViewSensitiveData(exp, currentUser)
-                      return (
-                        <tr key={exp.id} className="hover:bg-slate-50/60 bg-rose-50/30">
-                          <td className="py-2 px-2">
-                            <div className="flex items-center space-x-1.5">
-                              <input
-                                type="text"
-                                value={isVisible ? exp.concept : '••••••'}
-                                disabled={!isVisible}
-                                onChange={(e) => updateExtraExpense(exp.id, 'concept', e.target.value)}
-                                placeholder="Concepto de gasto adicional..."
-                                className="w-full bg-[#fef9c3] border border-[#fde047] rounded-lg px-2.5 py-1 text-xs outline-none"
-                              />
-                              <button
-                                type="button"
-                                onClick={() => toggleExpenseSensitive(exp.id)}
-                                title={exp.is_sensitive ? 'Gasto confidencial' : 'Hacer confidencial'}
-                                className={`p-1 rounded ${exp.is_sensitive ? 'text-rose-600 bg-rose-100' : 'text-slate-400 hover:text-slate-600'}`}
-                              >
-                                <Lock className="w-3 h-3" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => removeExtraExpense(exp.id)}
-                                className="text-rose-500 hover:text-rose-700 p-1 rounded"
-                                title="Eliminar fila"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          </td>
-                          <td className="py-2 px-2 text-right">
-                            <input
-                              type="number"
-                              min="0"
-                              step="any"
-                              value={exp.amount}
-                              onChange={(e) => updateExtraExpense(exp.id, 'amount', e.target.value)}
-                              className="w-full bg-[#fef9c3] border border-[#fde047] rounded-lg px-2.5 py-1.5 text-right font-semibold outline-none"
-                            />
-                          </td>
-                        </tr>
-                      )
-                    })}
-
-                  </tbody>
-                </table>
+                  <button
+                    type="button"
+                    onClick={addExtraExpense}
+                    className="flex items-center space-x-1 text-xs text-slate-600 hover:text-slate-800 font-bold px-2.5 py-1.5 rounded-xl border border-dashed border-slate-300 hover:bg-slate-50 transition-colors cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>+ Gasto Extra</span>
+                  </button>
+                </div>
               </div>
 
-              {/* Botón para agregar gasto dinámico */}
-              <div className="flex justify-start">
-                <button
-                  type="button"
-                  onClick={addExtraExpense}
-                  className="flex items-center space-x-1 text-xs text-rose-700 hover:text-rose-900 font-bold px-2.5 py-1 rounded-lg border border-dashed border-rose-300 hover:bg-rose-50 transition-colors"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>+ Agregar Otro Gasto / Rubro Operativo</span>
-                </button>
-              </div>
-
-              {/* TOTAL COSTOS (BARRA ROJA RESALTADA) */}
+              {/* TOTAL COSTOS (BARRA RESALTADA) */}
               <div className="bg-gradient-to-r from-rose-500 via-rose-600 to-rose-500 text-white font-bold p-3.5 rounded-xl flex items-center justify-between shadow-md">
                 <div className="flex items-center space-x-2">
                   <span className="text-lg">👉</span>
                   <span className="font-serif uppercase tracking-wider text-xs sm:text-sm font-black">
-                    TOTAL COSTOS:
+                    TOTAL COSTOS DEL EVENTO:
                   </span>
                 </div>
                 <div className="text-base sm:text-xl font-mono font-black tracking-tight">
@@ -2001,6 +2218,15 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
 
         {/* Botones de acción */}
         <div className="flex items-center space-x-2 w-full md:w-auto justify-end">
+          <button
+            onClick={handleExportExcel}
+            className="flex items-center space-x-1 px-3 py-2 rounded-xl text-xs font-bold bg-emerald-700 hover:bg-emerald-600 text-white transition-colors shadow-sm cursor-pointer"
+            title="Descargar Excel oficial de la cotización"
+          >
+            <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-200" />
+            <span className="hidden sm:inline">Excel</span>
+          </button>
+
           {(userCanCreate || userCanEdit) && (
             <button
               onClick={handleSaveAsQuote}
@@ -2041,6 +2267,352 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
         />
       )}
 
+            {/* MODAL DE SELECCIÓN DE INGRESOS DEL CATÁLOGO */}
+      {isIncomeModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-900/60 backdrop-blur-sm overflow-y-auto animate-fade-in">
+          <div className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[90vh]">
+            
+            {/* Header del Modal */}
+            <div className="bg-barolo-navy text-white px-5 py-4 flex items-center justify-between border-b border-barolo-gold/40 flex-shrink-0">
+              <div className="flex items-center space-x-2.5">
+                <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-barolo-gold to-amber-500 flex items-center justify-center text-barolo-navy font-bold shadow">
+                  <DollarSign className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-serif font-bold text-sm sm:text-base text-white">
+                    Catálogo de Ingresos del Evento
+                  </h3>
+                  <p className="text-[11px] text-slate-300">
+                    Marcá únicamente los conceptos de facturación que aplican a esta cotización
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsIncomeModalOpen(false)}
+                className="p-1.5 text-slate-300 hover:text-white rounded-xl hover:bg-white/10 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Barra de Búsqueda y Filtros */}
+            <div className="p-4 bg-slate-50 border-b border-slate-200 flex flex-col sm:flex-row gap-2 flex-shrink-0">
+              <div className="relative flex-1">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                <input
+                  type="text"
+                  placeholder="Buscar concepto por nombre..."
+                  value={incomeModalSearch}
+                  onChange={(e) => setIncomeModalSearch(e.target.value)}
+                  className="w-full bg-white border border-slate-200 rounded-xl pl-9 pr-3 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-400"
+                />
+              </div>
+
+              <div className="flex items-center space-x-1.5 text-xs overflow-x-auto pb-1 sm:pb-0">
+                <button
+                  type="button"
+                  onClick={() => setIncomeModalCategoryFilter('all')}
+                  className={`px-3 py-1.5 rounded-xl font-bold transition-all ${
+                    incomeModalCategoryFilter === 'all'
+                      ? 'bg-barolo-navy text-white shadow-sm'
+                      : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
+                  }`}
+                >
+                  Todos
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIncomeModalCategoryFilter('locacion')}
+                  className={`px-3 py-1.5 rounded-xl font-bold transition-all ${
+                    incomeModalCategoryFilter === 'locacion'
+                      ? 'bg-amber-600 text-white shadow-sm'
+                      : 'bg-amber-50 text-amber-900 border border-amber-200 hover:bg-amber-100'
+                  }`}
+                >
+                  🏛️ Salón
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIncomeModalCategoryFilter('gastronomia')}
+                  className={`px-3 py-1.5 rounded-xl font-bold transition-all ${
+                    incomeModalCategoryFilter === 'gastronomia'
+                      ? 'bg-emerald-600 text-white shadow-sm'
+                      : 'bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100'
+                  }`}
+                >
+                  🍽️ Barra/Catering
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIncomeModalCategoryFilter('comercial')}
+                  className={`px-3 py-1.5 rounded-xl font-bold transition-all ${
+                    incomeModalCategoryFilter === 'comercial'
+                      ? 'bg-purple-600 text-white shadow-sm'
+                      : 'bg-purple-50 text-purple-800 border border-purple-200 hover:bg-purple-100'
+                  }`}
+                >
+                  💎 Comercial
+                </button>
+              </div>
+            </div>
+
+            {/* Listado de Rubros del Catálogo */}
+            <div className="p-4 sm:p-5 overflow-y-auto flex-1 divide-y divide-slate-100">
+              {(templateConfig?.masterIncomeCatalog || DEFAULT_MASTER_INCOME_CATALOG)
+                .filter(item => item.enabled !== false)
+                .filter(item => incomeModalCategoryFilter === 'all' || item.category === incomeModalCategoryFilter)
+                .filter(item => !incomeModalSearch || item.name.toLowerCase().includes(incomeModalSearch.toLowerCase()))
+                .map(item => {
+                  const isChecked = selectedIncomes.some(i => i.key === item.key)
+                  const currentIncome = selectedIncomes.find(i => i.key === item.key)
+                  const catBadge = item.category === 'locacion' ? '🏛️ Salón / Locación' :
+                    item.category === 'gastronomia' ? '🍽️ Barra / Catering' :
+                    item.category === 'produccion' ? '🎬 Canon Producción' :
+                    item.category === 'comercial' ? '💎 Sponsor / Merchandising' : '📦 Otros Ingresos'
+
+                  return (
+                    <div
+                      key={item.key}
+                      className={`py-2.5 px-3 rounded-xl flex items-center justify-between gap-3 transition-colors ${
+                        isChecked ? 'bg-amber-50/50' : 'hover:bg-slate-50'
+                      }`}
+                    >
+                      <div className="flex items-center space-x-3 min-w-0 flex-1">
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => toggleIncomeInEvent(item)}
+                          className="w-4 h-4 text-amber-600 rounded border-slate-300 focus:ring-amber-400 cursor-pointer"
+                        />
+                        <div className="min-w-0">
+                          <p className={`text-xs font-bold truncate ${isChecked ? 'text-slate-900' : 'text-slate-700'}`}>
+                            {item.name}
+                          </p>
+                          <span className="inline-block text-[9px] font-bold px-1.5 py-0.2 rounded bg-amber-100 text-amber-900">
+                            {catBadge}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Input de monto cuando está marcado */}
+                      {isChecked && (
+                        <div className="flex items-center space-x-2 flex-shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => toggleSelectedIncomeSensitivity(item.key)}
+                            title={currentIncome?.is_sensitive ? 'Ingreso confidencial' : 'Hacer confidencial'}
+                            className={`p-1.5 rounded-lg ${
+                              currentIncome?.is_sensitive ? 'bg-rose-100 text-rose-600' : 'text-slate-300 hover:text-slate-500'
+                            }`}
+                          >
+                            <Lock className="w-3.5 h-3.5" />
+                          </button>
+                          <div className="relative w-32 sm:w-36">
+                            <span className="absolute left-2.5 top-1.5 text-xs text-slate-400 font-mono">$</span>
+                            <input
+                              type="number"
+                              min="0"
+                              step="any"
+                              value={currentIncome?.amount ?? 0}
+                              onChange={(e) => updateSelectedIncome(item.key, 'amount', e.target.value)}
+                              placeholder="0"
+                              className="w-full bg-white border border-amber-300 focus:border-amber-500 rounded-lg pl-6 pr-2.5 py-1 text-xs text-right font-semibold text-slate-900 outline-none"
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+            </div>
+
+            {/* Footer del Modal */}
+            <div className="bg-slate-50 px-5 py-3.5 border-t border-slate-200 flex items-center justify-between flex-shrink-0">
+              <span className="text-xs text-slate-600 font-medium">
+                <strong>{selectedIncomes.length}</strong> {selectedIncomes.length === 1 ? 'rubro seleccionado' : 'rubros seleccionados'}
+              </span>
+
+              <button
+                type="button"
+                onClick={() => setIsIncomeModalOpen(false)}
+                className="bg-barolo-navy hover:bg-barolo-navy-light text-white text-xs font-bold px-5 py-2 rounded-xl shadow transition-all active:scale-95 cursor-pointer"
+              >
+                Aplicar al Evento
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      
+      {/* MODAL DE SELECCIÓN DE COSTOS DEL CATÁLOGO */}
+      {isCostModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-900/60 backdrop-blur-sm overflow-y-auto animate-fade-in">
+          <div className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[90vh]">
+            
+            {/* Header del Modal */}
+            <div className="bg-barolo-navy text-white px-5 py-4 flex items-center justify-between border-b border-barolo-gold/40 flex-shrink-0">
+              <div className="flex items-center space-x-2.5">
+                <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-barolo-gold to-amber-500 flex items-center justify-center text-barolo-navy font-bold shadow">
+                  <Layers className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-serif font-bold text-sm sm:text-base text-white">
+                    Catálogo de Costos del Evento
+                  </h3>
+                  <p className="text-[11px] text-slate-300">
+                    Marcá únicamente los costos que aplican a esta cotización
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsCostModalOpen(false)}
+                className="p-1.5 text-slate-300 hover:text-white rounded-xl hover:bg-white/10 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Barra de Búsqueda y Filtros */}
+            <div className="p-4 bg-slate-50 border-b border-slate-200 flex flex-col sm:flex-row gap-2 flex-shrink-0">
+              <div className="relative flex-1">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                <input
+                  type="text"
+                  placeholder="Buscar rubro por nombre..."
+                  value={costModalSearch}
+                  onChange={(e) => setCostModalSearch(e.target.value)}
+                  className="w-full bg-white border border-slate-200 rounded-xl pl-9 pr-3 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-400"
+                />
+              </div>
+
+              <div className="flex items-center space-x-1.5 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setCostModalCategoryFilter('all')}
+                  className={`px-3 py-1.5 rounded-xl font-bold transition-all ${
+                    costModalCategoryFilter === 'all'
+                      ? 'bg-barolo-navy text-white shadow-sm'
+                      : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
+                  }`}
+                >
+                  Todos
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCostModalCategoryFilter('productor')}
+                  className={`px-3 py-1.5 rounded-xl font-bold transition-all ${
+                    costModalCategoryFilter === 'productor'
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'bg-blue-50 text-blue-800 border border-blue-200 hover:bg-blue-100'
+                  }`}
+                >
+                  👤 Productor
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCostModalCategoryFilter('barolo')}
+                  className={`px-3 py-1.5 rounded-xl font-bold transition-all ${
+                    costModalCategoryFilter === 'barolo'
+                      ? 'bg-amber-600 text-white shadow-sm'
+                      : 'bg-amber-50 text-amber-900 border border-amber-300 hover:bg-amber-100'
+                  }`}
+                >
+                  🏛️ Barolo
+                </button>
+              </div>
+            </div>
+
+            {/* Listado de Rubros del Catálogo */}
+            <div className="p-4 sm:p-5 overflow-y-auto flex-1 divide-y divide-slate-100">
+              {(templateConfig?.masterCostCatalog || DEFAULT_MASTER_COST_CATALOG)
+                .filter(item => item.enabled !== false)
+                .filter(item => costModalCategoryFilter === 'all' || item.category === costModalCategoryFilter)
+                .filter(item => !costModalSearch || item.name.toLowerCase().includes(costModalSearch.toLowerCase()))
+                .map(item => {
+                  const isChecked = selectedCosts.some(c => c.key === item.key)
+                  const currentCost = selectedCosts.find(c => c.key === item.key)
+                  const isBarolo = item.category === 'barolo'
+
+                  return (
+                    <div
+                      key={item.key}
+                      className={`py-2.5 px-3 rounded-xl flex items-center justify-between gap-3 transition-colors ${
+                        isChecked ? 'bg-amber-50/50' : 'hover:bg-slate-50'
+                      }`}
+                    >
+                      <div className="flex items-center space-x-3 min-w-0 flex-1">
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => toggleCostInEvent(item)}
+                          className="w-4 h-4 text-amber-600 rounded border-slate-300 focus:ring-amber-400 cursor-pointer"
+                        />
+                        <div className="min-w-0">
+                          <p className={`text-xs font-bold truncate ${isChecked ? 'text-slate-900' : 'text-slate-700'}`}>
+                            {item.name}
+                          </p>
+                          <span className={`inline-block text-[9px] font-bold px-1.5 py-0.2 rounded ${
+                            isBarolo ? 'bg-amber-100 text-amber-900' : 'bg-blue-100 text-blue-900'
+                          }`}>
+                            {isBarolo ? '🏛️ Costo Barolo' : '👤 Costo Productor'}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Input de monto cuando está marcado */}
+                      {isChecked && (
+                        <div className="flex items-center space-x-2 flex-shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => toggleSelectedCostSensitivity(item.key)}
+                            title={currentCost?.is_sensitive ? 'Costo confidencial' : 'Hacer confidencial'}
+                            className={`p-1.5 rounded-lg ${
+                              currentCost?.is_sensitive ? 'bg-rose-100 text-rose-600' : 'text-slate-300 hover:text-slate-500'
+                            }`}
+                          >
+                            <Lock className="w-3.5 h-3.5" />
+                          </button>
+                          <div className="relative w-32 sm:w-36">
+                            <span className="absolute left-2.5 top-1.5 text-xs text-slate-400 font-mono">$</span>
+                            <input
+                              type="number"
+                              min="0"
+                              step="any"
+                              value={currentCost?.amount ?? 0}
+                              onChange={(e) => updateSelectedCost(item.key, 'amount', e.target.value)}
+                              placeholder="0"
+                              className="w-full bg-white border border-amber-300 focus:border-amber-500 rounded-lg pl-6 pr-2.5 py-1 text-xs text-right font-semibold text-slate-900 outline-none"
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+            </div>
+
+            {/* Footer del Modal */}
+            <div className="bg-slate-50 px-5 py-3.5 border-t border-slate-200 flex items-center justify-between flex-shrink-0">
+              <span className="text-xs text-slate-600 font-medium">
+                <strong>{selectedCosts.length}</strong> {selectedCosts.length === 1 ? 'rubro seleccionado' : 'rubros seleccionados'}
+              </span>
+
+              <button
+                type="button"
+                onClick={() => setIsCostModalOpen(false)}
+                className="bg-barolo-navy hover:bg-barolo-navy-light text-white text-xs font-bold px-5 py-2 rounded-xl shadow transition-all active:scale-95 cursor-pointer"
+              >
+                Aplicar al Evento
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
     </div>
   )
 }

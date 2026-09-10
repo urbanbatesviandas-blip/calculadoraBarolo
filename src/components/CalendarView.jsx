@@ -195,7 +195,7 @@ export default function CalendarView({
       return (
         <div
           key={idx}
-          className={`min-h-[135px] border-b border-r border-slate-200 p-2 flex flex-col transition-all duration-300 ${
+          className={`group min-h-[135px] border-b border-r border-slate-200 p-2 flex flex-col transition-all duration-300 ${
             !isCurrentMonth ? 'bg-slate-50/70 text-slate-400' : 'bg-white text-slate-800'
           } ${isToday ? 'ring-2 ring-amber-400 ring-inset bg-amber-50/30' : ''} ${
             isHighlighted ? 'ring-4 ring-amber-500 ring-inset bg-amber-100/70 shadow-xl scale-[1.01] z-10' : ''
@@ -214,20 +214,8 @@ export default function CalendarView({
               <span>{format(dayItem, 'd')}</span>
               {isHighlighted && <span className="text-[10px] uppercase tracking-wider ml-1">⭐ ¡NUEVO!</span>}
             </span>
-            <div className="flex items-center space-x-1">
-              <span
-                className={`text-xs font-semibold px-2 py-0.5 rounded-full flex items-center space-x-1 ${
-                  isHighlighted
-                    ? 'bg-amber-600 text-white font-extrabold animate-pulse'
-                    : isToday 
-                      ? 'bg-barolo-navy text-amber-300 font-bold' 
-                      : isCurrentMonth ? 'text-slate-700' : 'text-slate-400'
-                }`}
-              >
-                <span>{format(dayItem, 'd')}</span>
-                {isHighlighted && <span className="text-[10px] uppercase tracking-wider ml-1">⭐ ¡NUEVO!</span>}
-              </span>
 
+            <div className="flex items-center space-x-1">
               {hasVenueConflict && (
                 <span 
                   className="text-[10px] bg-rose-600 text-white font-bold px-1.5 py-0.5 rounded shadow-sm flex items-center cursor-help" 
@@ -236,17 +224,17 @@ export default function CalendarView({
                   ⚠️
                 </span>
               )}
-            </div>
 
-            {isCurrentMonth && userCanCreate && (
-              <button
-                onClick={() => onNewEventAtDate(dateKey)}
-                className="opacity-0 hover:opacity-100 group-hover:opacity-100 text-slate-400 hover:text-barolo-navy text-xs px-1 rounded transition-opacity"
-                title="Nueva cotización en este día"
-              >
-                +
-              </button>
-            )}
+              {isCurrentMonth && userCanCreate && (
+                <button
+                  onClick={() => onNewEventAtDate(dateKey)}
+                  className="opacity-0 group-hover:opacity-100 hover:opacity-100 text-slate-400 hover:text-barolo-navy text-xs px-1.5 py-0.5 rounded hover:bg-slate-100 transition-opacity font-bold"
+                  title="Nueva cotización en este día"
+                >
+                  +
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Event Pills */}

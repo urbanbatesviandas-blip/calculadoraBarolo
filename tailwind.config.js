@@ -21,7 +21,11 @@ export default {
         },
       },
       fontFamily: {
-        sans: ['"Segoe UI"', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Roboto', 'sans-serif'],
+        sans: ['"Plus Jakarta Sans"', '"Segoe UI"', 'system-ui', '-apple-system', 'sans-serif'],
+        serif: ['"Montserrat"', 'sans-serif'],
+        brand: ['"Montserrat"', 'sans-serif'],
+        montserrat: ['"Montserrat"', 'sans-serif'],
+        script: ['"Lobster"', 'cursive'],
       },
       boxShadow: {
         'luxury': '0 10px 30px -5px rgba(27, 42, 74, 0.08), 0 4px 6px -2px rgba(27, 42, 74, 0.04)',

@@ -174,6 +174,9 @@ export const eventService = {
         if (eventData.contact_date) extendedMeta.contact_date = eventData.contact_date
         if (eventData.comision_catering) extendedMeta.comision_catering = eventData.comision_catering
         if (eventData.sensitive_notes) extendedMeta.sensitive_notes = eventData.sensitive_notes
+        if (eventData.invitaciones_qty !== undefined) extendedMeta.invitaciones_qty = eventData.invitaciones_qty
+        if (eventData.event_costs) extendedMeta.event_costs = eventData.event_costs
+        if (eventData.event_incomes) extendedMeta.event_incomes = eventData.event_incomes
 
         if (Object.keys(extendedMeta).length > 0) {
           const currentNotes = payload.notes || ''
@@ -413,6 +416,9 @@ export function unpackEventMeta(e) {
     contact_date: e.contact_date || meta.contact_date || '',
     comision_catering: e.comision_catering !== undefined ? Number(e.comision_catering) : (Number(meta.comision_catering) || 0),
     sensitive_notes: e.sensitive_notes || meta.sensitive_notes || '',
+    invitaciones_qty: e.invitaciones_qty !== undefined ? Number(e.invitaciones_qty) : (Number(meta.invitaciones_qty) || 0),
+    event_costs: Array.isArray(e.event_costs) ? e.event_costs : (Array.isArray(meta.event_costs) ? meta.event_costs : undefined),
+    event_incomes: Array.isArray(e.event_incomes) ? e.event_incomes : (Array.isArray(meta.event_incomes) ? meta.event_incomes : undefined),
     comments: comments
   }
 }

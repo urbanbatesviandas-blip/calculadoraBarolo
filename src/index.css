@@ -7,8 +7,13 @@
     font-family: 'Plus Jakarta Sans', 'Segoe UI', system-ui, -apple-system, sans-serif;
   }
   
-  h1, h2, h3, .font-serif {
-    font-family: 'Cinzel', serif, Georgia;
+  h1, h2, h3, .font-serif, .font-brand {
+    font-family: 'Montserrat', 'Segoe UI', sans-serif;
+    letter-spacing: 0.03em;
+  }
+
+  .font-script {
+    font-family: 'Lobster', cursive;
   }
 }
 
@@ -50,4 +55,15 @@ div[id^="netlify-hud-"],
   visibility: hidden !important;
   pointer-events: none !important;
   opacity: 0 !important;
+}
+
+/* Evitar que el autocompletado del navegador arruine el fondo oscuro de los inputs */
+input:-webkit-autofill,
+input:-webkit-autofill:hover, 
+input:-webkit-autofill:focus, 
+input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 1000px #1e293b inset !important;
+  -webkit-text-fill-color: #ffffff !important;
+  caret-color: #ffffff !important;
+  transition: background-color 5000s ease-in-out 0s;
 }

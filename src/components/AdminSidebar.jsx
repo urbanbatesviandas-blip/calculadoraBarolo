@@ -65,9 +65,11 @@ export default function AdminSidebar({
           {/* Header */}
           <div className="p-6 border-b border-slate-800 bg-slate-950/60 flex items-center justify-between">
             <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-barolo-gold to-barolo-gold-dark flex items-center justify-center text-barolo-navy font-bold text-lg shadow-md border border-amber-300/40">
-                PB
-              </div>
+              <img 
+                src="/logo-barolo.png" 
+                alt="Palacio Barolo" 
+                className="w-[46px] h-[46px] object-contain drop-shadow"
+              />
               <div>
                 <div className="flex items-center space-x-1.5">
                   <span className="text-[10px] bg-amber-400/20 text-amber-300 border border-amber-400/40 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">

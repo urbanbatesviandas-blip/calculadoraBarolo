@@ -52,7 +52,7 @@ export default function SettingsModal({ onClose, onConfigSaved, onResetData }) {
         </div>
 
         {/* Content */}
-        <form onSubmit={handleSave} className="p-6 space-y-5 text-xs text-slate-700">
+        <form onSubmit={handleSave} className="p-6 space-y-5 text-xs text-slate-700" autoComplete="off">
           
           {/* Current Status Pill */}
           <div className={`p-3 rounded-2xl border flex items-center justify-between ${
@@ -82,6 +82,9 @@ export default function SettingsModal({ onClose, onConfigSaved, onResetData }) {
               <label className="font-bold text-slate-800 block mb-1">Supabase Project URL</label>
               <input
                 type="text"
+                name="supabase_project_api_url"
+                id="supabase_project_api_url"
+                autoComplete="off"
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
                 placeholder="https://xyzcompany.supabase.co"
@@ -93,6 +96,10 @@ export default function SettingsModal({ onClose, onConfigSaved, onResetData }) {
               <label className="font-bold text-slate-800 block mb-1">Supabase Anon Key (Public)</label>
               <input
                 type="password"
+                name="supabase_project_anon_token"
+                id="supabase_project_anon_token"
+                autoComplete="off"
+                data-lpignore="true"
                 value={key}
                 onChange={(e) => setKey(e.target.value)}
                 placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."

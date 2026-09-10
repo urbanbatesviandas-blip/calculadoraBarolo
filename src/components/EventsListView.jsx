@@ -22,7 +22,15 @@ export default function EventsListView({
   const [searchTerm, setSearchTerm] = useState('')
   const [activeTab, setActiveTab] = useState('all') // 'all', 'contratado', 'reservado', 'cotizado', 'cancelado'
   const [venueFilter, setVenueFilter] = useState('all')
-  const [sortField, setSortField] = useState('date') // 'date', 'id', 'name', 'client', 'venue', 'income', 'costs', 'profit', 'status'
+  const todayLocal = useMemo(() => {
+    const d = new Date()
+    const year = d.getFullYear()
+    const month = String(d.getMonth() + 1).padStart(2, '0')
+    const day = String(d.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+  }, [])
+
+  const [sortField, setSortField] = useState('contact_date') // 'contact_date', 'date', 'id', 'name', 'client', 'venue', 'income', 'costs', 'profit', 'status'
   const [sortOrder, setSortOrder] = useState('desc') // 'asc', 'desc'
 
   // Alternar ordenamiento por columna
@@ -31,7 +39,7 @@ export default function EventsListView({
       setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')
     } else {
       setSortField(field)
-      setSortOrder(['date', 'income', 'costs', 'profit'].includes(field) ? 'desc' : 'asc')
+      setSortOrder(['contact_date', 'date', 'income', 'costs', 'profit'].includes(field) ? 'desc' : 'asc')
     }
   }
 
@@ -57,7 +65,14 @@ export default function EventsListView({
       return true
     }).sort((a, b) => {
       let comparison = 0
-      if (sortField === 'date') {
+      if (sortField === 'contact_date') {
+        const dateA = a.contact_date || a.created_at?.substring(0, 10) || a.event_date || ''
+        const dateB = b.contact_date || b.created_at?.substring(0, 10) || b.event_date || ''
+        comparison = dateA.localeCompare(dateB)
+        if (comparison === 0) {
+          comparison = (a.event_date || '').localeCompare(b.event_date || '')
+        }
+      } else if (sortField === 'date') {
         comparison = (a.event_date || '').localeCompare(b.event_date || '')
       } else if (sortField === 'id') {
         const numA = parseInt((a.calc_code || '').replace(/\D/g, ''), 10) || 0
@@ -135,6 +150,10 @@ export default function EventsListView({
             >
               <option value="date_desc">📅 Fecha: Más recientes primero</option>
               <option value="date_asc">📅 Fecha: Más antiguos primero</option>
+              <option value="contact_date_desc">📅 Cotización: Más recientes primero (Hoy arriba)</option>
+              <option value="contact_date_asc">📅 Cotización: Más antiguas primero</option>
+              <option value="date_desc">🎉 Fecha Evento: Más próximas primero</option>
+              <option value="date_asc">🎉 Fecha Evento: Más lejanas/antiguas primero</option>
               <option value="id_asc">🔢 Código: CALC ascendente (001 → 999)</option>
               <option value="id_desc">🔢 Código: CALC descendente (999 → 001)</option>
               <option value="name_asc">🔤 Nombre Evento: A → Z</option>
@@ -262,12 +281,23 @@ export default function EventsListView({
                 </th>
 
                 <th
-                  onClick={() => handleSort('date')}
-                  className={`py-3 px-4 cursor-pointer hover:bg-barolo-navy-dark transition-colors select-none ${sortField === 'date' ? 'text-amber-300' : ''}`}
-                  title="Ordenar por Fecha"
+                  onClick={() => handleSort('contact_date')}
+                  className={`py-3 px-3 cursor-pointer hover:bg-barolo-navy-dark transition-colors select-none ${sortField === 'contact_date' ? 'text-amber-300' : ''}`}
+                  title="Ordenar por Fecha de Cotización (Día actual arriba)"
                 >
                   <div className="flex items-center space-x-1">
-                    <span>Fecha</span>
+                    <span>F. Cotización</span>
+                    <span className="text-[10px]">{sortField === 'contact_date' ? (sortOrder === 'asc' ? ' ▲' : ' ▼') : <ArrowUpDown className="w-3 h-3 opacity-30 inline" />}</span>
+                  </div>
+                </th>
+
+                <th
+                  onClick={() => handleSort('date')}
+                  className={`py-3 px-3 cursor-pointer hover:bg-barolo-navy-dark transition-colors select-none ${sortField === 'date' ? 'text-amber-300' : ''}`}
+                  title="Ordenar por Fecha del Evento"
+                >
+                  <div className="flex items-center space-x-1">
+                    <span>F. Evento</span>
                     <span className="text-[10px]">{sortField === 'date' ? (sortOrder === 'asc' ? ' ▲' : ' ▼') : <ArrowUpDown className="w-3 h-3 opacity-30 inline" />}</span>
                   </div>
                 </th>
@@ -381,9 +411,25 @@ export default function EventsListView({
                       </div>
                     </td>
 
-                    {/* Col 3: Fecha */}
-                    <td className="py-3.5 px-4 whitespace-nowrap font-medium text-slate-600">
-                      {ev.event_date}
+                    {/* Col 3: Fecha Cotización */}
+                    <td className="py-3.5 px-3 whitespace-nowrap font-medium text-slate-600">
+                      <div className="flex items-center gap-1.5">
+                        <Clock className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                        <span className="font-mono text-xs">{ev.contact_date || ev.created_at?.substring(0, 10) || ev.event_date || '-'}</span>
+                      </div>
+                      {(ev.contact_date === todayLocal || (!ev.contact_date && ev.event_date === todayLocal)) && (
+                        <span className="inline-block mt-0.5 px-2 py-0.5 bg-emerald-100 text-emerald-800 font-bold text-[10px] rounded-full border border-emerald-300">
+                          HOY
+                        </span>
+                      )}
+                    </td>
+
+                    {/* Col 4: Fecha Evento */}
+                    <td className="py-3.5 px-3 whitespace-nowrap font-medium text-slate-700">
+                      <div className="flex items-center gap-1.5">
+                        <Calendar className="w-3.5 h-3.5 text-barolo-navy shrink-0" />
+                        <span className="font-mono text-xs">{ev.event_date || '-'}</span>
+                      </div>
                     </td>
 
                     {/* Col 4: Salón / Espacio */}

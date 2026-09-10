@@ -101,8 +101,27 @@ export default function EventDrilldownModal({ event, onClose, onUpdateStatus, on
       const alq = (Number(event.alquiler_espacio) || 0) + (Number(event.contratacion_salon) || 0)
 
       if (preventaTot > 0) items.push({ label: `Preventa (${event.preventa_qty} u.)`, amount: preventaTot, icon: '🎟️' })
+      if (Number(event.invitaciones_qty) > 0) items.push({ label: `Invitaciones Sin Cargo (${event.invitaciones_qty} u.)`, amount: 0, icon: '🤝' })
       if (generalTot > 0) items.push({ label: `Entradas Generales (${event.general_qty} u.)`, amount: generalTot, icon: '🎫' })
-      if (alq > 0) items.push({ label: 'Alquiler Espacio Barolo', amount: alq, icon: '🏛️' })
+      if (Array.isArray(event.event_incomes) && event.event_incomes.length > 0) {
+        event.event_incomes.forEach(inc => {
+          if (Number(inc.amount) > 0) {
+            const canView = !inc.is_sensitive || canViewSensitiveData(inc, currentUser)
+            const icon = inc.category === 'locacion' ? '🏛️' :
+              inc.category === 'gastronomia' ? '🍽️' :
+              inc.category === 'comercial' ? '💎' : '✨'
+            items.push({
+              label: canView ? inc.name : '[Ingreso Confidencial]',
+              amount: Number(inc.amount),
+              icon: inc.is_sensitive ? '🔒' : icon,
+              is_sensitive: inc.is_sensitive,
+              is_hidden: !canView
+            })
+          }
+        })
+      } else if (alq > 0) {
+        items.push({ label: 'Alquiler Espacio Barolo', amount: alq, icon: '🏛️' })
+      }
       
       if (event.extra_incomes && event.extra_incomes.length > 0) {
         event.extra_incomes.forEach(inc => {
@@ -144,13 +163,26 @@ export default function EventDrilldownModal({ event, onClose, onUpdateStatus, on
     
     // Si el evento ya tiene guardados los rubros específicos, usarlos
     if (event.cost_artistas !== undefined) {
+      const sens = Array.isArray(event.sensitive_costs) ? event.sensitive_costs : []
+      const canView = canViewSensitiveData(event, currentUser)
+      const checkItem = (key, label, amount, icon) => {
+        const isSens = sens.includes(key)
+        const hide = isSens && !canView
+        return {
+          label: hide ? '[Costo Confidencial]' : label,
+          amount: hide ? 0 : amount,
+          icon: isSens ? '🔒' : icon,
+          is_sensitive: isSens,
+          is_hidden: hide
+        }
+      }
       return [
-        { label: 'Honorarios Artistas', amount: Number(event.cost_artistas) || 0, icon: '🎭' },
-        { label: 'Técnica & Sonido', amount: Number(event.cost_tecnica) || 0, icon: '🎛️' },
-        { label: 'Disertantes / Speakers', amount: Number(event.cost_disertantes) || 0, icon: '🎙️' },
-        { label: 'Catering / Gastronomía', amount: Number(event.cost_catering) || 0, icon: '🍽️' },
-        { label: 'Mobiliario & Insumos', amount: (Number(event.cost_mobiliario) || 0) + (Number(event.cost_gastronomicos) || 0), icon: '🛋️' }
-      ].filter(i => i.amount > 0)
+        checkItem('cost_artistas', 'Honorarios Artistas', Number(event.cost_artistas) || 0, '🎭'),
+        checkItem('cost_tecnica', 'Técnica & Sonido', Number(event.cost_tecnica) || 0, '🎛️'),
+        checkItem('cost_disertantes', 'Disertantes / Speakers', Number(event.cost_disertantes) || 0, '🎙️'),
+        checkItem('cost_catering', 'Catering / Gastronomía', Number(event.cost_catering) || 0, '🍽️'),
+        checkItem('cost_mobiliario', 'Mobiliario & Insumos', (Number(event.cost_mobiliario) || 0) + (Number(event.cost_gastronomicos) || 0), '🛋️')
+      ].filter(i => i.is_hidden || i.amount > 0)
     }
 
     // Si viene de la base histórica general, aplicar proporciones estándar del Barolo

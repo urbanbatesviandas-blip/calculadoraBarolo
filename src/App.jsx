@@ -209,7 +209,7 @@ export default function App() {
 
   // Crear nuevo evento en fecha específica del calendario
   const handleNewEventAtDate = (dateStr) => {
-    setCalculatorEvent({ event_date: dateStr })
+    setCalculatorEvent({ event_date: dateStr, isBlank: true, _ts: Date.now() })
     setCurrentView('calculator')
   }
 
@@ -247,7 +247,7 @@ export default function App() {
         currentUser={currentUser}
         onLogout={handleLogout}
         onNewEvent={() => {
-          setCalculatorEvent(null)
+          setCalculatorEvent({ isBlank: true, _ts: Date.now() })
           setCurrentView('calculator')
         }}
         eventsCount={events.length}
@@ -283,7 +283,7 @@ export default function App() {
               />
             )}
 
-            {currentView === 'calculator' && (
+            <div className={currentView === 'calculator' ? 'block' : 'hidden'}>
               <CalculatorView
                 initialEventData={calculatorEvent}
                 onSaveEvent={handleSaveEvent}
@@ -291,7 +291,7 @@ export default function App() {
                 currentUser={currentUser}
                 allEvents={events}
               />
-            )}
+            </div>
 
             {currentView === 'dashboard' && (
               <DashboardView
@@ -317,7 +317,7 @@ export default function App() {
               <CalculatorConfigView
                 currentUser={currentUser}
                 onNavigateToCalculator={() => {
-                  setCalculatorEvent(null)
+                  setCalculatorEvent({ isBlank: true, _ts: Date.now() })
                   setCurrentView('calculator')
                 }}
               />
