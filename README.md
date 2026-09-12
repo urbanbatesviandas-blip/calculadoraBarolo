@@ -1,5 +1,7 @@
 # 🏛️ Palacio Barolo — Sistema Web de Gestión de Eventos & Rentabilidad
 
+🌐 **Acceso Web en Vivo (GitHub Pages):**  
+👉 **[https://urbanbatesviandas-blip.github.io/calculadoraBarolo/](https://urbanbatesviandas-blip.github.io/calculadoraBarolo/)**
 🌐 **Enlaces en Vivo en la Nube:**  
 - ⚡ **Vercel:** 👉 **[https://calculadorabarolo.vercel.app](https://calculadorabarolo.vercel.app)**  
 - 🐙 **GitHub Pages:** 👉 **[https://urbanbatesviandas-blip.github.io/calculadoraBarolo/](https://urbanbatesviandas-blip.github.io/calculadoraBarolo/)**

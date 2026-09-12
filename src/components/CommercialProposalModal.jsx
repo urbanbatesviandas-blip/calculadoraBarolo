@@ -1,7 +1,8 @@
 import React from 'react'
-import { X, Printer, Download, Building, Calendar, Users, DollarSign, Clock, ShieldCheck, Mail, Phone, FileText } from 'lucide-react'
+import { X, Printer, Download, Building, Calendar, Users, DollarSign, Clock, ShieldCheck, Mail, Phone, FileText, MonitorPlay } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
+import { htmlPresentationService } from '../services/htmlPresentationService'
 
 const formatARS = (val) => {
   const num = Number(val) || 0
@@ -63,6 +64,15 @@ export default function CommercialProposalModal({ event, onClose, currentUser })
           </div>
 
           <div className="flex items-center space-x-2">
+            <button
+              onClick={() => htmlPresentationService.downloadPresentationHtml(event)}
+              className="flex items-center space-x-1.5 bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-400/40 px-3.5 py-2 rounded-xl text-xs font-bold transition-all active:scale-95 cursor-pointer shadow"
+              title="Descargar archivo HTML interactivo para proyectar o presentar"
+            >
+              <MonitorPlay className="w-4 h-4 text-amber-300" />
+              <span>Presentación HTML</span>
+            </button>
+
             <button
               onClick={handlePrint}
               className="flex items-center space-x-1.5 bg-gradient-to-r from-barolo-gold to-amber-400 hover:from-amber-400 hover:to-amber-300 text-barolo-navy px-4 py-2 rounded-xl text-xs font-bold shadow-md transition-all active:scale-95 cursor-pointer"

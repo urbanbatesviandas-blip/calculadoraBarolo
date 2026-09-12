@@ -3,12 +3,13 @@ import {
   Calculator, Plus, Trash2, Save, CheckCircle2, RotateCcw, 
   Sparkles, DollarSign, Users, Calendar, MapPin, Building, AlertCircle, FileText, 
   ArrowRight, BookmarkCheck, Sliders, Lock, EyeOff, ShieldAlert, ChevronRight,
-  TrendingUp, Percent, Award, Info, Scale, Check, RefreshCw, Layers, Printer, FileSpreadsheet, Search, X
+  TrendingUp, Percent, Award, Info, Scale, Check, RefreshCw, Layers, Printer, FileSpreadsheet, Search, X, MonitorPlay
 } from 'lucide-react'
 import confetti from 'canvas-confetti'
 import { canCreateEvent, canEditEvent, canChangeStatus, isAdmin, canViewSensitiveData } from '../services/authService'
 import { calculatorConfigService, DEFAULT_MASTER_COST_CATALOG, DEFAULT_MASTER_INCOME_CATALOG } from '../services/calculatorConfigService'
 import { excelExportService } from '../services/excelExportService'
+import { htmlPresentationService } from '../services/htmlPresentationService'
 import CommercialProposalModal from './CommercialProposalModal'
 
 // Helper formatters
@@ -825,6 +826,10 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
     excelExportService.exportCalculatorMatrix(buildPayload(), currentUser)
   }
 
+  const handleExportHtmlPresentation = () => {
+    htmlPresentationService.downloadPresentationHtml(buildPayload())
+  }
+
   // Detección de solapamiento de salón en la misma fecha
   const venueConflicts = useMemo(() => {
     if (!eventDate || !venue || !Array.isArray(allEvents)) return []
@@ -873,7 +878,34 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
             </div>
           </div>
 
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={handleExportHtmlPresentation}
+              className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 transition-all shadow-md cursor-pointer group"
+              title="Descargar presentación interactiva en archivo HTML dinámico para compartir o proyectar"
+            >
+              <MonitorPlay className="w-4 h-4 text-slate-950 group-hover:scale-110 transition-transform" />
+              <span>Presentación HTML</span>
+            </button>
 
+            <button
+              onClick={() => setIsProposalModalOpen(true)}
+              className="flex items-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-700 text-white border border-slate-700 hover:border-slate-600 transition-colors shadow-sm cursor-pointer"
+              title="Abrir propuesta comercial formal para imprimir o guardar como PDF"
+            >
+              <FileText className="w-4 h-4 text-amber-400" />
+              <span>Presupuesto PDF</span>
+            </button>
+
+            <button
+              onClick={handleExportExcel}
+              className="flex items-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-emerald-700 hover:bg-emerald-600 text-white transition-colors shadow-sm cursor-pointer"
+              title="Exportar a planilla Excel oficial"
+            >
+              <FileSpreadsheet className="w-4 h-4 text-emerald-200" />
+              <span>Excel</span>
+            </button>
+          </div>
         </div>
 
         {/* Sub-bar con Estado, N° de Calculadora y Leyenda de Celdas */}
@@ -2218,6 +2250,24 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
 
         {/* Botones de acción */}
         <div className="flex items-center space-x-2 w-full md:w-auto justify-end">
+          <button
+            onClick={handleExportHtmlPresentation}
+            className="flex items-center space-x-1 px-3 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 transition-all shadow-sm cursor-pointer"
+            title="Descargar archivo HTML dinámico e interactivo de la cotización para presentar"
+          >
+            <MonitorPlay className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">HTML</span>
+          </button>
+
+          <button
+            onClick={() => setIsProposalModalOpen(true)}
+            className="flex items-center space-x-1 px-3 py-2 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-colors shadow-sm cursor-pointer"
+            title="Ver propuesta comercial imprimible / PDF"
+          >
+            <FileText className="w-3.5 h-3.5 text-amber-400" />
+            <span className="hidden sm:inline">PDF</span>
+          </button>
+
           <button
             onClick={handleExportExcel}
             className="flex items-center space-x-1 px-3 py-2 rounded-xl text-xs font-bold bg-emerald-700 hover:bg-emerald-600 text-white transition-colors shadow-sm cursor-pointer"

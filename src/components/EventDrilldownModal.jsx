@@ -2,11 +2,12 @@ import React, { useState, useEffect, useMemo } from 'react'
 import { 
   X, CheckCircle, Clock, XCircle, AlertTriangle, Building2, Calendar, 
   Users, DollarSign, ArrowUpRight, TrendingUp, Sparkles, Receipt, Calculator, PieChart, BookmarkCheck,
-  FileSpreadsheet, ShieldAlert, Lock, MessageSquare, Send, Trash2, Printer
+  FileSpreadsheet, ShieldAlert, Lock, MessageSquare, Send, Trash2, Printer, MonitorPlay
 } from 'lucide-react'
 import { Bar } from 'react-chartjs-2'
 import confetti from 'canvas-confetti'
 import { excelExportService } from '../services/excelExportService'
+import { htmlPresentationService } from '../services/htmlPresentationService'
 import { canEditEvent, canChangeStatus, canViewSensitiveData, isAdmin } from '../services/authService'
 import { eventService, parseNotesAndComments } from '../services/eventService'
 import CommercialProposalModal from './CommercialProposalModal'
@@ -735,8 +736,17 @@ export default function EventDrilldownModal({ event, onClose, onUpdateStatus, on
             </button>
 
             <button
+              onClick={() => htmlPresentationService.downloadPresentationHtml(event)}
+              className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold bg-indigo-50 text-indigo-900 border border-indigo-300 hover:bg-indigo-100 transition-colors cursor-pointer"
+              title="Descargar Presentación Interactiva (.html) para compartir pantalla o enviar"
+            >
+              <MonitorPlay className="w-4 h-4 text-indigo-600" />
+              <span>Presentación HTML</span>
+            </button>
+
+            <button
               onClick={() => setIsProposalOpen(true)}
-              className="flex items-center space-x-1.5 px-3 py-2 rounded-xl text-xs sm:text-sm font-bold bg-amber-50 text-amber-900 border border-amber-300 hover:bg-amber-100 transition-colors cursor-pointer"
+              className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold bg-amber-50 text-amber-900 border border-amber-300 hover:bg-amber-100 transition-colors cursor-pointer"
               title="Generar Presupuesto Formal para el Cliente (PDF / Imprimir)"
             >
               <Printer className="w-4 h-4 text-amber-600" />
