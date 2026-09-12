@@ -287,7 +287,7 @@ export default function App() {
       />
 
       {/* Main Content Area */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8">
+      <main className={`flex-1 w-full transition-all duration-300 ease-in-out p-4 sm:p-6 lg:p-8 ${isAiDrawerOpen ? 'lg:pr-[430px] max-w-none' : 'max-w-7xl mx-auto'}`}>
         {loading ? (
           <div className="flex flex-col items-center justify-center py-24 space-y-3">
             <div className="w-10 h-10 border-4 border-amber-400 border-t-transparent rounded-full animate-spin"></div>
@@ -317,6 +317,7 @@ export default function App() {
                 onSwitchView={setCurrentView}
                 currentUser={currentUser}
                 allEvents={events}
+                isAiDrawerOpen={isAiDrawerOpen}
               />
             </div>
 

@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react'
 import { 
   Wand2, X, Send, Sparkles, RotateCcw, Key, CheckCircle2, 
   ArrowRight, Calendar, Users, DollarSign, MapPin, Building, AlertCircle, 
-  ChevronRight, MessageSquare, Bot, HelpCircle, Maximize2, Minimize2, Minus
+  ChevronRight, MessageSquare, Bot, HelpCircle
 } from 'lucide-react'
 import { aiAssistantService } from '../services/aiAssistantService'
 
@@ -26,7 +26,6 @@ export default function AiAssistantDrawer({
   const [showKeyModal, setShowKeyModal] = useState(false)
   const [customKey, setCustomKey] = useState(() => aiAssistantService.getApiKey())
   const [keySavedToast, setKeySavedToast] = useState(false)
-  const [isFullHeight, setIsFullHeight] = useState(false)
 
   const messagesEndRef = useRef(null)
   const textareaRef = useRef(null)
@@ -181,38 +180,10 @@ export default function AiAssistantDrawer({
 
   return (
     <>
-      {/* 🪄 Botón Flotante (Varita Mágica) - En cotizador flota sobre la barra de totales */}
-      {!isOpen && (
-        <button
-          onClick={onToggle}
-          className={`fixed z-40 group flex items-center space-x-2.5 bg-gradient-to-r from-amber-500 via-barolo-gold to-amber-600 hover:from-amber-400 hover:to-amber-500 text-barolo-navy px-4 py-3 rounded-full shadow-2xl shadow-amber-500/30 hover:shadow-amber-500/50 hover:scale-105 active:scale-95 transition-all duration-300 cursor-pointer border border-amber-300/40 ${
-            currentView === 'calculator'
-              ? 'bottom-24 sm:bottom-28 right-4 sm:right-8'
-              : 'bottom-6 right-6'
-          }`}
-          title="Abrir Copiloto IA del Palacio Barolo"
-        >
-          <div className="relative">
-            <Wand2 className="w-5 h-5 text-barolo-navy animate-pulse" />
-            <span className="absolute -top-1 -right-1 flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-barolo-navy opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-barolo-navy"></span>
-            </span>
-          </div>
-          <span className="font-serif font-bold text-xs tracking-wide uppercase">
-            Copilot IA
-          </span>
-        </button>
-      )}
-
-      {/* 🚪 Ventana Flotante Compacta / Panel Lateral (Copilot IA) */}
+      {/* 🚪 Panel Lateral Derecho (Sidebar Copilot IA) */}
       <div 
-        className={`fixed z-50 bg-slate-900/95 backdrop-blur-xl border border-amber-500/30 shadow-2xl flex flex-col transition-all duration-300 ease-in-out ${
-          isFullHeight 
-            ? 'inset-y-0 right-0 w-full sm:w-[420px] md:w-[460px] border-l rounded-none' 
-            : 'bottom-4 sm:bottom-6 right-4 sm:right-8 w-[calc(100vw-2rem)] sm:w-[400px] md:w-[430px] h-[540px] max-h-[78vh] rounded-3xl shadow-amber-500/10'
-        } ${
-          isOpen ? 'translate-y-0 opacity-100 pointer-events-auto' : 'translate-y-12 opacity-0 pointer-events-none'
+        className={`fixed inset-y-0 right-0 z-50 w-full sm:w-[390px] lg:w-[420px] bg-slate-900/98 backdrop-blur-xl border-l border-amber-500/30 shadow-2xl flex flex-col transform transition-transform duration-300 ease-in-out ${
+          isOpen ? 'translate-x-0' : 'translate-x-full'
         }`}
       >
         {/* Header */}
@@ -235,13 +206,6 @@ export default function AiAssistantDrawer({
 
           <div className="flex items-center space-x-1">
             <button
-              onClick={() => setIsFullHeight(!isFullHeight)}
-              className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-white/10 transition-colors cursor-pointer"
-              title={isFullHeight ? "Cambiar a ventana flotante" : "Expandir a panel completo"}
-            >
-              {isFullHeight ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
-            </button>
-            <button
               onClick={() => setShowKeyModal(!showKeyModal)}
               className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
                 showKeyModal ? 'bg-amber-500/20 text-amber-300' : 'text-slate-400 hover:text-white hover:bg-white/10'
@@ -260,9 +224,9 @@ export default function AiAssistantDrawer({
             <button
               onClick={onClose}
               className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-white/10 transition-colors cursor-pointer"
-              title="Minimizar / Cerrar"
+              title="Cerrar panel lateral"
             >
-              <Minus className="w-4 h-4" />
+              <X className="w-4 h-4" />
             </button>
           </div>
         </div>
