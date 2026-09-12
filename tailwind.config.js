@@ -8,16 +8,16 @@ export default {
     extend: {
       colors: {
         barolo: {
-          navy: '#1B2A4A',
-          'navy-dark': '#0F172A',
-          'navy-light': '#2D4373',
-          gold: '#C5A059',
-          'gold-light': '#E8D5AC',
-          'gold-soft': '#FEF9EE',
-          'gold-dark': '#967432',
-          surface: '#F8FAFC',
-          card: '#FFFFFF',
-          border: '#E2E8F0',
+          navy: 'var(--barolo-navy, #1B2A4A)',
+          'navy-dark': 'var(--barolo-navy-dark, #0F172A)',
+          'navy-light': 'var(--barolo-navy-light, #2D4373)',
+          gold: 'var(--barolo-gold, #C5A059)',
+          'gold-light': 'var(--barolo-gold-light, #E8D5AC)',
+          'gold-soft': 'var(--barolo-gold-soft, #FEF9EE)',
+          'gold-dark': 'var(--barolo-gold-dark, #967432)',
+          surface: 'var(--barolo-surface, #F8FAFC)',
+          card: 'var(--barolo-card, #FFFFFF)',
+          border: 'var(--barolo-border, #E2E8F0)',
         },
       },
       fontFamily: {

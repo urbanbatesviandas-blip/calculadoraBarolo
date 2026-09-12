@@ -15,7 +15,8 @@ import { eventService } from './services/eventService'
 import { supabase, isSupabaseConfigured } from './services/supabaseClient'
 import { authService, canCreateEvent, canDeleteEvent } from './services/authService'
 import { excelExportService } from './services/excelExportService'
-import { Scale, X, FileSpreadsheet, ArrowRight } from 'lucide-react'
+import { htmlComparisonService } from './services/htmlComparisonService'
+import { Scale, X, FileSpreadsheet, ArrowRight, MonitorPlay } from 'lucide-react'
 
 export default function App() {
   const [currentView, setCurrentView] = useState('calendar') // 'calendar', 'calculator', 'dashboard', 'list', 'calculator_config', 'users'
@@ -370,6 +371,16 @@ export default function App() {
             >
               <span>{comparisonEvents.length < 2 ? 'Elegí 2 o más' : 'Comparar ahora'}</span>
               <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+
+            <button
+              onClick={() => htmlComparisonService.downloadComparisonHtml(comparisonEvents)}
+              disabled={comparisonEvents.length < 2}
+              className="flex items-center space-x-1 bg-barolo-gold hover:bg-barolo-gold-light text-barolo-navy px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shadow-sm border border-barolo-gold-dark/30"
+              title="Descargar comparativa interactiva en HTML"
+            >
+              <MonitorPlay className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">HTML</span>
             </button>
 
             <button

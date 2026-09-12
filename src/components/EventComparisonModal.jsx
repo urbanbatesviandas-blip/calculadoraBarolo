@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react'
-import { X, FileSpreadsheet, Trophy, DollarSign, TrendingUp, Users, Calendar, MapPin, CheckCircle2, Clock, Eye, Trash2, ArrowRight } from 'lucide-react'
+import { X, FileSpreadsheet, Trophy, DollarSign, TrendingUp, Users, Calendar, MapPin, CheckCircle2, Clock, Eye, Trash2, ArrowRight, MonitorPlay } from 'lucide-react'
 import { Bar } from 'react-chartjs-2'
 import {
   Chart as ChartJS,
@@ -11,6 +11,7 @@ import {
   Legend
 } from 'chart.js'
 import { excelExportService } from '../services/excelExportService'
+import { htmlComparisonService } from '../services/htmlComparisonService'
 
 ChartJS.register(
   CategoryScale,
@@ -129,6 +130,10 @@ export default function EventComparisonModal({ events = [], onClose, onSelectEve
     excelExportService.exportComparisonToExcel(events)
   }
 
+  const handleExportHtml = () => {
+    htmlComparisonService.downloadComparisonHtml(events)
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
       <div className="bg-white w-full max-w-6xl rounded-3xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[92vh]">
@@ -151,6 +156,14 @@ export default function EventComparisonModal({ events = [], onClose, onSelectEve
           </div>
 
           <div className="flex items-center space-x-2">
+            <button
+              onClick={handleExportHtml}
+              className="flex items-center space-x-1.5 bg-gradient-to-r from-amber-500 to-barolo-gold hover:from-amber-400 hover:to-amber-300 text-barolo-navy px-3 py-2 rounded-xl text-xs font-bold shadow-md transition-all active:scale-95 border border-barolo-gold-dark/30"
+              title="Descargar comparativa interactiva en HTML para presentaciones"
+            >
+              <MonitorPlay className="w-4 h-4" />
+              <span className="hidden sm:inline">Comparativa HTML</span>
+            </button>
             <button
               onClick={handleExportExcel}
               className="flex items-center space-x-1.5 bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-2 rounded-xl text-xs font-bold shadow-md transition-all active:scale-95"
@@ -687,6 +700,15 @@ export default function EventComparisonModal({ events = [], onClose, onSelectEve
             Podés comparar hasta 6 eventos en simultáneo. Para agregar más, marcalos con la casilla en el Registro o Calendario.
           </span>
           <div className="flex items-center space-x-2">
+            <button
+              type="button"
+              onClick={handleExportHtml}
+              className="px-4 py-2 bg-gradient-to-r from-amber-500 to-barolo-gold hover:from-amber-400 hover:to-amber-300 text-barolo-navy rounded-xl font-bold text-xs shadow-sm transition-colors flex items-center space-x-1.5 border border-barolo-gold-dark/30"
+              title="Descargar presentación interactiva HTML"
+            >
+              <MonitorPlay className="w-4 h-4" />
+              <span>Presentación HTML</span>
+            </button>
             <button
               type="button"
               onClick={handleExportExcel}

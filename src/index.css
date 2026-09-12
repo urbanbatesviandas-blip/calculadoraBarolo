@@ -2,6 +2,25 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  /* 🏛️ PALACIO BAROLO - PALETA DE COLORES CENTRALIZADA */
+  --barolo-navy: #1B2A4A;
+  --barolo-navy-dark: #0F172A;
+  --barolo-navy-light: #2D4373;
+  --barolo-gold: #C5A059;
+  --barolo-gold-light: #E8D5AC;
+  --barolo-gold-soft: #FEF9EE;
+  --barolo-gold-dark: #967432;
+  --barolo-surface: #F8FAFC;
+  --barolo-card: #FFFFFF;
+  --barolo-border: #E2E8F0;
+  
+  --barolo-emerald: #10B981;
+  --barolo-sky: #0EA5E9;
+  --barolo-rose: #EF4444;
+  --barolo-amber: #F59E0B;
+}
+
 @layer base {
   body {
     font-family: 'Plus Jakarta Sans', 'Segoe UI', system-ui, -apple-system, sans-serif;
