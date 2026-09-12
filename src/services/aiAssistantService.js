@@ -236,135 +236,58 @@ Si el usuario hace preguntas sobre el calendario, disponibilidad, qué fechas es
 
 ---
 ### 📅 RESUMEN DE EVENTOS EN SISTEMA:
-${JSON.stringify(context, null, 2)}
-`;
+${JSON.stringify(context, null, 2)}`;
 
-      // Filtrar y formatear historial según las especificaciones de Google Gemini:
       const validMessages = (messages || [])
         .filter(m => !m.isError && (m.text || m.content || '').trim().length > 0);
 
       const firstUserIndex = validMessages.findIndex(m => m.role === 'user');
-      const conversationFromFirstUser = firstUserIndex >= 0 ? validMessages.slice(firstUserIndex) : [];
+      const conversation = firstUserIndex >= 0 ? validMessages.slice(firstUserIndex) : [];
 
       const contents = [];
-      for (const msg of conversationFromFirstUser) {
+      for (const msg of conversation) {
         const role = (msg.role === 'assistant' || msg.role === 'model') ? 'model' : 'user';
+        const text = msg.text || msg.content;
         if (contents.length > 0 && contents[contents.length - 1].role === role) {
-          contents[contents.length - 1].parts[0].text += `\n\n${msg.text || msg.content}`;
+          contents[contents.length - 1].parts[0].text += `\n\n${text}`;
         } else {
           contents.push({
             role,
-            parts: [{ text: msg.text || msg.content }]
+            parts: [{ text }]
           });
         }
       }
 
-      // Crear versión estándar (con system_instruction) y versión universal (con prompt en user turn)
-      const standardPayload = {
+      const payload = {
         system_instruction: { parts: [{ text: systemPrompt }] },
         contents: contents.length > 0 ? contents : [{ role: 'user', parts: [{ text: 'Hola' }] }],
         generationConfig: { temperature: 0.2, topP: 0.95, maxOutputTokens: 1500 }
       };
 
-      const firstUserText = contents[0]?.parts?.[0]?.text || 'Hola';
-      const universalContents = [
-        {
-          role: 'user',
-          parts: [{ text: `[INSTRUCCIONES DEL SISTEMA DEL PALACIO BAROLO]\n${systemPrompt}\n[FIN DE INSTRUCCIONES]\n\n${firstUserText}` }]
-        },
-        ...contents.slice(1)
-      ];
-      const universalPayload = {
-        contents: universalContents,
-        generationConfig: { temperature: 0.2, topP: 0.95, maxOutputTokens: 1500 }
-      };
-
-      // 1. Descubrir modelos activos directamente desde la API de Google
-      let discoveredModels = [];
-      try {
-        const listRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${effectiveKey}`);
-        if (listRes.ok) {
-          const listData = await listRes.json();
-          discoveredModels = (listData.models || []).map(m => ({
-            name: m.name.replace('models/', ''),
-            methods: m.supportedGenerationMethods || []
-          }));
-        }
-      } catch (e) {}
-
-      // Ordenar modelos a probar: primero los que tienen 'generateContent', priorizando 'flash' luego 'pro'
-      let modelsToTry = [];
-      if (discoveredModels.length > 0) {
-        const supporting = discoveredModels
-          .filter(m => m.methods.includes('generateContent'))
-          .map(m => m.name);
-        
-        const allNames = discoveredModels.map(m => m.name);
-        const baseList = supporting.length > 0 ? supporting : allNames;
-
-        modelsToTry = [
-          ...baseList.filter(m => m.includes('flash')),
-          ...baseList.filter(m => m.includes('pro') && !m.includes('flash')),
-          ...baseList.filter(m => !m.includes('flash') && !m.includes('pro'))
-        ];
-      }
-
-      if (modelsToTry.length === 0) {
-        modelsToTry = ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.0-flash', 'gemini-1.5-flash'];
-      }
-
+      const modelsToTry = ['gemini-2.5-flash', 'gemini-2.5-pro'];
       let res = null;
-      const attemptLogs = [];
 
-      // 2. Probar cada modelo con payloads y versiones de API
       for (const model of modelsToTry) {
-        const variations = [
-          { version: 'v1beta', payload: standardPayload, label: 'std' },
-          { version: 'v1beta', payload: universalPayload, label: 'universal' },
-          { version: 'v1alpha', payload: universalPayload, label: 'v1alpha' }
-        ];
-
-        for (const variant of variations) {
-          const url = `https://generativelanguage.googleapis.com/${variant.version}/models/${model}:generateContent?key=${effectiveKey}`;
-          try {
-            const fetchRes = await fetch(url, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(variant.payload)
-            });
-
-            if (fetchRes.ok) {
-              res = fetchRes;
-              break;
-            } else {
-              const errText = await fetchRes.text();
-              let parsedMsg = errText;
-              try {
-                const j = JSON.parse(errText);
-                if (j?.error?.message) parsedMsg = j.error.message;
-              } catch (e) {}
-              attemptLogs.push(`${model} [${variant.version}/${variant.label}]: HTTP ${fetchRes.status} (${parsedMsg})`);
-
-              if (fetchRes.status !== 404 && fetchRes.status !== 400) {
-                break;
-              }
-            }
-          } catch (e) {
-            attemptLogs.push(`${model} [${variant.version}]: Error de red (${e.message})`);
+        try {
+          const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${effectiveKey}`;
+          const fetchRes = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+          if (fetchRes.ok) {
+            res = fetchRes;
+            break;
           }
-        }
-
-        if (res && res.ok) {
-          break;
+        } catch (e) {
+          // Continuar con el siguiente modelo
         }
       }
 
       if (!res || !res.ok) {
-        const availableList = discoveredModels.map(m => m.name).slice(0, 6).join(', ');
-
         return {
           success: false,
-          text: `⚠️ No se pudo conectar con ningún modelo de Gemini:\n\n${attemptLogs.slice(0, 5).join('\n')}${availableList ? `\n\n📌 Modelos en tu clave: ${availableList}` : ''}`
+          text: '⚠️ No se pudo conectar con el servicio de Gemini. Verificá tu clave API de Google.'
         };
       }
 
@@ -384,9 +307,7 @@ ${JSON.stringify(context, null, 2)}
             quoteData = parsed.quoteData;
             cleanText = candidateText.replace(/```json\s*[\s\S]*?\s*```/, '').trim();
           }
-        } catch (e) {
-          console.warn('Fallback JSON parse error:', e);
-        }
+        } catch (e) {}
       }
 
       return {
@@ -396,10 +317,9 @@ ${JSON.stringify(context, null, 2)}
         quoteData
       };
     } catch (err) {
-      console.error('Gemini fallback fetch failed:', err);
       return {
         success: false,
-        text: `⚠️ No se pudo conectar con el servicio de IA: ${err.message}`
+        text: `⚠️ Error conectando con el servicio de IA: ${err.message}`
       };
     }
   }

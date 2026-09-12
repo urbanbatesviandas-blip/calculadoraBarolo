@@ -1,57 +1,10 @@
 /**
  * 🏛️ PALACIO BAROLO - VERCEL SERVERLESS FUNCTION
- * Endpoint seguro para el Asistente Inteligente (Gemini).
+ * Endpoint seguro para el Copiloto Inteligente (Google Gemini).
  * Mantiene la clave API protegida en el backend sin exponerla al cliente.
  */
 
-export default async function handler(req, res) {
-  // Manejo de CORS
-  res.setHeader('Access-Control-Allow-Credentials', true);
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
-  res.setHeader(
-    'Access-Control-Allow-Headers',
-    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
-  );
-
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
-
-  if (req.method === 'GET') {
-    const hasEnvKey = !!(process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY);
-    return res.status(200).json({
-      status: 'online',
-      service: 'Palacio Barolo Copilot IA API',
-      hasServerApiKey: hasEnvKey,
-      message: 'El endpoint de IA del Palacio Barolo está activo. Para consultar al copiloto, la aplicación realiza peticiones vía POST.'
-    });
-  }
-
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Método no permitido. Solo se acepta POST.' });
-  }
-
-  try {
-    let body = req.body;
-    if (typeof body === 'string') {
-      try { body = JSON.parse(body); } catch (e) {}
-    }
-    const { messages = [], context = {}, clientApiKey } = body || {};
-
-    const apiKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY || clientApiKey;
-
-    if (!apiKey) {
-      return res.status(200).json({
-        success: false,
-        needsApiKey: true,
-        error: 'NO_API_KEY',
-        message: '🔑 Para activar el Copiloto IA se requiere una clave de Google Gemini. Podés configurarla en Vercel como `GEMINI_API_KEY` o ingresarla haciendo clic en el icono de llave 🔑 arriba.'
-      });
-    }
-
-    // Construcción del System Prompt con contexto dinámico del Barolo
-    const systemPrompt = `Sos el Copiloto Inteligente y Asistente Comercial del Palacio Barolo, el emblemático rascacielos histórico de Buenos Aires (Av. de Mayo 1370).
+const SYSTEM_PROMPT_BASE = `Sos el Copiloto Inteligente y Asistente Comercial del Palacio Barolo, el emblemático rascacielos histórico de Buenos Aires (Av. de Mayo 1370).
 Tu rol es asistir a los ejecutivos de ventas y coordinadores en dos tareas esenciales:
 
 1. 📋 **COTIZADOR INTELIGENTE (INTERPRETAR WHATSAPP / TEXTO)**:
@@ -101,182 +54,192 @@ Si el usuario hace preguntas sobre el calendario, disponibilidad, qué fechas es
   * Espacio Barolo (Planta baja y subsuelo histórico, capacidad hasta 150 personas).
   * Cúpula / Mirador (Piso 22, exclusivo para recepciones VIP íntimas, 20-35 personas).
 - **Modelo de Ingresos**: Venta de tickets (Preventa + General), Canon locativo del salón, comisiones gastronómicas y servicios adicionales.
-- **Acuerdos habituales**: 50% - 50% con productor, o Alquiler Fijo + Comisión.
+- **Acuerdos habituales**: 50% - 50% con productor, o Alquiler Fijo + Comisión.`;
 
----
-### 📅 RESUMEN DE EVENTOS EN SISTEMA:
-${JSON.stringify(context, null, 2)}
-`;
+/**
+ * Convierte el historial de mensajes de la app al formato esperado por Gemini
+ */
+function formatGeminiContents(messages = []) {
+  const validMessages = (messages || [])
+    .filter(m => !m.isError && (m.text || m.content || '').trim().length > 0);
 
-    // Filtrar y formatear historial según las especificaciones de Google Gemini:
-    // - Debe comenzar con el primer turno de 'user' (omitir bienvenida del asistente)
-    // - No debe incluir mensajes de error
-    // - Debe alternar estrictamente 'user' y 'model' (si son consecutivos, se concatenan)
-    const validMessages = (messages || [])
-      .filter(m => !m.isError && (m.text || m.content || '').trim().length > 0);
+  const firstUserIndex = validMessages.findIndex(m => m.role === 'user');
+  const conversation = firstUserIndex >= 0 ? validMessages.slice(firstUserIndex) : [];
 
-    const firstUserIndex = validMessages.findIndex(m => m.role === 'user');
-    const conversationFromFirstUser = firstUserIndex >= 0 ? validMessages.slice(firstUserIndex) : [];
-
-    const contents = [];
-    for (const msg of conversationFromFirstUser) {
-      const role = (msg.role === 'assistant' || msg.role === 'model') ? 'model' : 'user';
-      if (contents.length > 0 && contents[contents.length - 1].role === role) {
-        contents[contents.length - 1].parts[0].text += `\n\n${msg.text || msg.content}`;
-      } else {
-        contents.push({
-          role,
-          parts: [{ text: msg.text || msg.content }]
-        });
-      }
+  const contents = [];
+  for (const msg of conversation) {
+    const role = (msg.role === 'assistant' || msg.role === 'model') ? 'model' : 'user';
+    const text = msg.text || msg.content;
+    if (contents.length > 0 && contents[contents.length - 1].role === role) {
+      contents[contents.length - 1].parts[0].text += `\n\n${text}`;
+    } else {
+      contents.push({
+        role,
+        parts: [{ text }]
+      });
     }
+  }
 
-    // Crear versión estándar (con system_instruction) y versión universal (con prompt en user turn)
-    const standardPayload = {
-      system_instruction: { parts: [{ text: systemPrompt }] },
-      contents: contents.length > 0 ? contents : [{ role: 'user', parts: [{ text: 'Hola' }] }],
-      generationConfig: { temperature: 0.2, topP: 0.95, maxOutputTokens: 1500 }
-    };
+  return contents.length > 0 ? contents : [{ role: 'user', parts: [{ text: 'Hola' }] }];
+}
 
-    // Versión universal compatible con cualquier modelo (Gemma, Gemini 2.5, etc.)
-    const firstUserText = contents[0]?.parts?.[0]?.text || 'Hola';
-    const universalContents = [
-      {
-        role: 'user',
-        parts: [{ text: `[INSTRUCCIONES DEL SISTEMA DEL PALACIO BAROLO]\n${systemPrompt}\n[FIN DE INSTRUCCIONES]\n\n${firstUserText}` }]
-      },
-      ...contents.slice(1)
-    ];
-    const universalPayload = {
-      contents: universalContents,
-      generationConfig: { temperature: 0.2, topP: 0.95, maxOutputTokens: 1500 }
-    };
+/**
+ * Parsea y extrae el bloque JSON de cotización si está presente en la respuesta
+ */
+function extractQuoteData(rawText = '') {
+  let isQuote = false;
+  let quoteData = null;
+  let cleanText = rawText;
 
-    // 1. Descubrir modelos activos directamente desde la API de Google
-    let discoveredModels = [];
+  const jsonMatch = rawText.match(/```json\s*([\s\S]*?)\s*```/);
+  if (jsonMatch) {
     try {
-      const listRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
-      if (listRes.ok) {
-        const listData = await listRes.json();
-        discoveredModels = (listData.models || []).map(m => ({
-          name: m.name.replace('models/', ''),
-          methods: m.supportedGenerationMethods || []
-        }));
+      const parsed = JSON.parse(jsonMatch[1]);
+      if (parsed?.isQuote && parsed?.quoteData) {
+        isQuote = true;
+        quoteData = parsed.quoteData;
+        cleanText = rawText.replace(/```json\s*[\s\S]*?\s*```/, '').trim();
       }
-    } catch (e) {}
-
-    // Ordenar modelos a probar: primero los que tienen 'generateContent', priorizando 'flash' luego 'pro'
-    let modelsToTry = [];
-    if (discoveredModels.length > 0) {
-      const supporting = discoveredModels
-        .filter(m => m.methods.includes('generateContent'))
-        .map(m => m.name);
-      
-      const allNames = discoveredModels.map(m => m.name);
-      const baseList = supporting.length > 0 ? supporting : allNames;
-
-      // Ordenar: flash primero, luego pro, luego otros
-      modelsToTry = [
-        ...baseList.filter(m => m.includes('flash')),
-        ...baseList.filter(m => m.includes('pro') && !m.includes('flash')),
-        ...baseList.filter(m => !m.includes('flash') && !m.includes('pro'))
-      ];
+    } catch (e) {
+      // Ignorar error si el bloque no era json de cotización
     }
+  }
 
-    // Si no se descubrieron modelos, usar lista por defecto
-    if (modelsToTry.length === 0) {
-      modelsToTry = ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.0-flash', 'gemini-1.5-flash'];
+  return { isQuote, quoteData, cleanText };
+}
+
+/**
+ * Consulta la API de Gemini para un modelo específico
+ */
+async function callGemini(model, apiKey, payload) {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  return res;
+}
+
+export default async function handler(req, res) {
+  // Manejo de CORS
+  res.setHeader('Access-Control-Allow-Credentials', true);
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,POST');
+  res.setHeader(
+    'Access-Control-Allow-Headers',
+    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
+  );
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
+  if (req.method === 'GET') {
+    const hasEnvKey = !!(process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY);
+    return res.status(200).json({
+      status: 'online',
+      service: 'Palacio Barolo Copilot IA API',
+      hasServerApiKey: hasEnvKey,
+      message: 'El endpoint de IA del Palacio Barolo está activo.'
+    });
+  }
+
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Método no permitido. Solo se acepta POST.' });
+  }
+
+  try {
+    let body = req.body;
+    if (typeof body === 'string') {
+      try { body = JSON.parse(body); } catch (e) {}
     }
+    const { messages = [], context = {}, clientApiKey } = body || {};
 
-    let response = null;
-    const attemptLogs = [];
+    const apiKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY || clientApiKey;
 
-    // 2. Probar cada modelo con payloads y versiones de API
-    for (const model of modelsToTry) {
-      const variations = [
-        { version: 'v1beta', payload: standardPayload, label: 'std' },
-        { version: 'v1beta', payload: universalPayload, label: 'universal' },
-        { version: 'v1alpha', payload: universalPayload, label: 'v1alpha' }
-      ];
-
-      for (const variant of variations) {
-        const url = `https://generativelanguage.googleapis.com/${variant.version}/models/${model}:generateContent?key=${apiKey}`;
-        try {
-          const res = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(variant.payload)
-          });
-
-          if (res.ok) {
-            response = res;
-            break;
-          } else {
-            const errText = await res.text();
-            let parsedMsg = errText;
-            try {
-              const j = JSON.parse(errText);
-              if (j?.error?.message) parsedMsg = j.error.message;
-            } catch (e) {}
-            attemptLogs.push(`${model} [${variant.version}/${variant.label}]: HTTP ${res.status} (${parsedMsg})`);
-            
-            // Si el error es 403 o 429, no seguir probando variaciones de este modelo
-            if (res.status !== 404 && res.status !== 400) {
-              break;
-            }
-          }
-        } catch (err) {
-          attemptLogs.push(`${model} [${variant.version}]: Error de red (${err.message})`);
-        }
-      }
-
-      if (response && response.ok) {
-        break;
-      }
-    }
-
-    if (!response || !response.ok) {
-      console.error('Gemini API Error:', attemptLogs);
-      const availableList = discoveredModels.map(m => m.name).slice(0, 6).join(', ');
-
+    if (!apiKey) {
       return res.status(200).json({
         success: false,
-        error: 'GEMINI_ERROR',
-        message: `⚠️ No se pudo conectar con ningún modelo de Gemini:\n\n${attemptLogs.slice(0, 5).join('\n')}${availableList ? `\n\n📌 Modelos en tu clave: ${availableList}` : ''}`
+        needsApiKey: true,
+        error: 'NO_API_KEY',
+        message: '🔑 Para activar el Copiloto IA se requiere una clave de Google Gemini. Podés configurarla en Vercel como `GEMINI_API_KEY` o ingresarla en el icono de llave 🔑.'
       });
     }
 
-    const data = await response.json();
-    const candidateText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    const systemPrompt = `${SYSTEM_PROMPT_BASE}\n\n---\n### 📅 RESUMEN DE EVENTOS EN SISTEMA:\n${JSON.stringify(context, null, 2)}`;
+    const contents = formatGeminiContents(messages);
 
-    // Extraer bloque JSON de cotización si existe
-    let quoteData = null;
-    let isQuote = false;
-    let cleanText = candidateText;
+    const payload = {
+      system_instruction: { parts: [{ text: systemPrompt }] },
+      contents,
+      generationConfig: {
+        temperature: 0.2,
+        topP: 0.95,
+        maxOutputTokens: 1500
+      }
+    };
 
-    const jsonMatch = candidateText.match(/```json\s*([\s\S]*?)\s*```/);
-    if (jsonMatch) {
+    // 1. Probar directamente los modelos modernos oficiales (Gemini 2.5 Flash / Pro)
+    const primaryModels = ['gemini-2.5-flash', 'gemini-2.5-pro'];
+    let geminiResponse = null;
+
+    for (const model of primaryModels) {
       try {
-        const parsed = JSON.parse(jsonMatch[1]);
-        if (parsed && parsed.isQuote && parsed.quoteData) {
-          isQuote = true;
-          quoteData = parsed.quoteData;
-          cleanText = candidateText.replace(/```json\s*[\s\S]*?\s*```/, '').trim();
+        const response = await callGemini(model, apiKey, payload);
+        if (response.ok) {
+          geminiResponse = response;
+          break;
         }
-      } catch (e) {
-        console.warn('Could not parse quote JSON from model output:', e);
+      } catch (err) {
+        // Continuar al siguiente modelo
       }
     }
+
+    // 2. Si fallaron los modelos primarios, descubrir dinámicamente qué modelos soporta la key
+    if (!geminiResponse) {
+      try {
+        const listRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+        if (listRes.ok) {
+          const listData = await listRes.json();
+          const supportingModels = (listData.models || [])
+            .filter(m => (m.supportedGenerationMethods || []).includes('generateContent'))
+            .map(m => m.name.replace('models/', ''));
+
+          for (const fallbackModel of supportingModels) {
+            if (primaryModels.includes(fallbackModel)) continue;
+            try {
+              const resFallback = await callGemini(fallbackModel, apiKey, payload);
+              if (resFallback.ok) {
+                geminiResponse = resFallback;
+                break;
+              }
+            } catch (e) {}
+          }
+        }
+      } catch (e) {}
+    }
+
+    if (!geminiResponse || !geminiResponse.ok) {
+      return res.status(200).json({
+        success: false,
+        error: 'GEMINI_ERROR',
+        message: '⚠️ No se pudo obtener respuesta del servicio de Google Gemini. Verificá la validez de tu API Key o la cuota disponible.'
+      });
+    }
+
+    const data = await geminiResponse.json();
+    const rawCandidateText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    const { isQuote, quoteData, cleanText } = extractQuoteData(rawCandidateText);
 
     return res.status(200).json({
       text: cleanText,
       isQuote,
       quoteData,
-      raw: candidateText
+      raw: rawCandidateText
     });
 
   } catch (error) {
-    console.error('Handler error:', error);
     return res.status(500).json({
       error: 'SERVER_ERROR',
       message: error.message || 'Error interno del servidor procesando la consulta.'

@@ -64,17 +64,6 @@
   animation: fadeIn 0.15s ease-out forwards;
 }
 
-/* Ocultar badge flotante de Netlify que tapa la pantalla en celulares */
-iframe[id^="netlify-"], 
-div[id^="netlify-hud-"], 
-#netlify-hud, 
-.netlify-hud,
-[data-netlify-site-id] {
-  display: none !important;
-  visibility: hidden !important;
-  pointer-events: none !important;
-  opacity: 0 !important;
-}
 
 /* Evitar que el autocompletado del navegador arruine el fondo oscuro de los inputs */
 input:-webkit-autofill,
