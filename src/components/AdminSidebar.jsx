@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react'
-import { X, Users, Sliders, ShieldCheck, ChevronRight, Settings, Sparkles, LogOut } from 'lucide-react'
+import { X, Users, Sliders, ShieldCheck, ChevronRight, Settings, Sparkles, LogOut, BookOpen } from 'lucide-react'
 
 export default function AdminSidebar({ 
   isOpen, 
@@ -34,6 +34,17 @@ export default function AdminSidebar({
       subtitle: 'Gastos predeterminados, salones y acuerdos',
       icon: Sliders,
       badge: 'Cotizador'
+    },
+    {
+      id: 'manual_usuario',
+      title: 'Manual de Usuario',
+      subtitle: 'Guía oficial de procedimientos y uso en HTML/PDF',
+      icon: BookOpen,
+      badge: 'Guía',
+      isAction: true,
+      onClick: () => {
+        window.open('/manual-usuario.html', '_blank')
+      }
     }
   ]
 

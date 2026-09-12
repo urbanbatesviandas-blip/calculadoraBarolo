@@ -1,0 +1,1327 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Manual de Usuario | Palacio Barolo Eventos</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800;900&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --barolo-navy: #0b132b;
+      --barolo-navy-dark: #050b1a;
+      --barolo-navy-light: #1c2541;
+      --barolo-gold: #c69214;
+      --barolo-gold-light: #d4af37;
+      --barolo-gold-soft: #fbf5e6;
+      --emerald-accent: #059669;
+      --emerald-bg: #ecfdf5;
+      --rose-accent: #e11d48;
+      --rose-bg: #fff1f2;
+      --blue-accent: #2563eb;
+      --blue-bg: #eff6ff;
+      --slate-50: #f8fafc;
+      --slate-100: #f1f5f9;
+      --slate-200: #e2e8f0;
+      --slate-300: #cbd5e1;
+      --slate-600: #475569;
+      --slate-700: #334155;
+      --slate-800: #1e293b;
+      --slate-900: #0f172a;
+      --shadow-luxury: 0 20px 35px -10px rgba(11, 19, 43, 0.15), 0 1px 3px 0 rgba(0, 0, 0, 0.05);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: #f8fafc;
+      color: var(--slate-800);
+      line-height: 1.65;
+      font-size: 15px;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Tipografías especiales */
+    .font-serif {
+      font-family: 'Cinzel', serif;
+      letter-spacing: 0.03em;
+    }
+
+    .font-mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* Header Superior Fijo */
+    header.main-header {
+      background: linear-gradient(135deg, var(--barolo-navy-dark) 0%, var(--barolo-navy) 60%, var(--barolo-navy-light) 100%);
+      color: #ffffff;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      border-bottom: 2px solid rgba(212, 175, 55, 0.4);
+      box-shadow: 0 4px 20px rgba(0,0,0,0.25);
+    }
+
+    .header-content {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 0.9rem 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+
+    .brand-group {
+      display: flex;
+      align-items: center;
+      gap: 0.9rem;
+    }
+
+    .brand-logo {
+      width: 44px;
+      height: 44px;
+      object-fit: contain;
+      border-radius: 8px;
+      background: rgba(255,255,255,0.05);
+      padding: 4px;
+      border: 1px solid rgba(212, 175, 55, 0.4);
+    }
+
+    .brand-titles h1 {
+      font-size: 1.15rem;
+      color: #ffffff;
+      margin-bottom: 2px;
+      font-weight: 800;
+    }
+
+    .brand-titles p {
+      font-size: 0.75rem;
+      color: var(--barolo-gold-light);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      font-weight: 600;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .search-box {
+      position: relative;
+      width: 260px;
+    }
+
+    .search-box input {
+      width: 100%;
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(212, 175, 55, 0.3);
+      padding: 0.5rem 0.8rem 0.5rem 2.2rem;
+      border-radius: 9999px;
+      color: #ffffff;
+      font-size: 0.82rem;
+      outline: none;
+      transition: all 0.2s ease;
+    }
+
+    .search-box input:focus {
+      background: rgba(255,255,255,0.15);
+      border-color: var(--barolo-gold-light);
+      box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.2);
+    }
+
+    .search-box svg {
+      position: absolute;
+      left: 0.8rem;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 14px;
+      height: 14px;
+      color: var(--barolo-gold-light);
+    }
+
+    .btn-print {
+      background: linear-gradient(135deg, var(--barolo-gold) 0%, #b8860b 100%);
+      color: var(--barolo-navy-dark);
+      font-weight: 700;
+      font-size: 0.82rem;
+      padding: 0.55rem 1rem;
+      border-radius: 9999px;
+      border: none;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      box-shadow: 0 2px 8px rgba(198, 146, 20, 0.3);
+      transition: all 0.2s ease;
+    }
+
+    .btn-print:hover {
+      background: linear-gradient(135deg, #e6b800 0%, #c69214 100%);
+      transform: translateY(-1px);
+    }
+
+    /* Layout Principal de 2 Columnas */
+    .app-container {
+      max-width: 1400px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 280px 1fr;
+      gap: 2rem;
+      padding: 2rem 1.5rem;
+      position: relative;
+    }
+
+    /* Navegación Lateral (TOC) */
+    aside.sidebar {
+      position: sticky;
+      top: 5rem;
+      height: calc(100vh - 6.5rem);
+      overflow-y: auto;
+      padding-right: 0.5rem;
+    }
+
+    aside.sidebar::-webkit-scrollbar {
+      width: 4px;
+    }
+    aside.sidebar::-webkit-scrollbar-thumb {
+      background: var(--slate-300);
+      border-radius: 4px;
+    }
+
+    .nav-card {
+      background: #ffffff;
+      border-radius: 1rem;
+      border: 1px solid var(--slate-200);
+      padding: 1.25rem 1rem;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.03);
+    }
+
+    .nav-title {
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      color: var(--slate-600);
+      margin-bottom: 0.8rem;
+      padding-left: 0.5rem;
+      border-bottom: 1px solid var(--slate-100);
+      padding-bottom: 0.4rem;
+    }
+
+    .toc-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+    }
+
+    .toc-item a {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      padding: 0.45rem 0.65rem;
+      color: var(--slate-700);
+      text-decoration: none;
+      font-size: 0.84rem;
+      font-weight: 600;
+      border-radius: 0.5rem;
+      transition: all 0.15s ease;
+    }
+
+    .toc-item a:hover {
+      background: var(--barolo-gold-soft);
+      color: #855800;
+    }
+
+    .toc-item.active a {
+      background: var(--barolo-navy);
+      color: #ffffff;
+    }
+
+    .toc-badge {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.68rem;
+      padding: 0.1rem 0.35rem;
+      border-radius: 4px;
+      background: var(--slate-100);
+      color: var(--slate-600);
+    }
+
+    .toc-item.active .toc-badge {
+      background: rgba(255,255,255,0.2);
+      color: var(--barolo-gold-light);
+    }
+
+    /* Área de Contenido */
+    main.content {
+      min-width: 0;
+    }
+
+    /* Portada / Banner Hero */
+    .hero-banner {
+      background: linear-gradient(135deg, var(--barolo-navy) 0%, #152243 60%, var(--barolo-navy-dark) 100%);
+      border-radius: 1.25rem;
+      color: #ffffff;
+      padding: 2.5rem 2rem;
+      position: relative;
+      overflow: hidden;
+      border: 1px solid rgba(212, 175, 55, 0.3);
+      box-shadow: var(--shadow-luxury);
+      margin-bottom: 2.5rem;
+    }
+
+    .hero-banner::after {
+      content: "1923";
+      position: absolute;
+      right: 2%;
+      bottom: -15%;
+      font-family: 'Cinzel', serif;
+      font-size: 11rem;
+      font-weight: 900;
+      color: rgba(255, 255, 255, 0.03);
+      pointer-events: none;
+      user-select: none;
+    }
+
+    .hero-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      background: rgba(212, 175, 55, 0.15);
+      border: 1px solid rgba(212, 175, 55, 0.35);
+      color: var(--barolo-gold-light);
+      padding: 0.25rem 0.75rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.9rem;
+    }
+
+    .hero-banner h2 {
+      font-size: 1.95rem;
+      font-weight: 800;
+      color: #ffffff;
+      line-height: 1.25;
+      margin-bottom: 0.8rem;
+    }
+
+    .hero-banner p.lead {
+      color: #cbd5e1;
+      font-size: 0.98rem;
+      max-width: 750px;
+      line-height: 1.6;
+      margin-bottom: 1.5rem;
+    }
+
+    .hero-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1.5rem;
+      padding-top: 1.25rem;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+      font-size: 0.82rem;
+    }
+
+    .meta-item {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      color: #94a3b8;
+    }
+
+    .meta-item strong {
+      color: #ffffff;
+    }
+
+    /* Secciones del Manual */
+    section.manual-section {
+      background: #ffffff;
+      border-radius: 1.25rem;
+      border: 1px solid var(--slate-200);
+      padding: 2rem;
+      margin-bottom: 2rem;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.02);
+      scroll-margin-top: 5rem;
+    }
+
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 2px solid var(--slate-100);
+      padding-bottom: 1rem;
+      margin-bottom: 1.5rem;
+      gap: 1rem;
+    }
+
+    .section-header-title {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .section-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      background: var(--barolo-gold-soft);
+      color: #855800;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .section-header h3 {
+      font-size: 1.35rem;
+      font-weight: 800;
+      color: var(--barolo-navy);
+    }
+
+    .section-pill {
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 0.25rem 0.7rem;
+      border-radius: 9999px;
+      background: var(--slate-100);
+      color: var(--slate-700);
+      border: 1px solid var(--slate-200);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* Bloques de Alerta y Callouts */
+    .alert {
+      padding: 1rem 1.25rem;
+      border-radius: 0.85rem;
+      margin: 1.25rem 0;
+      display: flex;
+      align-items: flex-start;
+      gap: 0.85rem;
+      font-size: 0.88rem;
+    }
+
+    .alert-tip {
+      background: #ecfdf5;
+      border-left: 4px solid #10b981;
+      color: #065f46;
+    }
+
+    .alert-important {
+      background: #eff6ff;
+      border-left: 4px solid #3b82f6;
+      color: #1e40af;
+    }
+
+    .alert-warning {
+      background: #fffbeb;
+      border-left: 4px solid #f59e0b;
+      color: #92400e;
+    }
+
+    .alert-security {
+      background: #fff1f2;
+      border-left: 4px solid #f43f5e;
+      color: #9f1239;
+    }
+
+    .alert-icon {
+      font-size: 1.2rem;
+      line-height: 1;
+      margin-top: 1px;
+    }
+
+    /* Grillas y Mockups Visuales */
+    .cards-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1.25rem;
+      margin: 1.5rem 0;
+    }
+
+    .feature-card {
+      background: var(--slate-50);
+      border: 1px solid var(--slate-200);
+      border-radius: 1rem;
+      padding: 1.25rem;
+      transition: all 0.2s ease;
+    }
+
+    .feature-card:hover {
+      border-color: var(--barolo-gold);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(0,0,0,0.04);
+    }
+
+    .feature-card h4 {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--barolo-navy);
+      margin-bottom: 0.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .feature-card p {
+      font-size: 0.84rem;
+      color: var(--slate-600);
+      line-height: 1.55;
+    }
+
+    /* Pasos Numéricos */
+    .steps-container {
+      margin: 1.5rem 0;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .step-item {
+      display: flex;
+      gap: 1rem;
+      align-items: flex-start;
+      background: #ffffff;
+      border: 1px solid var(--slate-200);
+      border-radius: 0.85rem;
+      padding: 1rem 1.25rem;
+    }
+
+    .step-number {
+      width: 28px;
+      height: 28px;
+      border-radius: 9999px;
+      background: var(--barolo-navy);
+      color: var(--barolo-gold-light);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 0.8rem;
+      flex-shrink: 0;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .step-content h4 {
+      font-size: 0.92rem;
+      font-weight: 700;
+      color: var(--slate-900);
+      margin-bottom: 0.3rem;
+    }
+
+    .step-content p {
+      font-size: 0.84rem;
+      color: var(--slate-600);
+    }
+
+    /* Tablas Estilizadas */
+    .table-container {
+      overflow-x: auto;
+      margin: 1.5rem 0;
+      border-radius: 0.85rem;
+      border: 1px solid var(--slate-200);
+    }
+
+    table.custom-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+      text-align: left;
+    }
+
+    table.custom-table th {
+      background: var(--barolo-navy);
+      color: #ffffff;
+      padding: 0.75rem 1rem;
+      font-weight: 700;
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    table.custom-table td {
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid var(--slate-200);
+      color: var(--slate-700);
+    }
+
+    table.custom-table tr:last-child td {
+      border-bottom: none;
+    }
+
+    table.custom-table tr:nth-child(even) {
+      background: var(--slate-50);
+    }
+
+    /* Badges de Estado */
+    .badge-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      padding: 0.2rem 0.6rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 700;
+    }
+
+    .badge-confirmado {
+      background: #dcfce7;
+      color: #166534;
+      border: 1px solid #86efac;
+    }
+
+    .badge-reserva {
+      background: #dbeafe;
+      color: #1e40af;
+      border: 1px solid #93c5fd;
+    }
+
+    .badge-cotizacion {
+      background: #fef9c3;
+      color: #854d0e;
+      border: 1px solid #fde047;
+    }
+
+    .badge-cancelado {
+      background: #ffe4e6;
+      color: #9f1239;
+      border: 1px solid #fecdd3;
+    }
+
+    /* Footer */
+    footer.main-footer {
+      background: var(--barolo-navy-dark);
+      color: #94a3b8;
+      padding: 2.5rem 1.5rem;
+      border-top: 2px solid var(--barolo-gold);
+      margin-top: 3rem;
+      text-align: center;
+      font-size: 0.82rem;
+    }
+
+    footer.main-footer p {
+      margin-bottom: 0.5rem;
+    }
+
+    footer.main-footer .footer-gold {
+      color: var(--barolo-gold-light);
+      font-weight: 700;
+    }
+
+    /* Botón Flotante Volver Arriba */
+    #backToTop {
+      position: fixed;
+      bottom: 2rem;
+      right: 2rem;
+      background: var(--barolo-navy);
+      color: var(--barolo-gold-light);
+      border: 1px solid var(--barolo-gold);
+      width: 42px;
+      height: 42px;
+      border-radius: 9999px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      box-shadow: 0 6px 16px rgba(0,0,0,0.25);
+      transition: all 0.2s ease;
+      opacity: 0;
+      visibility: hidden;
+      z-index: 90;
+    }
+
+    #backToTop.show {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    #backToTop:hover {
+      transform: translateY(-3px);
+      background: var(--barolo-navy-light);
+    }
+
+    /* Estilos para Impresión / PDF */
+    @media print {
+      header.main-header,
+      aside.sidebar,
+      .btn-print,
+      .search-box,
+      #backToTop {
+        display: none !important;
+      }
+
+      .app-container {
+        display: block !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        max-width: 100% !important;
+      }
+
+      section.manual-section {
+        border: none !important;
+        box-shadow: none !important;
+        padding: 1.5rem 0 !important;
+        page-break-inside: avoid;
+      }
+
+      .hero-banner {
+        background: #0b132b !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+    }
+
+    /* Responsive Móvil */
+    @media (max-width: 960px) {
+      .app-container {
+        grid-template-columns: 1fr;
+      }
+
+      aside.sidebar {
+        display: none;
+      }
+
+      .search-box {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ENCABEZADO SUPERIOR -->
+  <header class="main-header">
+    <div class="header-content">
+      <div class="brand-group">
+        <img src="/logo-barolo.png" alt="Palacio Barolo" class="brand-logo">
+        <div class="brand-titles">
+          <h1 class="font-serif">PALACIO BAROLO</h1>
+          <p>Manual Oficial del Usuario • Sistema Integral de Eventos</p>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <div class="search-box">
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+          </svg>
+          <input type="text" id="manualSearch" placeholder="Buscar en el manual (ej: Vista Cliente, Costos...)" onkeyup="filterManual()">
+        </div>
+
+        <button class="btn-print" onclick="window.print()" title="Imprimir o exportar este manual a PDF">
+          <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/>
+          </svg>
+          <span>Imprimir / PDF</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- CONTENEDOR PRINCIPAL -->
+  <div class="app-container">
+
+    <!-- BARRA LATERAL CON ÍNDICE INTERACTIVO -->
+    <aside class="sidebar">
+      <div class="nav-card">
+        <div class="nav-title">Índice del Manual</div>
+        <ul class="toc-list" id="tocList">
+          <li class="toc-item active"><a href="#introduccion"><span class="toc-badge">01</span> Introducción y Roles</a></li>
+          <li class="toc-item"><a href="#calendario"><span class="toc-badge">02</span> Calendario de Eventos</a></li>
+          <li class="toc-item"><a href="#cotizador"><span class="toc-badge">03</span> Cotizador Financiero</a></li>
+          <li class="toc-item"><a href="#vista-cliente"><span class="toc-badge">04</span> Vista Cliente Comercial</a></li>
+          <li class="toc-item"><a href="#propuestas"><span class="toc-badge">05</span> Propuestas y WhatsApp</a></li>
+          <li class="toc-item"><a href="#dashboard"><span class="toc-badge">06</span> Dashboard y Métricas</a></li>
+          <li class="toc-item"><a href="#listado"><span class="toc-badge">07</span> Listado y Auditoría</a></li>
+          <li class="toc-item"><a href="#comparador"><span class="toc-badge">08</span> Comparador de Eventos</a></li>
+          <li class="toc-item"><a href="#copiloto"><span class="toc-badge">09</span> Copiloto IA (Gemini)</a></li>
+          <li class="toc-item"><a href="#administracion"><span class="toc-badge">10</span> Administración y Plantilla</a></li>
+          <li class="toc-item"><a href="#excel"><span class="toc-badge">11</span> Exportaciones Excel</a></li>
+          <li class="toc-item"><a href="#faq"><span class="toc-badge">12</span> Preguntas Frecuentes</a></li>
+        </ul>
+      </div>
+    </aside>
+
+    <!-- ÁREA DE CONTENIDO -->
+    <main class="content">
+
+      <!-- PORTADA HERO -->
+      <div class="hero-banner">
+        <div class="hero-tag">Guía Oficial de Operación • v2.0</div>
+        <h2 class="font-serif">Manual de Procedimientos y Uso del Sistema</h2>
+        <p class="lead">
+          Bienvenido al centro de conocimiento oficial de la plataforma de eventos del <strong>Palacio Barolo</strong>. Esta guía detalla paso a paso el funcionamiento comercial, financiero y operativo del sistema: desde la prospección con Inteligencia Artificial hasta la emisión de contratos y análisis de rentabilidad.
+        </p>
+
+        <div class="hero-meta">
+          <div class="meta-item">
+            <span>🏛️ Espacios:</span> <strong>Salón 1923, Espacio Barolo, Terraza, EB + Cielos</strong>
+          </div>
+          <div class="meta-item">
+            <span>🛡️ Perfiles:</span> <strong>Administrador, Coordinador, Operador</strong>
+          </div>
+          <div class="meta-item">
+            <span>✨ Actualización:</span> <strong>Septiembre 2026</strong>
+          </div>
+        </div>
+      </div>
+
+      <!-- SECCIÓN 1: INTRODUCCIÓN Y ROLES -->
+      <section id="introduccion" class="manual-section">
+        <div class="section-header">
+          <div class="section-header-title">
+            <div class="section-icon">🔐</div>
+            <div>
+              <h3>1. Acceso, Seguridad y Roles de Usuario</h3>
+              <p class="text-xs text-slate-500">Gestión de accesos jerárquicos y protección de datos confidenciales</p>
+            </div>
+          </div>
+          <span class="section-pill">SEGURIDAD & ROLES</span>
+        </div>
+
+        <p>El sistema cuenta con una arquitectura de seguridad por perfiles. Cada integrante del equipo accede con su usuario o correo electrónico y contraseña individual:</p>
+
+        <div class="cards-grid">
+          <div class="feature-card">
+            <h4>👑 Administrador General</h4>
+            <p>Acceso total irrestricto. Puede crear usuarios, definir contraseñas, editar la Plantilla Maestra de costos, visualizar utilidades y márgenes netos, y eliminar registros históricos.</p>
+          </div>
+          <div class="feature-card">
+            <h4>📋 Coordinador de Eventos</h4>
+            <p>Diseñado para el equipo comercial y de producción. Permite cotizar eventos, modificar estados de reservas, generar propuestas comerciales y sincronizar con clientes.</p>
+          </div>
+          <div class="feature-card">
+            <h4>👁️ Operador / Consulta</h4>
+            <p>Acceso de solo lectura al calendario operativo y listado de eventos para control de accesos, logística y staff de sala, sin visualización de márgenes financieros.</p>
+          </div>
+        </div>
+
+        <div class="alert alert-security">
+          <span class="alert-icon">🔒</span>
+          <div>
+            <strong>Costos Confidenciales con Candado:</strong> Los costos marcados con el icono del candado en el cotizador solo son visibles para administradores y para el creador del evento. Los demás usuarios verán puntos protegidos (••••••), resguardando acuerdos especiales con artistas y proveedores.
+          </div>
+        </div>
+      </section>
+
+      <!-- SECCIÓN 2: CALENDARIO -->
+      <section id="calendario" class="manual-section">
+        <div class="section-header">
+          <div class="section-header-title">
+            <div class="section-icon">📅</div>
+            <div>
+              <h3>2. Calendario General de Eventos</h3>
+              <p class="text-xs text-slate-500">Visualización temporal de fechas disponibles, reservas y cotizaciones</p>
+            </div>
+          </div>
+          <span class="section-pill">PLANIFICACIÓN TEMPORAL</span>
+        </div>
+
+        <p>El calendario interactivo permite monitorear de forma intuitiva el estado de ocupación de las locaciones del Palacio Barolo (Salón 1923, Espacio Barolo, Terraza del piso 13 y EB + Cielos):</p>
+
+        <div class="table-container">
+          <table class="custom-table">
+            <thead>
+              <tr>
+                <th>Estado del Evento</th>
+                <th>Color Identificador</th>
+                <th>Significado Operativo</th>
+                <th>Acción Recomendada</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><span class="badge-status badge-confirmado">● Confirmado</span></td>
+                <td><strong>Verde Esmeralda</strong></td>
+                <td>Seña o pago total recibido. Fecha bloqueada en sala.</td>
+                <td>Coordinar técnica, catering y accesos de invitados.</td>
+              </tr>
+              <tr>
+                <td><span class="badge-status badge-reserva">● Reserva</span></td>
+                <td><strong>Azul Zafiro</strong></td>
+                <td>Acuerdo de palabra o fecha apartada con prioridad.</td>
+                <td>Efectuar seguimiento de pago de la seña pactada.</td>
+              </tr>
+              <tr>
+                <td><span class="badge-status badge-cotizacion">● Cotización</span></td>
+                <td><strong>Amarillo Oro</strong></td>
+                <td>Propuesta comercial enviada en proceso de decisión.</td>
+                <td>Enviar recordatorio de vigencia (15 días).</td>
+              </tr>
+              <tr>
+                <td><span class="badge-status badge-cancelado">● Cancelado</span></td>
+                <td><strong>Rojo Carmesí</strong></td>
+                <td>Fecha liberada por el cliente o baja de evento.</td>
+                <td>La sala vuelve a estar disponible para cotizar.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="steps-container">
+          <div class="step-item">
+            <div class="step-number">1</div>
+            <div class="step-content">
+              <h4>Nueva Cotización Rápida en 1 Clic</h4>
+              <p>Hacé clic directamente sobre cualquier casillero del calendario para abrir el cotizador con esa fecha preseleccionada.</p>
+            </div>
+          </div>
+          <div class="step-item">
+            <div class="step-number">2</div>
+            <div class="step-content">
+              <h4>Ficha Ejecutiva (Drilldown Modal)</h4>
+              <p>Al hacer clic sobre una tarjeta de evento en el calendario, se abrirá la ficha rápida con el resumen financiero, horario, contacto del cliente y accesos rápidos.</p>
+            </div>
+          </div>
+          <div class="step-item">
+            <div class="step-number">3</div>
+            <div class="step-content">
+              <h4>Modo Cuadrícula o Agenda Semanal</h4>
+              <p>Alterná entre la vista mensual clásica de cuadrícula y la vista de agenda lineal para visualizar cronogramas detallados.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SECCIÓN 3: COTIZADOR FINANCIERO -->
+      <section id="cotizador" class="manual-section">
+        <div class="section-header">
+          <div class="section-header-title">
+            <div class="section-icon">🧮</div>
+            <div>
+              <h3>3. Cotizador Financiero y Calculadora Comercial</h3>
+              <p class="text-xs text-slate-500">El motor analítico central para presupuestar eventos y calcular rentabilidad neta</p>
+            </div>
+          </div>
+          <span class="section-pill">MOTOR MATEMÁTICO</span>
+        </div>
+
+        <p>El cotizador está estructurado en 4 bloques que replican y automatizan el modelo analítico del Palacio Barolo:</p>
+
+        <div class="cards-grid">
+          <div class="feature-card">
+            <h4>Bloque 1: Datos Generales</h4>
+            <p>Nombre del evento, cliente o empresa, CUIT/DNI, teléfono, email, salón seleccionado (Salón 1923, Espacio Barolo, etc.), horario de montaje e inicio, asistentes y organizador responsable.</p>
+          </div>
+          <div class="feature-card">
+            <h4>Bloque 2: Ingresos del Evento</h4>
+            <p>Ingresos por alquiler del espacio, venta de tickets/localidades (con promedio de ticket y asistentes), más catálogo de ingresos adicionales (canon de barra, comisión catering, sponsors).</p>
+          </div>
+          <div class="feature-card">
+            <h4>Bloque 3: Costos del Evento</h4>
+            <p>Costos del Productor (técnica, sonido, cachets de artistas) vs. Costos directos del Barolo (catering, limpieza integral, personal de acceso, seguros). Posibilidad de sumar rubros y gastos extras.</p>
+          </div>
+          <div class="feature-card">
+            <h4>Bloque 4: Resultados & Facturación</h4>
+            <p>Cálculo en vivo de Ingresos Brutos, Costos Totales, Rentabilidad Neta para el Barolo y Margen %. Incluye desglose tributario: Factura A (con 21% IVA discriminado), Factura B o Presupuesto.</p>
+          </div>
+        </div>
+
+        <div class="alert alert-important">
+          <span class="alert-icon">💡</span>
+          <div>
+            <strong>Catálogo Maestro Interactivo:</strong> Mediante el botón <em>"➕ Gestionar / Seleccionar Costos"</em> podés sumar únicamente los ítems que aplican a la cotización actual. Aquellos costos no contratados no aparecerán, manteniendo la plantilla pulcra y ligera.
+          </div>
+        </div>
+      </section>
+
+      <!-- SECCIÓN 4: VISTA CLIENTE COMERCIAL -->
+      <section id="vista-cliente" class="manual-section">
+        <div class="section-header">
+          <div class="section-header-title">
+            <div class="section-icon">👁️</div>
+            <div>
+              <h3>4. Modo Vista Cliente (Presentación Comercial Segura)</h3>
+              <p class="text-xs text-slate-500">Ocultamiento de datos confidenciales y sincronización dinámica de servicios incluidos</p>
+            </div>
+          </div>
+          <span class="section-pill">MODO SEGURO</span>
+        </div>
+
+        <p>Cuando estás reunido presencialmente con un cliente o compartiendo tu pantalla, activá el botón <strong>"👁️ Vista Cliente"</strong> ubicado en el encabezado del cotizador:</p>
+
+        <div class="steps-container">
+          <div class="step-item">
+            <div class="step-number">🔒</div>
+            <div class="step-content">
+              <h4>Ocultamiento Inmediato de Rentabilidad Interna</h4>
+              <p>La Vista Cliente oculta automáticamente los costos internos de proveedores, la ganancia neta del Barolo, el margen porcentual y los acuerdos de producción.</p>
+            </div>
+          </div>
+          <div class="step-item">
+            <div class="step-number">⚡</div>
+            <div class="step-content">
+              <h4>Sincronización Dinámica de Servicios Incluidos</h4>
+              <p>El Bloque 3 se transforma automáticamente en <strong>"3. SERVICIOS Y COBERTURA OPERATIVA INCLUIDA"</strong>. Los ítems se agregan o quitan dinámicamente según los rubros activos:</p>
+              <ul style="margin-top: 0.5rem; margin-left: 1.2rem; font-size: 0.83rem; color: var(--slate-700);">
+                <li><strong>Técnica:</strong> Si agregás costo de sonido/luces, se suma <em>"Técnica Base, Sonido & Iluminación"</em> con su tilde verde.</li>
+                <li><strong>Catering:</strong> Si cargás gastronomía, se suma <em>"Servicio de Catering & Bebidas"</em>.</li>
+                <li><strong>Limpieza:</strong> Si quitás limpieza del evento, se retira inmediatamente de la lista comercial.</li>
+                <li><strong>Gastos Extras:</strong> Todo servicio adicional cargado se refleja con redacción formal.</li>
+              </ul>
+            </div>
+          </div>
+          <div class="step-item">
+            <div class="step-number">🏷️</div>
+            <div class="step-content">
+              <h4>Resumen Comercial de Inversión</h4>
+              <p>El Bloque 4 presenta con elegancia el valor global presupuestado, el tipo de factura y las condiciones de pago (30% de seña para reservar fecha y 70% saldo cancelatorio previo al evento).</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SECCIÓN 5: PROPUESTAS Y WHATSAPP -->
+      <section id="propuestas" class="manual-section">
+        <div class="section-header">
+          <div class="section-header-title">
+            <div class="section-icon">📄</div>
+            <div>
+              <h3>5. Generador de Propuestas Formales y WhatsApp</h3>
+              <p class="text-xs text-slate-500">Emisión de cotizaciones ejecutivas listas para enviar por chat, email o imprimir</p>
+            </div>
+          </div>
+          <span class="section-pill">COMUNICACIÓN CLIENTE</span>
+        </div>
+
+        <p>Desde el cotizador o la ficha de cualquier evento podés abrir la <strong>Propuesta Comercial Formal</strong>:</p>
+
+        <div class="cards-grid">
+          <div class="feature-card">
+            <h4>💬 Copiar para WhatsApp</h4>
+            <p>Genera con un solo clic el texto formateado con emojis elegantes, saltos de línea y síntesis económica, listo para pegar en WhatsApp o correo electrónico.</p>
+          </div>
+          <div class="feature-card">
+            <h4>🖨️ Imprimir / Guardar en PDF</h4>
+            <p>Abre el visor de impresión con diseño membretado institucional del Palacio Barolo, ideal para guardar en PDF y enviar como archivo adjunto corporativo.</p>
+          </div>
+          <div class="feature-card">
+            <h4>🌐 Exportar HTML Interactivo</h4>
+            <p>Descarga un archivo HTML autónomo de alta fidelidad que el cliente puede abrir directamente en su celular o computadora con toda la propuesta navegable.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- SECCIÓN 6: DASHBOARD EJECUTIVO -->
+      <section id="dashboard" class="manual-section">
+        <div class="section-header">
+          <div class="section-header-title">
+            <div class="section-icon">📊</div>
+            <div>
+              <h3>6. Dashboard Ejecutivo y Analítica Financiera</h3>
+              <p class="text-xs text-slate-500">Métricas de rendimiento comercial, rentabilidad y ocupación por salón</p>
+            </div>
+          </div>
+          <span class="section-pill">BUSINESS INTELLIGENCE</span>
+        </div>
+
+        <p>El Dashboard reúne los principales indicadores de desempeño del Palacio Barolo con selector de períodos (Mes en curso, Trimestre, Año, Histórico acumulado):</p>
+
+        <div class="cards-grid">
+          <div class="feature-card">
+            <h4>Ingresos Brutos Cotizados</h4>
+            <p>Facturación bruta proyectada de todos los eventos activos del período.</p>
+          </div>
+          <div class="feature-card">
+            <h4>Rentabilidad Neta Barolo</h4>
+            <p>Ganancia real neta luego de deducir todos los costos operativos y de terceros.</p>
+          </div>
+          <div class="feature-card">
+            <h4>Margen Comercial Promedio</h4>
+            <p>Porcentaje de rentabilidad sobre el total facturado en la cartera de eventos.</p>
+          </div>
+          <div class="feature-card">
+            <h4>Distribución por Salón</h4>
+            <p>Desglose comparativo entre el Salón 1923, Espacio Barolo, Terraza y EB + Cielos.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- SECCIÓN 7: LISTADO Y AUDITORÍA -->
+      <section id="listado" class="manual-section">
+        <div class="section-header">
+          <div class="section-header-title">
+            <div class="section-icon">📋</div>
+            <div>
+              <h3>7. Listado Maestro de Eventos y Auditoría</h3>
+              <p class="text-xs text-slate-500">Búsqueda rápida, ordenamiento multicriterio y acciones masivas</p>
+            </div>
+          </div>
+          <span class="section-pill">CONTROL OPERATIVO</span>
+        </div>
+
+        <p>Permite auditar el historial completo de eventos con herramientas avanzadas:</p>
+        <ul style="margin-left: 1.5rem; margin-top: 0.5rem; font-size: 0.88rem; color: var(--slate-700); line-height: 1.8;">
+          <li><strong>Buscador en Tiempo Real:</strong> Escribí cualquier palabra clave (cliente, fecha, salón, productor o código del cotizador).</li>
+          <li><strong>Filtros por Estado y Salón:</strong> Aislá rápidamente solo las cotizaciones pendientes para hacer seguimiento de cierre comercial.</li>
+          <li><strong>Ordenamiento Dinámico:</strong> Ordená la tabla por fecha cronológica, cliente alfabético o rentabilidad de mayor a menor.</li>
+          <li><strong>Selección para Comparativa:</strong> Marcá los checkboxes de 2 o más eventos para compararlos en detalle.</li>
+        </ul>
+      </section>
+
+      <!-- SECCIÓN 8: COMPARADOR MULTIEVENTO -->
+      <section id="comparador" class="manual-section">
+        <div class="section-header">
+          <div class="section-header-title">
+            <div class="section-icon">⚖️</div>
+            <div>
+              <h3>8. Comparador Multievento Lado a Lado</h3>
+              <p class="text-xs text-slate-500">Benchmarking comercial y financiero entre diferentes cotizaciones</p>
+            </div>
+          </div>
+          <span class="section-pill">BENCHMARKING</span>
+        </div>
+
+        <p>Al seleccionar eventos desde el listado o desde la barra superior, hacé clic en el botón <strong>"Comparar (N)"</strong> para abrir la matriz comparativa:</p>
+
+        <div class="table-container">
+          <table class="custom-table">
+            <thead>
+              <tr>
+                <th>Variable de Análisis</th>
+                <th>Evento A (Ej: Gala Corporativa)</th>
+                <th>Evento B (Ej: Conferencia Tech)</th>
+                <th>Utilidad Estratégica</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Facturación Bruta</strong></td>
+                <td>$8.500.000</td>
+                <td>$6.200.000</td>
+                <td>Volumen global comercial.</td>
+              </tr>
+              <tr>
+                <td><strong>Costos Operativos</strong></td>
+                <td>$2.800.000</td>
+                <td>$1.400.000</td>
+                <td>Eficiencia de gasto por productor.</td>
+              </tr>
+              <tr>
+                <td><strong>Ganancia Neta Barolo</strong></td>
+                <td>$5.700.000 (67.1%)</td>
+                <td>$4.800.000 (77.4%)</td>
+                <td>Permite evaluar si un evento menor deja mejor margen neto.</td>
+              </tr>
+              <tr>
+                <td><strong>Ganancia por Persona</strong></td>
+                <td>$47.500 / pax</td>
+                <td>$60.000 / pax</td>
+                <td>Medición del rendimiento unitario de la sala.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- SECCIÓN 9: COPILOTO IA -->
+      <section id="copiloto" class="manual-section">
+        <div class="section-header">
+          <div class="section-header-title">
+            <div class="section-icon">🪄</div>
+            <div>
+              <h3>9. Copiloto IA del Palacio Barolo (Gemini)</h3>
+              <p class="text-xs text-slate-500">Asistente comercial inteligente para agilizar cotizaciones y responder dudas de negocio</p>
+            </div>
+          </div>
+          <span class="section-pill">INTELIGENCIA ARTIFICIAL</span>
+        </div>
+
+        <p>Haciendo clic en el botón flotante dorado con la varita mágica <strong>(🪄)</strong> se despliega el asistente lateral del Barolo:</p>
+
+        <div class="steps-container">
+          <div class="step-item">
+            <div class="step-number">1</div>
+            <div class="step-content">
+              <h4>Función "Pegar WhatsApp"</h4>
+              <p>Pegá un mensaje informal que te envió un cliente o productor (ej: <em>"Hola, necesito el Salón 1923 para el 15 de noviembre, unas 90 personas, entradas $15.000 preventa y $18.000 general, técnica propia"</em>). El copiloto extraerá fecha, salón, cupo, valores y bonificaciones automáticamente, devolviendo una tarjeta lista para cargar al cotizador en 1 clic.</p>
+            </div>
+          </div>
+          <div class="step-item">
+            <div class="step-number">2</div>
+            <div class="step-content">
+              <h4>Consultas Rápidas de Negocio</h4>
+              <p>Podés consultarle: <em>"¿Qué evento es el más rentable de este año?"</em>, <em>"¿Qué eventos tenemos confirmados para el mes que viene?"</em> o <em>"¿Cuánto facturamos en total?"</em> y responderá al instante con datos precisos del sistema.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SECCIÓN 10: ADMINISTRACIÓN Y PLANTILLA -->
+      <section id="administracion" class="manual-section">
+        <div class="section-header">
+          <div class="section-header-title">
+            <div class="section-icon">⚙️</div>
+            <div>
+              <h3>10. Administración y Plantilla Maestra</h3>
+              <p class="text-xs text-slate-500">Configuración de usuarios, contraseñas, costos y valores predeterminados</p>
+            </div>
+          </div>
+          <span class="section-pill">PANEL DE CONTROL</span>
+        </div>
+
+        <p>Accesible exclusivamente para Administradores desde el icono del engranaje en la barra superior izquierda:</p>
+
+        <div class="cards-grid">
+          <div class="feature-card">
+            <h4>👥 Gestión de Usuarios</h4>
+            <p>Creación de nuevas cuentas de colaboradores, asignación de roles (Admin, Coordinador, Operador), cambio y restablecimiento de contraseñas de acceso.</p>
+          </div>
+          <div class="feature-card">
+            <h4>📐 Plantilla Maestra del Cotizador</h4>
+            <p>Personalización del catálogo de costos predeterminados, valores sugeridos de salones, gastos operativos fijos y cláusulas comerciales estándar.</p>
+          </div>
+        </div>
+
+        <div class="alert alert-tip">
+          <span class="alert-icon">💡</span>
+          <div>
+            <strong>Privacidad de la Base de Datos:</strong> Toda la configuración de servidores y almacenamiento en la nube se encuentra blindada y gestionada internamente. No se expone ninguna interfaz técnica a usuarios ni clientes.
+          </div>
+        </div>
+      </section>
+
+      <!-- SECCIÓN 11: EXPORTACIONES EXCEL -->
+      <section id="excel" class="manual-section">
+        <div class="section-header">
+          <div class="section-header-title">
+            <div class="section-icon">📑</div>
+            <div>
+              <h3>11. Exportaciones a Excel y Reportes</h3>
+              <p class="text-xs text-slate-500">Generación de planillas de cálculo corporativas para contabilidad y dirección</p>
+            </div>
+          </div>
+          <span class="section-pill">REPORTES & AUDITORÍA</span>
+        </div>
+
+        <p>Desde el botón <strong>"Exportar Excel"</strong> en la barra superior podés descargar reportes en formato <code>.xlsx</code> con diseño profesional:</p>
+        <ul style="margin-left: 1.5rem; margin-top: 0.5rem; font-size: 0.88rem; color: var(--slate-700); line-height: 1.8;">
+          <li><strong>Reporte Mensual:</strong> Descarga exclusivamente los eventos del mes que estás visualizando en el calendario.</li>
+          <li><strong>Exportación Consolidada Anual:</strong> Descarga la totalidad de la base de datos de eventos para balances contables, declaraciones tributarias y auditorías de fin de año.</li>
+        </ul>
+      </section>
+
+      <!-- SECCIÓN 12: PREGUNTAS FRECUENTES -->
+      <section id="faq" class="manual-section">
+        <div class="section-header">
+          <div class="section-header-title">
+            <div class="section-icon">❓</div>
+            <div>
+              <h3>12. Preguntas Frecuentes y Buenas Prácticas</h3>
+              <p class="text-xs text-slate-500">Respuestas rápidas a las consultas operativas más habituales</p>
+            </div>
+          </div>
+          <span class="section-pill">FAQ & SOPORTE</span>
+        </div>
+
+        <div class="steps-container">
+          <div class="step-item">
+            <div class="step-number">?</div>
+            <div class="step-content">
+              <h4>¿Cómo evito que un cliente vea los costos internos durante una reunión?</h4>
+              <p>Antes de proyectar la pantalla o reunirte, hacé clic en el botón <strong>"👁️ Vista Cliente"</strong> en la parte superior del cotizador. La pantalla entrará en Modo Comercial seguro, transformando los costos en servicios incluidos y ocultando toda cifra de rentabilidad interna.</p>
+            </div>
+          </div>
+          <div class="step-item">
+            <div class="step-number">?</div>
+            <div class="step-content">
+              <h4>¿Cómo se sincronizan los cambios si varios coordinadores usan el sistema?</h4>
+              <p>El sistema cuenta con sincronización automática en segundo plano. Cuando volvés a la pestaña de tu navegador, los eventos se actualizan de forma silenciosa e instantánea sin interrumpir tu trabajo ni recargar la pantalla.</p>
+            </div>
+          </div>
+          <div class="step-item">
+            <div class="step-number">?</div>
+            <div class="step-content">
+              <h4>¿Qué hago si cerré el navegador antes de guardar una cotización?</h4>
+              <p>El sistema guarda un borrador automático en el almacenamiento local de tu navegador para que puedas retomar la carga de datos sin perder información.</p>
+            </div>
+          </div>
+          <div class="step-item">
+            <div class="step-number">?</div>
+            <div class="step-content">
+              <h4>¿Cómo imprimo este manual para tenerlo en papel o guardarlo en PDF?</h4>
+              <p>Hacé clic en el botón dorado superior <strong>"Imprimir / PDF"</strong> o presioná <code>Ctrl + P</code> (o <code>Cmd + P</code> en Mac). La hoja se adaptará automáticamente a formato imprimible limpio sin menús ni botones.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- PIE DE PÁGINA -->
+  <footer class="main-footer">
+    <p class="footer-gold font-serif">PALACIO BAROLO • BUENOS AIRES, ARGENTINA</p>
+    <p>Sistema Web de Cotización y Gestión Financiera de Eventos • Manual Oficial de Usuario</p>
+    <p style="font-size: 0.75rem; color: #64748b;">© 2026 Todos los derechos reservados. Documento interno para el equipo del Palacio Barolo.</p>
+  </footer>
+
+  <!-- BOTÓN FLOTANTE VOLVER ARRIBA -->
+  <button id="backToTop" onclick="window.scrollTo({top: 0, behavior: 'smooth'})" title="Volver al inicio">
+    <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 15l7-7 7 7"/>
+    </svg>
+  </button>
+
+  <!-- SCRIPTS INTERACTIVOS -->
+  <script>
+    // Mostrar u ocultar botón volver arriba
+    window.addEventListener('scroll', () => {
+      const btn = document.getElementById('backToTop');
+      if (window.scrollY > 300) {
+        btn.classList.add('show');
+      } else {
+        btn.classList.remove('show');
+      }
+
+      // Actualizar enlace activo en TOC
+      const sections = document.querySelectorAll('section.manual-section');
+      const navItems = document.querySelectorAll('.toc-item');
+      let currentSectionId = '';
+
+      sections.forEach(sec => {
+        const top = sec.offsetTop - 120;
+        if (window.scrollY >= top) {
+          currentSectionId = sec.getAttribute('id');
+        }
+      });
+
+      if (currentSectionId) {
+        navItems.forEach(item => {
+          const link = item.querySelector('a');
+          if (link.getAttribute('href') === '#' + currentSectionId) {
+            item.classList.add('active');
+          } else {
+            item.classList.remove('active');
+          }
+        });
+      }
+    });
+
+    // Filtro de búsqueda en tiempo real dentro del manual
+    function filterManual() {
+      const query = document.getElementById('manualSearch').value.toLowerCase().trim();
+      const sections = document.querySelectorAll('section.manual-section');
+
+      sections.forEach(sec => {
+        const text = sec.innerText.toLowerCase();
+        if (!query || text.includes(query)) {
+          sec.style.display = 'block';
+        } else {
+          sec.style.display = 'none';
+        }
+      });
+    }
+  </script>
+</body>
+</html>

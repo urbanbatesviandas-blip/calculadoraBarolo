@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { 
   Calendar, Calculator, LayoutDashboard, ListFilter, PlusCircle, 
-  FileSpreadsheet, Scale, ChevronDown, Settings, LogOut, Sliders, Users, Wand2
+  FileSpreadsheet, Scale, ChevronDown, Settings, LogOut, Sliders, Users, Wand2, BookOpen
 } from 'lucide-react'
 import { canCreateEvent, isAdmin } from '../services/authService'
 
@@ -262,7 +262,17 @@ export default function Navbar({
                       </div>
                     </div>
 
-                    <div className="pt-1">
+                    <div className="pt-1 border-t border-slate-100">
+                      <a
+                        href="/manual-usuario.html"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={() => setShowUserMenu(false)}
+                        className="w-full text-left px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-amber-50/60 hover:text-amber-900 flex items-center space-x-2 transition-colors"
+                      >
+                        <BookOpen className="w-3.5 h-3.5 text-amber-500" />
+                        <span>Manual de Usuario</span>
+                      </a>
                       <button
                         onClick={() => {
                           setShowUserMenu(false)
