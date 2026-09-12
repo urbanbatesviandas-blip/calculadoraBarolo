@@ -154,6 +154,10 @@ export const aiAssistantService = {
             text: '🔑 Para activar el Copiloto IA se requiere una clave de Google Gemini. Podés configurarla en Vercel como `GEMINI_API_KEY` o ingresarla haciendo clic en el icono de llave 🔑 arriba.'
           };
         }
+        return {
+          success: false,
+          text: errData.message || `⚠️ Error del servidor (${response.status}): ${JSON.stringify(errData)}`
+        };
       }
     } catch (netErr) {
       console.warn('/api/assistant no disponible, probando fallback directo...', netErr);
@@ -233,18 +237,17 @@ ${JSON.stringify(context, null, 2)}
         parts: [{ text: msg.text || msg.content }]
       }));
 
-      // Endpoints candidatos en cascada para máxima resiliencia
+      // Endpoints candidatos en cascada para máxima resiliencia (Gemini 2.0 Flash prioritario)
       const candidates = [
-        { version: 'v1beta', model: 'gemini-1.5-flash' },
-        { version: 'v1', model: 'gemini-1.5-flash' },
         { version: 'v1beta', model: 'gemini-2.0-flash' },
-        { version: 'v1beta', model: 'gemini-1.5-flash-latest' },
-        { version: 'v1beta', model: 'gemini-1.5-pro' },
-        { version: 'v1', model: 'gemini-pro' }
+        { version: 'v1beta', model: 'gemini-2.0-flash-lite' },
+        { version: 'v1beta', model: 'gemini-1.5-flash-8b' },
+        { version: 'v1beta', model: 'gemini-1.5-flash' },
+        { version: 'v1beta', model: 'gemini-1.5-pro' }
       ];
 
       const payload = {
-        systemInstruction: { parts: [{ text: systemPrompt }] },
+        system_instruction: { parts: [{ text: systemPrompt }] },
         contents: contents.length > 0 ? contents : [{ role: 'user', parts: [{ text: 'Hola' }] }],
         generationConfig: {
           temperature: 0.2,
@@ -287,9 +290,23 @@ ${JSON.stringify(context, null, 2)}
       }
 
       if (!res || !res.ok) {
+        let diagInfo = '';
+        try {
+          const diagRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${effectiveKey}`);
+          const diagData = await diagRes.json();
+          if (diagData.models && diagData.models.length > 0) {
+            const names = diagData.models.map(m => m.name.replace('models/', ''));
+            diagInfo = `Modelos disponibles para tu clave: ${names.slice(0, 6).join(', ')}`;
+          } else if (diagData.error) {
+            diagInfo = `Diagnóstico de Google: ${diagData.error.message}`;
+          }
+        } catch (diagErr) {
+          diagInfo = `Error de diagnóstico: ${diagErr.message}`;
+        }
+
         return {
           success: false,
-          text: `⚠️ Error de Google Gemini (${res ? res.status : 500}): ${lastErrText}`
+          text: `⚠️ Error de Google Gemini (${res ? res.status : 500}): ${lastErrText}${diagInfo ? `\n\n📌 ${diagInfo}` : ''}`
         };
       }
 

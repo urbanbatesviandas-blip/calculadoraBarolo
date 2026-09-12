@@ -102,7 +102,7 @@ ${JSON.stringify(context, null, 2)}
     }
 
     const payload = {
-      systemInstruction: {
+      system_instruction: {
         parts: [{ text: systemPrompt }]
       },
       contents: contents.length > 0 ? contents : [{ role: 'user', parts: [{ text: 'Hola' }] }],
@@ -113,14 +113,14 @@ ${JSON.stringify(context, null, 2)}
       }
     };
 
-    // Endpoints candidatos en cascada para máxima resiliencia
+    // Endpoints candidatos en cascada para máxima resiliencia (Gemini 2.0 Flash prioritario)
     const candidates = [
+      { version: 'v1beta', model: 'gemini-2.0-flash' },
+      { version: 'v1beta', model: 'gemini-2.0-flash-lite' },
+      { version: 'v1beta', model: 'gemini-1.5-flash-8b' },
       { version: 'v1beta', model: 'gemini-1.5-flash' },
       { version: 'v1', model: 'gemini-1.5-flash' },
-      { version: 'v1beta', model: 'gemini-2.0-flash' },
-      { version: 'v1beta', model: 'gemini-1.5-flash-latest' },
-      { version: 'v1beta', model: 'gemini-1.5-pro' },
-      { version: 'v1', model: 'gemini-pro' }
+      { version: 'v1beta', model: 'gemini-1.5-pro' }
     ];
 
     let response = null;
