@@ -233,27 +233,61 @@ ${JSON.stringify(context, null, 2)}
         parts: [{ text: msg.text || msg.content }]
       }));
 
-      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${effectiveKey}`;
+      const candidateModels = [
+        'gemini-1.5-flash',
+        'gemini-2.0-flash',
+        'gemini-1.5-flash-latest',
+        'gemini-1.5-pro',
+        'gemini-pro'
+      ];
 
-      const res = await fetch(geminiUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          systemInstruction: { parts: [{ text: systemPrompt }] },
-          contents: contents.length > 0 ? contents : [{ role: 'user', parts: [{ text: 'Hola' }] }],
-          generationConfig: {
-            temperature: 0.2,
-            topP: 0.95,
-            maxOutputTokens: 1500
+      const payload = {
+        systemInstruction: { parts: [{ text: systemPrompt }] },
+        contents: contents.length > 0 ? contents : [{ role: 'user', parts: [{ text: 'Hola' }] }],
+        generationConfig: {
+          temperature: 0.2,
+          topP: 0.95,
+          maxOutputTokens: 1500
+        }
+      };
+
+      let res = null;
+      let lastErrText = '';
+
+      for (const model of candidateModels) {
+        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${effectiveKey}`;
+        try {
+          const fetchRes = await fetch(geminiUrl, {
+            method: 'POST',
+            headers: { 
+              'Content-Type': 'application/json',
+              'x-goog-api-key': effectiveKey
+            },
+            body: JSON.stringify(payload)
+          });
+
+          if (fetchRes.ok) {
+            res = fetchRes;
+            break;
+          } else {
+            lastErrText = await fetchRes.text();
+            if (fetchRes.status === 404) {
+              console.warn(`Modelo ${model} no encontrado (404), reintentando con alternativo...`);
+              continue;
+            } else {
+              res = fetchRes;
+              break;
+            }
           }
-        })
-      });
+        } catch (e) {
+          lastErrText = e.message;
+        }
+      }
 
-      if (!res.ok) {
-        const errText = await res.text();
+      if (!res || !res.ok) {
         return {
           success: false,
-          text: `⚠️ Error de Google Gemini (${res.status}): ${errText}`
+          text: `⚠️ Error de Google Gemini (${res ? res.status : 500}): ${lastErrText}`
         };
       }
 

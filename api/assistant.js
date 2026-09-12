@@ -103,7 +103,13 @@ ${JSON.stringify(context, null, 2)}
       });
     }
 
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+    const candidateModels = [
+      'gemini-1.5-flash',
+      'gemini-2.0-flash',
+      'gemini-1.5-flash-latest',
+      'gemini-1.5-pro',
+      'gemini-pro'
+    ];
 
     const payload = {
       systemInstruction: {
@@ -117,18 +123,45 @@ ${JSON.stringify(context, null, 2)}
       }
     };
 
-    const response = await fetch(geminiUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
+    let response = null;
+    let lastErrorBody = '';
 
-    if (!response.ok) {
-      const errBody = await response.text();
-      console.error('Gemini API Error:', response.status, errBody);
-      return res.status(response.status).json({
+    for (const model of candidateModels) {
+      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+      try {
+        const res = await fetch(geminiUrl, {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'x-goog-api-key': apiKey
+          },
+          body: JSON.stringify(payload)
+        });
+
+        if (res.ok) {
+          response = res;
+          break;
+        } else {
+          lastErrorBody = await res.text();
+          // Si es 404, probamos el siguiente modelo
+          if (res.status === 404) {
+            console.warn(`Modelo ${model} retornó 404, probando siguiente...`);
+            continue;
+          } else {
+            response = res;
+            break;
+          }
+        }
+      } catch (netErr) {
+        lastErrorBody = netErr.message;
+      }
+    }
+
+    if (!response || !response.ok) {
+      console.error('Gemini API Error:', lastErrorBody);
+      return res.status(response ? response.status : 500).json({
         error: 'GEMINI_ERROR',
-        message: `Error de Google Gemini (${response.status}): ${errBody}`
+        message: `Error de Google Gemini (${response ? response.status : 500}): ${lastErrorBody}`
       });
     }
 
