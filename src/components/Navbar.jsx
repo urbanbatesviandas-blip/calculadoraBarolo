@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { 
   Calendar, Calculator, LayoutDashboard, ListFilter, PlusCircle, 
-  FileSpreadsheet, Scale, ChevronDown, Settings, LogOut, Sliders, Users, Cloud 
+  FileSpreadsheet, Scale, ChevronDown, Settings, LogOut, Sliders, Users, Cloud, Wand2
 } from 'lucide-react'
 import { canCreateEvent, isAdmin } from '../services/authService'
 
@@ -18,7 +18,8 @@ export default function Navbar({
   quotesCount, 
   onExportAllExcel,
   onExportMonthExcel,
-  onToggleAdminSidebar
+  onToggleAdminSidebar,
+  onToggleAiAssistant
 }) {
   const [showExcelMenu, setShowExcelMenu] = useState(false)
   const [showUserMenu, setShowUserMenu] = useState(false)
@@ -205,6 +206,18 @@ export default function Navbar({
                 <span className="bg-white text-purple-900 px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold">
                   {comparisonCount}
                 </span>
+              </button>
+            )}
+
+            {/* Botón Copilot IA en la barra superior */}
+            {onToggleAiAssistant && (
+              <button
+                onClick={onToggleAiAssistant}
+                className="flex items-center space-x-1.5 bg-gradient-to-r from-amber-500/20 via-barolo-gold/20 to-amber-600/20 hover:from-amber-500/30 hover:to-amber-600/30 text-amber-300 border border-amber-400/40 px-2.5 sm:px-3 py-2 rounded-xl text-xs font-bold transition-all shadow-md active:scale-95 cursor-pointer group"
+                title="Abrir Copiloto IA del Palacio Barolo"
+              >
+                <Wand2 className="w-4 h-4 text-amber-400 group-hover:rotate-12 transition-transform" />
+                <span className="hidden sm:inline">Copilot IA</span>
               </button>
             )}
 

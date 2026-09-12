@@ -283,6 +283,7 @@ export default function App() {
         onExportAllExcel={handleExportAllExcel}
         onExportMonthExcel={handleExportMonthExcel}
         onToggleAdminSidebar={() => setIsAdminSidebarOpen(true)}
+        onToggleAiAssistant={() => setIsAiDrawerOpen(prev => !prev)}
       />
 
       {/* Main Content Area */}

@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react'
 import { 
   Wand2, X, Send, Sparkles, RotateCcw, Key, CheckCircle2, 
   ArrowRight, Calendar, Users, DollarSign, MapPin, Building, AlertCircle, 
-  ChevronRight, MessageSquare, Bot, HelpCircle
+  ChevronRight, MessageSquare, Bot, HelpCircle, Maximize2, Minimize2, Minus
 } from 'lucide-react'
 import { aiAssistantService } from '../services/aiAssistantService'
 
@@ -26,6 +26,7 @@ export default function AiAssistantDrawer({
   const [showKeyModal, setShowKeyModal] = useState(false)
   const [customKey, setCustomKey] = useState(() => aiAssistantService.getApiKey())
   const [keySavedToast, setKeySavedToast] = useState(false)
+  const [isFullHeight, setIsFullHeight] = useState(false)
 
   const messagesEndRef = useRef(null)
   const textareaRef = useRef(null)
@@ -180,11 +181,15 @@ export default function AiAssistantDrawer({
 
   return (
     <>
-      {/* 🪄 Botón Flotante (Varita Mágica) */}
+      {/* 🪄 Botón Flotante (Varita Mágica) - En cotizador flota sobre la barra de totales */}
       {!isOpen && (
         <button
           onClick={onToggle}
-          className="fixed bottom-6 right-6 z-40 group flex items-center space-x-2.5 bg-gradient-to-r from-amber-500 via-barolo-gold to-amber-600 hover:from-amber-400 hover:to-amber-500 text-barolo-navy px-4 py-3.5 rounded-full shadow-2xl shadow-amber-500/30 hover:shadow-amber-500/50 hover:scale-105 active:scale-95 transition-all duration-300 cursor-pointer border border-amber-300/40"
+          className={`fixed z-40 group flex items-center space-x-2.5 bg-gradient-to-r from-amber-500 via-barolo-gold to-amber-600 hover:from-amber-400 hover:to-amber-500 text-barolo-navy px-4 py-3 rounded-full shadow-2xl shadow-amber-500/30 hover:shadow-amber-500/50 hover:scale-105 active:scale-95 transition-all duration-300 cursor-pointer border border-amber-300/40 ${
+            currentView === 'calculator'
+              ? 'bottom-24 sm:bottom-28 right-4 sm:right-8'
+              : 'bottom-6 right-6'
+          }`}
           title="Abrir Copiloto IA del Palacio Barolo"
         >
           <div className="relative">
@@ -200,25 +205,29 @@ export default function AiAssistantDrawer({
         </button>
       )}
 
-      {/* 🚪 Panel Lateral (Slide-over Drawer) */}
+      {/* 🚪 Ventana Flotante Compacta / Panel Lateral (Copilot IA) */}
       <div 
-        className={`fixed inset-y-0 right-0 z-50 w-full sm:w-[420px] md:w-[460px] bg-slate-900/95 backdrop-blur-xl border-l border-amber-500/30 shadow-2xl flex flex-col transform transition-transform duration-300 ease-in-out ${
-          isOpen ? 'translate-x-0' : 'translate-x-full'
+        className={`fixed z-50 bg-slate-900/95 backdrop-blur-xl border border-amber-500/30 shadow-2xl flex flex-col transition-all duration-300 ease-in-out ${
+          isFullHeight 
+            ? 'inset-y-0 right-0 w-full sm:w-[420px] md:w-[460px] border-l rounded-none' 
+            : 'bottom-4 sm:bottom-6 right-4 sm:right-8 w-[calc(100vw-2rem)] sm:w-[400px] md:w-[430px] h-[540px] max-h-[78vh] rounded-3xl shadow-amber-500/10'
+        } ${
+          isOpen ? 'translate-y-0 opacity-100 pointer-events-auto' : 'translate-y-12 opacity-0 pointer-events-none'
         }`}
       >
         {/* Header */}
-        <div className="p-4 sm:p-5 border-b border-slate-800 bg-slate-950/80 flex items-center justify-between flex-shrink-0">
-          <div className="flex items-center space-x-3">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-400 to-barolo-gold flex items-center justify-center text-barolo-navy shadow-md">
-              <Wand2 className="w-5 h-5" />
+        <div className="p-3.5 sm:p-4 border-b border-slate-800 bg-slate-950/80 flex items-center justify-between flex-shrink-0">
+          <div className="flex items-center space-x-2.5">
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-amber-400 to-barolo-gold flex items-center justify-center text-barolo-navy shadow-md flex-shrink-0">
+              <Wand2 className="w-4 h-4" />
             </div>
             <div>
               <div className="flex items-center space-x-1.5">
-                <span className="text-[10px] bg-amber-400/20 text-amber-300 border border-amber-400/40 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
-                  Gemini 1.5 Flash
+                <span className="text-[9px] bg-amber-400/20 text-amber-300 border border-amber-400/40 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
+                  Gemini 2.5 Flash
                 </span>
               </div>
-              <h3 className="font-serif font-bold text-sm sm:text-base text-white mt-0.5">
+              <h3 className="font-serif font-bold text-xs sm:text-sm text-white mt-0.5 truncate">
                 Palacio Barolo Copilot
               </h3>
             </div>
@@ -226,8 +235,15 @@ export default function AiAssistantDrawer({
 
           <div className="flex items-center space-x-1">
             <button
+              onClick={() => setIsFullHeight(!isFullHeight)}
+              className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-white/10 transition-colors cursor-pointer"
+              title={isFullHeight ? "Cambiar a ventana flotante" : "Expandir a panel completo"}
+            >
+              {isFullHeight ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+            </button>
+            <button
               onClick={() => setShowKeyModal(!showKeyModal)}
-              className={`p-2 rounded-xl transition-colors cursor-pointer ${
+              className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
                 showKeyModal ? 'bg-amber-500/20 text-amber-300' : 'text-slate-400 hover:text-white hover:bg-white/10'
               }`}
               title="Configurar Gemini API Key"
@@ -236,17 +252,17 @@ export default function AiAssistantDrawer({
             </button>
             <button
               onClick={handleResetChat}
-              className="p-2 text-slate-400 hover:text-white rounded-xl hover:bg-white/10 transition-colors cursor-pointer"
+              className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-white/10 transition-colors cursor-pointer"
               title="Reiniciar conversación"
             >
               <RotateCcw className="w-4 h-4" />
             </button>
             <button
               onClick={onClose}
-              className="p-2 text-slate-400 hover:text-white rounded-xl hover:bg-white/10 transition-colors cursor-pointer"
-              title="Cerrar panel"
+              className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-white/10 transition-colors cursor-pointer"
+              title="Minimizar / Cerrar"
             >
-              <X className="w-5 h-5" />
+              <Minus className="w-4 h-4" />
             </button>
           </div>
         </div>
