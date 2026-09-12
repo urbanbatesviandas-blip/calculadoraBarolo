@@ -1668,7 +1668,12 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
           {/* BLOQUE 3: COSTOS DEL EVENTO (O SERVICIOS INCLUIDOS EN VISTA CLIENTE)   */}
           {/* ======================================================================= */}
           {isClientViewMode ? (
-            <ClientViewServicesCard venue={venue} />
+            <ClientViewServicesCard
+              venue={venue}
+              selectedCosts={selectedCosts}
+              extraExpenses={extraExpenses}
+              alquilerEspacio={alquilerEspacio}
+            />
           ) : (
             <div className="bg-white rounded-2xl shadow-luxury border border-slate-200 overflow-hidden">
               {/* Header del bloque con botón directo para abrir catálogo */}
