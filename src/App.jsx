@@ -284,10 +284,11 @@ export default function App() {
         onExportMonthExcel={handleExportMonthExcel}
         onToggleAdminSidebar={() => setIsAdminSidebarOpen(true)}
         onToggleAiAssistant={() => setIsAiDrawerOpen(prev => !prev)}
+        isAiDrawerOpen={isAiDrawerOpen}
       />
 
       {/* Main Content Area */}
-      <main className={`flex-1 w-full transition-all duration-300 ease-in-out p-4 sm:p-6 lg:p-8 ${isAiDrawerOpen ? 'lg:pr-[430px] max-w-none' : 'max-w-7xl mx-auto'}`}>
+      <main className={`flex-1 w-full transition-all duration-300 ease-in-out p-4 sm:p-6 lg:p-8 ${isAiDrawerOpen ? 'copilot-open-layout' : 'max-w-7xl mx-auto'}`}>
         {loading ? (
           <div className="flex flex-col items-center justify-center py-24 space-y-3">
             <div className="w-10 h-10 border-4 border-amber-400 border-t-transparent rounded-full animate-spin"></div>

@@ -86,3 +86,16 @@ input:-webkit-autofill:active {
   caret-color: #ffffff !important;
   transition: background-color 5000s ease-in-out 0s;
 }
+
+/* Desplazamiento reactivo cuando el sidebar Copilot IA está abierto */
+@media (min-width: 768px) {
+  .copilot-open-layout {
+    padding-right: 440px !important;
+    max-width: none !important;
+  }
+  
+  .copilot-open-sticky {
+    right: 450px !important;
+  }
+}
+

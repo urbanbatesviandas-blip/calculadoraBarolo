@@ -1061,12 +1061,12 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
       {/* ========================================================================= */}
       {/* MATRIZ DE 6 BLOQUES — GRID 2 COLUMNAS (7 / 5) RESPONSIVE */}
       {/* ========================================================================= */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div className={`grid gap-6 ${isAiDrawerOpen ? 'grid-cols-1 xl:grid-cols-12' : 'grid-cols-1 lg:grid-cols-12'}`}>
 
         {/* ------------------------------------------------------------------------- */}
         {/* COLUMNA IZQUIERDA (7 cols): BLOQUES 1, 2 Y 3 (DATOS, INGRESOS Y COSTOS)  */}
         {/* ------------------------------------------------------------------------- */}
-        <div className="lg:col-span-7 space-y-6">
+        <div className={`${isAiDrawerOpen ? 'xl:col-span-7' : 'lg:col-span-7'} space-y-6`}>
 
           {/* ======================================================================= */}
           {/* BLOQUE 1: DATOS GENERALES Y CLIENTE */}
@@ -2042,7 +2042,7 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
         {/* ------------------------------------------------------------------------- */}
         {/* COLUMNA DERECHA (5 cols): BLOQUES 4, 5 Y 6 (RESULTADO, BREAK-EVEN, MARGEN) */}
         {/* ------------------------------------------------------------------------- */}
-        <div className="lg:col-span-5 space-y-6">
+        <div className={`${isAiDrawerOpen ? 'xl:col-span-5' : 'lg:col-span-5'} space-y-6`}>
 
           {/* ======================================================================= */}
           {/* BLOQUE 4: RESULTADO ECONÓMICO (O RESUMEN DE INVERSIÓN VISTA CLIENTE)     */}
@@ -2441,7 +2441,7 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
       {/* ========================================================================= */}
       {/* BARRA INFERIOR FLOTANTE (STICKY TOTALS & ACTIONS)                         */}
       {/* ========================================================================= */}
-      <div className={`fixed bottom-4 left-4 right-4 sm:left-8 ${isAiDrawerOpen ? 'lg:left-72 lg:right-[435px]' : 'lg:left-72 sm:right-8'} z-30 bg-[#0f172a]/95 backdrop-blur-md text-white px-4 sm:px-6 py-3 rounded-2xl shadow-2xl border border-slate-700 flex flex-col md:flex-row items-center justify-between gap-3 transition-all duration-300 ease-in-out`}>
+      <div className={`fixed bottom-4 left-4 sm:left-8 ${isAiDrawerOpen ? 'copilot-open-sticky' : 'right-4 sm:right-8'} z-30 bg-[#0f172a]/95 backdrop-blur-md text-white px-4 sm:px-6 py-3 rounded-2xl shadow-2xl border border-slate-700 flex flex-col md:flex-row items-center justify-between gap-3 transition-all duration-300 ease-in-out`}>
         
         {/* Métricas rápidas */}
         {isClientViewMode ? (

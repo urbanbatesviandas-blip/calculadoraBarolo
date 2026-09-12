@@ -19,7 +19,8 @@ export default function Navbar({
   onExportAllExcel,
   onExportMonthExcel,
   onToggleAdminSidebar,
-  onToggleAiAssistant
+  onToggleAiAssistant,
+  isAiDrawerOpen = false
 }) {
   const [showExcelMenu, setShowExcelMenu] = useState(false)
   const [showUserMenu, setShowUserMenu] = useState(false)
@@ -46,7 +47,7 @@ export default function Navbar({
 
   return (
     <header className="sticky top-0 z-40 bg-barolo-navy text-white shadow-xl border-b border-barolo-gold/30">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 transition-all duration-300 ${isAiDrawerOpen ? 'copilot-open-layout' : ''}`}>
         <div className="flex items-center justify-between h-20">
           
           {/* Left: Admin Gear Sidebar Trigger + Logo */}
