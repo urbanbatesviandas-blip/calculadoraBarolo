@@ -131,110 +131,119 @@ ${JSON.stringify(context, null, 2)}
       }
     }
 
-    const payload = {
-      system_instruction: {
-        parts: [{ text: systemPrompt }]
-      },
+    // Crear versión estándar (con system_instruction) y versión universal (con prompt en user turn)
+    const standardPayload = {
+      system_instruction: { parts: [{ text: systemPrompt }] },
       contents: contents.length > 0 ? contents : [{ role: 'user', parts: [{ text: 'Hola' }] }],
-      generationConfig: {
-        temperature: 0.2,
-        topP: 0.95,
-        maxOutputTokens: 1500
-      }
+      generationConfig: { temperature: 0.2, topP: 0.95, maxOutputTokens: 1500 }
     };
 
-    // Endpoints candidatos en cascada (Gemini 2.5 Flash y 2.5 Pro prioritarios para 2026)
-    const candidates = [
-      { version: 'v1beta', model: 'gemini-2.5-flash' },
-      { version: 'v1beta', model: 'gemini-2.5-pro' },
-      { version: 'v1beta', model: 'gemini-2.0-flash' },
-      { version: 'v1beta', model: 'gemini-2.0-flash-lite' },
-      { version: 'v1beta', model: 'gemini-1.5-flash-8b' },
-      { version: 'v1beta', model: 'gemini-1.5-flash' },
-      { version: 'v1beta', model: 'gemini-1.5-pro' }
+    // Versión universal compatible con cualquier modelo (Gemma, Gemini 2.5, etc.)
+    const firstUserText = contents[0]?.parts?.[0]?.text || 'Hola';
+    const universalContents = [
+      {
+        role: 'user',
+        parts: [{ text: `[INSTRUCCIONES DEL SISTEMA DEL PALACIO BAROLO]\n${systemPrompt}\n[FIN DE INSTRUCCIONES]\n\n${firstUserText}` }]
+      },
+      ...contents.slice(1)
     ];
+    const universalPayload = {
+      contents: universalContents,
+      generationConfig: { temperature: 0.2, topP: 0.95, maxOutputTokens: 1500 }
+    };
+
+    // 1. Descubrir modelos activos directamente desde la API de Google
+    let discoveredModels = [];
+    try {
+      const listRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+      if (listRes.ok) {
+        const listData = await listRes.json();
+        discoveredModels = (listData.models || []).map(m => ({
+          name: m.name.replace('models/', ''),
+          methods: m.supportedGenerationMethods || []
+        }));
+      }
+    } catch (e) {}
+
+    // Ordenar modelos a probar: primero los que tienen 'generateContent', priorizando 'flash' luego 'pro'
+    let modelsToTry = [];
+    if (discoveredModels.length > 0) {
+      const supporting = discoveredModels
+        .filter(m => m.methods.includes('generateContent'))
+        .map(m => m.name);
+      
+      const allNames = discoveredModels.map(m => m.name);
+      const baseList = supporting.length > 0 ? supporting : allNames;
+
+      // Ordenar: flash primero, luego pro, luego otros
+      modelsToTry = [
+        ...baseList.filter(m => m.includes('flash')),
+        ...baseList.filter(m => m.includes('pro') && !m.includes('flash')),
+        ...baseList.filter(m => !m.includes('flash') && !m.includes('pro'))
+      ];
+    }
+
+    // Si no se descubrieron modelos, usar lista por defecto
+    if (modelsToTry.length === 0) {
+      modelsToTry = ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.0-flash', 'gemini-1.5-flash'];
+    }
 
     let response = null;
-    let lastErrorBody = '';
+    const attemptLogs = [];
 
-    for (const item of candidates) {
-      const geminiUrl = `https://generativelanguage.googleapis.com/${item.version}/models/${item.model}:generateContent?key=${apiKey}`;
-      try {
-        const res = await fetch(geminiUrl, {
-          method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json',
-            'x-goog-api-key': apiKey
-          },
-          body: JSON.stringify(payload)
-        });
+    // 2. Probar cada modelo con payloads y versiones de API
+    for (const model of modelsToTry) {
+      const variations = [
+        { version: 'v1beta', payload: standardPayload, label: 'std' },
+        { version: 'v1beta', payload: universalPayload, label: 'universal' },
+        { version: 'v1alpha', payload: universalPayload, label: 'v1alpha' }
+      ];
 
-        if (res.ok) {
-          response = res;
-          break;
-        } else {
-          lastErrorBody = await res.text();
-          if (res.status === 404) {
-            console.warn(`[Gemini] ${item.version}/${item.model} devolvió 404, probando siguiente candidato...`);
-            continue;
-          } else {
+      for (const variant of variations) {
+        const url = `https://generativelanguage.googleapis.com/${variant.version}/models/${model}:generateContent?key=${apiKey}`;
+        try {
+          const res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(variant.payload)
+          });
+
+          if (res.ok) {
             response = res;
             break;
+          } else {
+            const errText = await res.text();
+            let parsedMsg = errText;
+            try {
+              const j = JSON.parse(errText);
+              if (j?.error?.message) parsedMsg = j.error.message;
+            } catch (e) {}
+            attemptLogs.push(`${model} [${variant.version}/${variant.label}]: HTTP ${res.status} (${parsedMsg})`);
+            
+            // Si el error es 403 o 429, no seguir probando variaciones de este modelo
+            if (res.status !== 404 && res.status !== 400) {
+              break;
+            }
           }
+        } catch (err) {
+          attemptLogs.push(`${model} [${variant.version}]: Error de red (${err.message})`);
         }
-      } catch (err) {
-        lastErrorBody = err.message;
+      }
+
+      if (response && response.ok) {
+        break;
       }
     }
 
     if (!response || !response.ok) {
-      console.error('Gemini API Error:', lastErrorBody);
-      let diagInfo = '';
-      try {
-        const diagRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`, {
-          headers: { 'x-goog-api-key': apiKey }
-        });
-        const diagData = await diagRes.json();
-        if (diagData.models && diagData.models.length > 0) {
-          const supported = diagData.models
-            .filter(m => (m.supportedGenerationMethods || []).includes('generateContent'))
-            .map(m => m.name.replace('models/', ''));
-          
-          diagInfo = `Modelos disponibles para tu clave: ${supported.slice(0, 6).join(', ')}`;
+      console.error('Gemini API Error:', attemptLogs);
+      const availableList = discoveredModels.map(m => m.name).slice(0, 6).join(', ');
 
-          // Auto-recuperación: si hay un modelo compatible descubierto, intentar con ese de inmediato
-          if (supported.length > 0) {
-            const fallbackModel = supported.find(m => m.includes('flash')) || supported[0];
-            const autoUrl = `https://generativelanguage.googleapis.com/v1beta/models/${fallbackModel}:generateContent?key=${apiKey}`;
-            const autoRes = await fetch(autoUrl, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
-              body: JSON.stringify(payload)
-            });
-            if (autoRes.ok) {
-              response = autoRes;
-            }
-          }
-        } else if (diagData.error) {
-          diagInfo = `Diagnóstico de Google: ${diagData.error.message}`;
-        }
-      } catch (diagErr) {
-        diagInfo = `Error de diagnóstico: ${diagErr.message}`;
-      }
-
-      if (!response || !response.ok) {
-        let cleanMessage = lastErrorBody;
-        try {
-          const parsed = JSON.parse(lastErrorBody);
-          if (parsed?.error?.message) cleanMessage = parsed.error.message;
-        } catch (e) {}
-
-        return res.status(200).json({
-          success: false,
-          error: 'GEMINI_ERROR',
-          message: `⚠️ Error de Google Gemini (${response ? response.status : 500}): ${cleanMessage}${diagInfo ? `\n\n📌 ${diagInfo}` : ''}`
-        });
-      }
+      return res.status(200).json({
+        success: false,
+        error: 'GEMINI_ERROR',
+        message: `⚠️ No se pudo conectar con ningún modelo de Gemini:\n\n${attemptLogs.slice(0, 5).join('\n')}${availableList ? `\n\n📌 Modelos en tu clave: ${availableList}` : ''}`
+      });
     }
 
     const data = await response.json();

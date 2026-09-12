@@ -259,104 +259,113 @@ ${JSON.stringify(context, null, 2)}
         }
       }
 
-      // Endpoints candidatos en cascada (Gemini 2.5 Flash y 2.5 Pro prioritarios para 2026)
-      const candidates = [
-        { version: 'v1beta', model: 'gemini-2.5-flash' },
-        { version: 'v1beta', model: 'gemini-2.5-pro' },
-        { version: 'v1beta', model: 'gemini-2.0-flash' },
-        { version: 'v1beta', model: 'gemini-2.0-flash-lite' },
-        { version: 'v1beta', model: 'gemini-1.5-flash-8b' },
-        { version: 'v1beta', model: 'gemini-1.5-flash' },
-        { version: 'v1beta', model: 'gemini-1.5-pro' }
-      ];
-
-      const payload = {
+      // Crear versión estándar (con system_instruction) y versión universal (con prompt en user turn)
+      const standardPayload = {
         system_instruction: { parts: [{ text: systemPrompt }] },
         contents: contents.length > 0 ? contents : [{ role: 'user', parts: [{ text: 'Hola' }] }],
-        generationConfig: {
-          temperature: 0.2,
-          topP: 0.95,
-          maxOutputTokens: 1500
-        }
+        generationConfig: { temperature: 0.2, topP: 0.95, maxOutputTokens: 1500 }
       };
 
+      const firstUserText = contents[0]?.parts?.[0]?.text || 'Hola';
+      const universalContents = [
+        {
+          role: 'user',
+          parts: [{ text: `[INSTRUCCIONES DEL SISTEMA DEL PALACIO BAROLO]\n${systemPrompt}\n[FIN DE INSTRUCCIONES]\n\n${firstUserText}` }]
+        },
+        ...contents.slice(1)
+      ];
+      const universalPayload = {
+        contents: universalContents,
+        generationConfig: { temperature: 0.2, topP: 0.95, maxOutputTokens: 1500 }
+      };
+
+      // 1. Descubrir modelos activos directamente desde la API de Google
+      let discoveredModels = [];
+      try {
+        const listRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${effectiveKey}`);
+        if (listRes.ok) {
+          const listData = await listRes.json();
+          discoveredModels = (listData.models || []).map(m => ({
+            name: m.name.replace('models/', ''),
+            methods: m.supportedGenerationMethods || []
+          }));
+        }
+      } catch (e) {}
+
+      // Ordenar modelos a probar: primero los que tienen 'generateContent', priorizando 'flash' luego 'pro'
+      let modelsToTry = [];
+      if (discoveredModels.length > 0) {
+        const supporting = discoveredModels
+          .filter(m => m.methods.includes('generateContent'))
+          .map(m => m.name);
+        
+        const allNames = discoveredModels.map(m => m.name);
+        const baseList = supporting.length > 0 ? supporting : allNames;
+
+        modelsToTry = [
+          ...baseList.filter(m => m.includes('flash')),
+          ...baseList.filter(m => m.includes('pro') && !m.includes('flash')),
+          ...baseList.filter(m => !m.includes('flash') && !m.includes('pro'))
+        ];
+      }
+
+      if (modelsToTry.length === 0) {
+        modelsToTry = ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.0-flash', 'gemini-1.5-flash'];
+      }
+
       let res = null;
-      let lastErrText = '';
+      const attemptLogs = [];
 
-      for (const item of candidates) {
-        const geminiUrl = `https://generativelanguage.googleapis.com/${item.version}/models/${item.model}:generateContent?key=${effectiveKey}`;
-        try {
-          const fetchRes = await fetch(geminiUrl, {
-            method: 'POST',
-            headers: { 
-              'Content-Type': 'application/json',
-              'x-goog-api-key': effectiveKey
-            },
-            body: JSON.stringify(payload)
-          });
+      // 2. Probar cada modelo con payloads y versiones de API
+      for (const model of modelsToTry) {
+        const variations = [
+          { version: 'v1beta', payload: standardPayload, label: 'std' },
+          { version: 'v1beta', payload: universalPayload, label: 'universal' },
+          { version: 'v1alpha', payload: universalPayload, label: 'v1alpha' }
+        ];
 
-          if (fetchRes.ok) {
-            res = fetchRes;
-            break;
-          } else {
-            lastErrText = await fetchRes.text();
-            if (fetchRes.status === 404) {
-              console.warn(`[Gemini client] ${item.version}/${item.model} devolvió 404, probando siguiente candidato...`);
-              continue;
-            } else {
+        for (const variant of variations) {
+          const url = `https://generativelanguage.googleapis.com/${variant.version}/models/${model}:generateContent?key=${effectiveKey}`;
+          try {
+            const fetchRes = await fetch(url, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(variant.payload)
+            });
+
+            if (fetchRes.ok) {
               res = fetchRes;
               break;
+            } else {
+              const errText = await fetchRes.text();
+              let parsedMsg = errText;
+              try {
+                const j = JSON.parse(errText);
+                if (j?.error?.message) parsedMsg = j.error.message;
+              } catch (e) {}
+              attemptLogs.push(`${model} [${variant.version}/${variant.label}]: HTTP ${fetchRes.status} (${parsedMsg})`);
+
+              if (fetchRes.status !== 404 && fetchRes.status !== 400) {
+                break;
+              }
             }
+          } catch (e) {
+            attemptLogs.push(`${model} [${variant.version}]: Error de red (${e.message})`);
           }
-        } catch (e) {
-          lastErrText = e.message;
+        }
+
+        if (res && res.ok) {
+          break;
         }
       }
 
       if (!res || !res.ok) {
-        let diagInfo = '';
-        try {
-          const diagRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${effectiveKey}`);
-          const diagData = await diagRes.json();
-          if (diagData.models && diagData.models.length > 0) {
-            const supported = diagData.models
-              .filter(m => (m.supportedGenerationMethods || []).includes('generateContent'))
-              .map(m => m.name.replace('models/', ''));
+        const availableList = discoveredModels.map(m => m.name).slice(0, 6).join(', ');
 
-            diagInfo = `Modelos disponibles para tu clave: ${supported.slice(0, 6).join(', ')}`;
-
-            // Auto-recuperación: si hay un modelo compatible descubierto, intentar con ese de inmediato
-            if (supported.length > 0) {
-              const fallbackModel = supported.find(m => m.includes('flash')) || supported[0];
-              const autoUrl = `https://generativelanguage.googleapis.com/v1beta/models/${fallbackModel}:generateContent?key=${effectiveKey}`;
-              const autoRes = await fetch(autoUrl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'x-goog-api-key': effectiveKey },
-                body: JSON.stringify(payload)
-              });
-              if (autoRes.ok) {
-                res = autoRes;
-              }
-            }
-          } else if (diagData.error) {
-            diagInfo = `Diagnóstico de Google: ${diagData.error.message}`;
-          }
-        } catch (diagErr) {
-          diagInfo = `Error de diagnóstico: ${diagErr.message}`;
-        }
-
-        if (!res || !res.ok) {
-          let cleanMessage = lastErrText;
-          try {
-            const parsed = JSON.parse(lastErrText);
-            if (parsed?.error?.message) cleanMessage = parsed.error.message;
-          } catch (e) {}
-
-          return {
-            success: false,
-            text: `⚠️ Error de Google Gemini (${res ? res.status : 500}): ${cleanMessage}${diagInfo ? `\n\n📌 ${diagInfo}` : ''}`
-          };
-        }
+        return {
+          success: false,
+          text: `⚠️ No se pudo conectar con ningún modelo de Gemini:\n\n${attemptLogs.slice(0, 5).join('\n')}${availableList ? `\n\n📌 Modelos en tu clave: ${availableList}` : ''}`
+        };
       }
 
       const data = await res.json();
