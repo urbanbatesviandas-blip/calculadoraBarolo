@@ -1099,7 +1099,7 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
                     type="text"
                     value={clientName}
                     onChange={(e) => setClientName(e.target.value)}
-                    placeholder="Ej: Camila Ocampo"
+                    placeholder="Ej: Cliente / Referente"
                     className="w-full bg-[#fef9c3] hover:bg-[#fef08a] focus:bg-white border border-[#fde047] focus:border-amber-500 rounded-lg px-3 py-2 text-slate-900 font-medium outline-none transition-colors"
                   />
                 </div>

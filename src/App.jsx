@@ -36,15 +36,19 @@ export default function App() {
   const [isSyncing, setIsSyncing] = useState(false)
 
   // Cargar eventos al iniciar
-  const loadEvents = async () => {
-    setLoading(true)
+  const loadEvents = async (silent = false) => {
+    if (!silent) {
+      setLoading(true)
+    }
     try {
       const data = await eventService.getEvents()
       setEvents(data)
     } catch (err) {
       console.error('Failed to load events:', err)
     } finally {
-      setLoading(false)
+      if (!silent) {
+        setLoading(false)
+      }
     }
   }
 
@@ -57,7 +61,7 @@ export default function App() {
         setEvents(res.events)
         showToast(`☁️ ¡Eventos sincronizados! (${res.count} eventos al día)`)
       } else {
-        await loadEvents()
+        await loadEvents(true)
         showToast('☁️ Datos actualizados.')
       }
     } catch (err) {
@@ -81,15 +85,13 @@ export default function App() {
       loadEvents()
     }
 
-    // Sincronizar automáticamente cuando el usuario regresa a la app en celular o PC
+    // Sincronizar en segundo plano de manera silenciosa cuando la pestaña vuelve a ser visible
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible' && currentUser) {
-        console.log('App resumed, reloading events...')
-        loadEvents()
+        loadEvents(true) // silent: no muestra spinner ni interrumpe lo que está haciendo el usuario
       }
     }
     window.addEventListener('visibilitychange', handleVisibilityChange)
-    window.addEventListener('focus', handleVisibilityChange)
 
     // Listener de cambios de autenticación
     const unsubscribeAuth = authService.onAuthStateChanged((user) => {
@@ -104,7 +106,7 @@ export default function App() {
         .on('postgres_changes', { event: '*', schema: 'public', table: 'events' }, (payload) => {
           console.log('⚡ Realtime update:', payload.eventType)
           if (currentUser) {
-            loadEvents()
+            loadEvents(true) // silent: actualiza los datos en segundo plano sin parpadear la pantalla
           }
         })
         .subscribe()
@@ -112,7 +114,6 @@ export default function App() {
 
     return () => {
       window.removeEventListener('visibilitychange', handleVisibilityChange)
-      window.removeEventListener('focus', handleVisibilityChange)
       if (unsubscribeAuth) unsubscribeAuth()
       if (channel && supabase) {
         supabase.removeChannel(channel)

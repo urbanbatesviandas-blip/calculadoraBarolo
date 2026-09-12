@@ -134,7 +134,7 @@ export default function LoginView({ onLoginSuccess }) {
                   required
                   value={identifier}
                   onChange={(e) => setIdentifier(e.target.value)}
-                  placeholder="ej: admin, pato o tu correo"
+                  placeholder="ej: admin o tu correo"
                   className="w-full pl-10 pr-4 py-3 bg-slate-800/80 border border-slate-700 rounded-xl text-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-amber-400 transition-all placeholder:text-slate-500"
                 />
               </div>

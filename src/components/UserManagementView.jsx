@@ -304,7 +304,7 @@ export default function UserManagementView({ currentUser, onBack }) {
                 required
                 value={newName}
                 onChange={e => setNewName(e.target.value)}
-                placeholder="Ej: Camila Paz"
+                placeholder="Ej: Coordinador/a de Eventos"
                 className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-900 font-medium focus:ring-2 focus:ring-amber-400 focus:outline-none"
               />
             </div>
@@ -320,7 +320,7 @@ export default function UserManagementView({ currentUser, onBack }) {
                   required
                   value={newUsername}
                   onChange={e => setNewUsername(e.target.value)}
-                  placeholder="ej: camila"
+                  placeholder="ej: operador1"
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-900 font-medium focus:ring-2 focus:ring-amber-400 focus:outline-none"
                 />
               </div>
@@ -333,7 +333,7 @@ export default function UserManagementView({ currentUser, onBack }) {
                   type="email"
                   value={newEmail}
                   onChange={e => setNewEmail(e.target.value)}
-                  placeholder="camila@palaciobarolo.com.ar"
+                  placeholder="usuario@palaciobarolo.com.ar"
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-900 font-medium focus:ring-2 focus:ring-amber-400 focus:outline-none"
                 />
               </div>
