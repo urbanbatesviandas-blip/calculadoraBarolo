@@ -259,8 +259,10 @@ ${JSON.stringify(context, null, 2)}
         }
       }
 
-      // Endpoints candidatos en cascada para máxima resiliencia (Gemini 2.0 Flash prioritario)
+      // Endpoints candidatos en cascada (Gemini 2.5 Flash y 2.5 Pro prioritarios para 2026)
       const candidates = [
+        { version: 'v1beta', model: 'gemini-2.5-flash' },
+        { version: 'v1beta', model: 'gemini-2.5-pro' },
         { version: 'v1beta', model: 'gemini-2.0-flash' },
         { version: 'v1beta', model: 'gemini-2.0-flash-lite' },
         { version: 'v1beta', model: 'gemini-1.5-flash-8b' },
@@ -317,8 +319,25 @@ ${JSON.stringify(context, null, 2)}
           const diagRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${effectiveKey}`);
           const diagData = await diagRes.json();
           if (diagData.models && diagData.models.length > 0) {
-            const names = diagData.models.map(m => m.name.replace('models/', ''));
-            diagInfo = `Modelos disponibles para tu clave: ${names.slice(0, 6).join(', ')}`;
+            const supported = diagData.models
+              .filter(m => (m.supportedGenerationMethods || []).includes('generateContent'))
+              .map(m => m.name.replace('models/', ''));
+
+            diagInfo = `Modelos disponibles para tu clave: ${supported.slice(0, 6).join(', ')}`;
+
+            // Auto-recuperación: si hay un modelo compatible descubierto, intentar con ese de inmediato
+            if (supported.length > 0) {
+              const fallbackModel = supported.find(m => m.includes('flash')) || supported[0];
+              const autoUrl = `https://generativelanguage.googleapis.com/v1beta/models/${fallbackModel}:generateContent?key=${effectiveKey}`;
+              const autoRes = await fetch(autoUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'x-goog-api-key': effectiveKey },
+                body: JSON.stringify(payload)
+              });
+              if (autoRes.ok) {
+                res = autoRes;
+              }
+            }
           } else if (diagData.error) {
             diagInfo = `Diagnóstico de Google: ${diagData.error.message}`;
           }
@@ -326,10 +345,18 @@ ${JSON.stringify(context, null, 2)}
           diagInfo = `Error de diagnóstico: ${diagErr.message}`;
         }
 
-        return {
-          success: false,
-          text: `⚠️ Error de Google Gemini (${res ? res.status : 500}): ${lastErrText}${diagInfo ? `\n\n📌 ${diagInfo}` : ''}`
-        };
+        if (!res || !res.ok) {
+          let cleanMessage = lastErrText;
+          try {
+            const parsed = JSON.parse(lastErrText);
+            if (parsed?.error?.message) cleanMessage = parsed.error.message;
+          } catch (e) {}
+
+          return {
+            success: false,
+            text: `⚠️ Error de Google Gemini (${res ? res.status : 500}): ${cleanMessage}${diagInfo ? `\n\n📌 ${diagInfo}` : ''}`
+          };
+        }
       }
 
       const data = await res.json();
