@@ -63,7 +63,7 @@ export default function SettingsModal({ onClose, onConfigSaved, onResetData }) {
             <div className="flex items-center space-x-2">
               <span className={`w-2.5 h-2.5 rounded-full ${isConnected ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`}></span>
               <span className="font-bold">
-                {isConnected ? 'Conectado a la Base de Datos Supabase' : 'Modo Local / Demo Activo (81 eventos cargados)'}
+                {isConnected ? 'Conectado a la Base de Datos Supabase' : 'Modo Local / Demo Activo (27 eventos cargados)'}
               </span>
             </div>
             {isConnected && (

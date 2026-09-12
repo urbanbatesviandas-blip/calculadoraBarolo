@@ -473,7 +473,7 @@ export default function App() {
           onResetData={() => {
             eventService.resetToInitial()
             loadEvents()
-            showToast('Datos restablecidos a los 81 eventos originales')
+            showToast('Datos restablecidos a los 27 eventos demo del Palacio Barolo')
           }}
         />
       )}

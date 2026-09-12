@@ -1,16 +1,15 @@
 import { supabase, isSupabaseConfigured } from './supabaseClient'
 import initialEvents from '../data/historicalEvents.json'
 
-const LOCAL_STORAGE_KEY = 'barolo_events_v2'
+const LOCAL_STORAGE_KEY = 'barolo_events_v3'
 
 const isUuidString = (str) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str)
 
 // Inicializar eventos locales si no existen
 const getLocalEvents = () => {
   try {
-    if (localStorage.getItem('barolo_events_data')) {
-      localStorage.removeItem('barolo_events_data')
-    }
+    if (localStorage.getItem('barolo_events_data')) localStorage.removeItem('barolo_events_data')
+    if (localStorage.getItem('barolo_events_v2')) localStorage.removeItem('barolo_events_v2')
     const saved = localStorage.getItem(LOCAL_STORAGE_KEY)
     if (saved !== null) {
       const parsed = JSON.parse(saved)
