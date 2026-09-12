@@ -32,7 +32,9 @@ class ErrorBoundary extends React.Component {
               {this.state.error?.message || "Se produjo un error al renderizar la vista."}
             </p>
             <button
-              onClick={() => window.location.reload()}
+              onClick={() => {
+                window.location.href = window.location.pathname + '?t=' + Date.now()
+              }}
               className="w-full bg-gradient-to-r from-barolo-gold to-amber-500 hover:from-amber-400 hover:to-amber-500 text-barolo-navy font-bold py-3 px-4 rounded-xl text-sm transition-all shadow-lg cursor-pointer"
             >
               Recargar Aplicación
