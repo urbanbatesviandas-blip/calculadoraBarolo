@@ -117,10 +117,155 @@ export const aiAssistantService = {
   },
 
   /**
+   * Intenta extraer datos de cotización de un mensaje de WhatsApp mediante heurística local
+   * Garantiza que la funcionalidad de cotización rápida siempre funcione incluso sin conexión o sin API Key.
+   */
+  parseWhatsAppQuoteLocal(text = '') {
+    const t = (text || '').toLowerCase();
+    
+    // Validar si parece una solicitud de cotización
+    const hasQuoteSignals = 
+      t.includes('salón') || t.includes('salon') || t.includes('espacio') || t.includes('cúpula') ||
+      t.includes('personas') || t.includes('pax') || t.includes('entradas') || t.includes('preventa') ||
+      t.includes('general') || t.includes('productor') || t.includes('noviembre') || t.includes('diciembre');
+
+    if (!hasQuoteSignals) return null;
+
+    // Detección de Salón
+    let venue = 'Salón 1923';
+    if (t.includes('espacio barolo') || t.includes('espacio')) venue = 'Espacio Barolo';
+    else if (t.includes('1923') || t.includes('salon 1923') || t.includes('salón 1923')) venue = 'Salón 1923';
+    else if (t.includes('dorado') || t.includes('salon dorado') || t.includes('salón dorado')) venue = 'Salón Dorado';
+    else if (t.includes('cúpula') || t.includes('cupula') || t.includes('mirador')) venue = 'Cúpula Barolo';
+
+    // Detección de Fecha
+    let event_date = '';
+    const monthMap = {
+      enero: '01', febrero: '02', marzo: '03', abril: '04', mayo: '05', junio: '06',
+      julio: '07', agosto: '08', septiembre: '09', setiembre: '09', octubre: '10', noviembre: '11', diciembre: '12'
+    };
+    const dateMatchText = t.match(/(\d{1,2})\s+de\s+([a-z]+)/i);
+    if (dateMatchText && monthMap[dateMatchText[2].toLowerCase()]) {
+      const day = dateMatchText[1].padStart(2, '0');
+      const month = monthMap[dateMatchText[2].toLowerCase()];
+      event_date = `2026-${month}-${day}`;
+    } else {
+      const slashMatch = t.match(/(\d{1,2})[\/\-](\d{1,2})/);
+      if (slashMatch) {
+        event_date = `2026-${slashMatch[2].padStart(2, '0')}-${slashMatch[1].padStart(2, '0')}`;
+      }
+    }
+
+    // Asistentes
+    let attendees = 80;
+    const attMatch = t.match(/(\d+)\s*(?:personas|asistentes|pax|invitados)/i) || t.match(/(?:calcula|calculo|para)\s*(\d+)/i);
+    if (attMatch) {
+      attendees = parseInt(attMatch[1], 10);
+    }
+
+    // Precios: preventa y general
+    let preventa_price = 0;
+    let general_price = 0;
+
+    const prevMatch = t.match(/(?:preventa|anticipada|anticipadas)[\s\:\$]*(\d[\d\.]*)/i) || t.match(/\$?\s*(\d[\d\.]*)\s*(?:preventa|anticipada)/i);
+    if (prevMatch) {
+      preventa_price = parseInt(prevMatch[1].replace(/\./g, ''), 10);
+    }
+
+    const genMatch = t.match(/(?:general|generales|puerta)[\s\:\$]*(\d[\d\.]*)/i) || t.match(/\$?\s*(\d[\d\.]*)\s*(?:general|generales)/i);
+    if (genMatch) {
+      general_price = parseInt(genMatch[1].replace(/\./g, ''), 10);
+    }
+
+    // Si solo hay un precio especificado
+    if (general_price === 0 && preventa_price > 0) {
+      general_price = Math.round(preventa_price * 1.2);
+    }
+
+    // Sonido / Técnica: si traen técnica propia se bonifica a 0
+    let cost_tecnica = 0;
+    if (t.includes('sonido propio') || t.includes('tecnica propia') || t.includes('técnica propia') || t.includes('traen sonido') || t.includes('propio')) {
+      cost_tecnica = 0;
+    } else {
+      cost_tecnica = 120000;
+    }
+
+    const preventa_qty = Math.round(attendees * 0.4);
+    const general_qty = attendees - preventa_qty;
+
+    const quoteData = {
+      name: `Evento en ${venue}${event_date ? ' (' + event_date + ')' : ''}`,
+      event_date: event_date || '2026-11-15',
+      event_time: '19:00',
+      venue,
+      event_type: 'Cultural',
+      attendees,
+      preventa_qty,
+      preventa_price: preventa_price || 15000,
+      general_qty,
+      general_price: general_price || 18000,
+      alquiler_espacio: 250000,
+      cost_tecnica,
+      cost_limpieza: 45000,
+      notes: text.slice(0, 150)
+    };
+
+    return {
+      isQuote: true,
+      quoteData,
+      cleanText: `¡Excelente! He interpretado el mensaje de WhatsApp y preparé la cotización comercial para **${venue}** el **${event_date || '15 de noviembre'}** (${attendees} personas, entradas $${(preventa_price || 15000).toLocaleString('es-AR')} preventa y $${(general_price || 18000).toLocaleString('es-AR')} general):`
+    };
+  },
+
+  /**
+   * Responde consultas contextuales frecuentes usando los datos locales de eventos
+   */
+  answerContextualQuestionLocal(text = '', context = {}) {
+    const t = (text || '').toLowerCase();
+    
+    if (t.includes('rentable') || t.includes('ganancia') || t.includes('margen')) {
+      const top = context.topProfitableEvents?.[0];
+      if (top) {
+        return {
+          success: true,
+          text: `🏆 El evento más rentable registrado para el Palacio Barolo es **"${top.name}"**, agendado para el **${top.date}** en el **${top.venue}** (${top.attendees} asistentes).\n\n* **Ganancia Neta Barolo**: ${top.profit}\n* **Margen Comercial**: ${top.margin}\n\nEste evento optimiza al máximo el valor del ticket y los costos de técnica y operación.`
+        };
+      }
+    }
+
+    if (t.includes('disponibilidad') || t.includes('cuántos eventos') || t.includes('contratados') || t.includes('agendados') || t.includes('calendario')) {
+      const counts = context.statusCounts || {};
+      const upcoming = context.upcomingEvents || [];
+      const fin = context.financialSummary || {};
+
+      let msg = `📅 **Estado actual de la agenda del Palacio Barolo**:\n\n`;
+      msg += `* **Contratados**: ${counts.contratado || 0} eventos confirmados.\n`;
+      msg += `* **En Reserva**: ${counts.reservado || 0} fechas bloqueadas con seña.\n`;
+      msg += `* **Cotizaciones activas**: ${counts.cotizado || 0} propuestas en seguimiento.\n`;
+      msg += `* **Ganancia Proyectada del Mes**: ${fin.currentMonthProfit || '$0'}\n\n`;
+
+      if (upcoming.length > 0) {
+        msg += `**Próximos eventos en calendario**:\n`;
+        upcoming.slice(0, 4).forEach(e => {
+          msg += `* **${e.date}** — ${e.name} (${e.venue}, ${e.attendees} pax) [${(e.status || '').toUpperCase()}]\n`;
+        });
+      }
+
+      return {
+        success: true,
+        text: msg
+      };
+    }
+
+    return null;
+  },
+
+  /**
    * Envía la conversación al asistente y retorna la respuesta procesada
    */
   async sendMessage(messages = [], context = {}) {
     const clientApiKey = this.getApiKey();
+    const lastUserMsg = [...(messages || [])].reverse().find(m => m.role === 'user')?.text || '';
 
     // 1. Intentar primero a través de la Serverless Function de Vercel (/api/assistant)
     try {
@@ -137,47 +282,68 @@ export const aiAssistantService = {
       if (response.ok) {
         const data = await response.json();
         if (data.success === false) {
+          // Si el servidor indica falta de API key o error, probar fallback local
+          const localQuote = this.parseWhatsAppQuoteLocal(lastUserMsg);
+          if (localQuote) {
+            return {
+              success: true,
+              text: localQuote.cleanText,
+              isQuote: true,
+              quoteData: localQuote.quoteData
+            };
+          }
+          const localAnswer = this.answerContextualQuestionLocal(lastUserMsg, context);
+          if (localAnswer) {
+            return localAnswer;
+          }
+
           return {
             success: false,
             needsApiKey: !!data.needsApiKey || data.error === 'NO_API_KEY',
             text: data.message || 'Hubo un inconveniente al comunicarse con Gemini.'
           };
         }
+
+        const resText = (data.text || '').trim();
+        const fallbackText = data.isQuote 
+          ? '¡Excelente! He preparado la propuesta de cotización para este evento:' 
+          : 'He procesado tu consulta sobre el Palacio Barolo.';
+
         return {
           success: true,
-          text: data.text,
+          text: resText || fallbackText,
           isQuote: !!data.isQuote,
           quoteData: data.quoteData || null
         };
       }
-
-      // Si el servidor devolvió un error específico
-      if (response.status !== 404) {
-        const errData = await response.json().catch(() => ({}));
-        if (errData.error === 'NO_API_KEY') {
-          return {
-            success: false,
-            needsApiKey: true,
-            text: '🔑 Para activar el Copiloto IA se requiere una clave de Google Gemini. Podés configurarla en Vercel como `GEMINI_API_KEY` o ingresarla haciendo clic en el icono de llave 🔑 arriba.'
-          };
-        }
-        return {
-          success: false,
-          text: errData.message || `⚠️ Error del servidor (${response.status}): ${JSON.stringify(errData)}`
-        };
-      }
     } catch (netErr) {
-      console.warn('/api/assistant no disponible, probando fallback directo...', netErr);
+      console.warn('/api/assistant no disponible, evaluando fallback local...', netErr);
     }
 
-    // 2. Fallback directo a la API de Google Gemini (para desarrollo local con Vite)
+    // 2. Si falló el endpoint remoto, verificar si es interpretable localmente
+    const localQuote = this.parseWhatsAppQuoteLocal(lastUserMsg);
+    if (localQuote) {
+      return {
+        success: true,
+        text: localQuote.cleanText,
+        isQuote: true,
+        quoteData: localQuote.quoteData
+      };
+    }
+
+    const localAnswer = this.answerContextualQuestionLocal(lastUserMsg, context);
+    if (localAnswer) {
+      return localAnswer;
+    }
+
+    // 3. Fallback directo a la API de Google Gemini (para desarrollo local con Vite)
     const effectiveKey = clientApiKey || import.meta.env.VITE_GEMINI_API_KEY;
 
     if (!effectiveKey) {
       return {
         success: false,
         needsApiKey: true,
-        text: '🔑 No se encontró la clave de API de Google Gemini. Por favor ingresá tu API Key haciendo clic en el icono de llave 🔑 en la esquina superior del chat.'
+        text: '🔑 Para activar el Copiloto IA con Google Gemini podés ingresar tu API Key haciendo clic en el icono de llave 🔑 arriba. Igualmente, ¡podés probar pegando un mensaje de WhatsApp y te armará la cotización al instante!'
       };
     }
 
@@ -187,21 +353,13 @@ Tu rol es asistir a los ejecutivos de ventas y coordinadores en dos tareas esenc
 
 1. 📋 **COTIZADOR INTELIGENTE (INTERPRETAR WHATSAPP / TEXTO)**:
 Cuando el usuario pegue un mensaje de WhatsApp o describa una solicitud de evento informal:
-- Extraé con precisión:
-  * Nombre del evento o tipo (ej: "Cata de Vinos de Autor", "Concierto Íntimo", "Cumpleaños 50", "Conferencia Corporativa").
-  * Fecha del evento en formato AAAA-MM-DD (si dicen "el 24 de noviembre", asumí año corriente 2026).
-  * Salón / Espacio (Opciones válidas: "Salón 1923", "Espacio Barolo", "Salón Dorado", "Cúpula Barolo", "Mirador").
-  * Asistentes / Cupo total esperado.
-  * Entradas: Preventa (cantidad y precio) y General (cantidad y precio).
-  * Alquiler de espacio (canon base del salón si aplica).
-  * Costos mencionados: Si traen técnica propia (cost_tecnica: 0), catering, artistas, limpieza, etc.
-- Respondé en lenguaje natural cálido, profesional y ejecutivo confirmando los detalles detectados.
-- **MUY IMPORTANTE**: Si detectás una intención de cotizar o pegar un WhatsApp, agregá AL FINAL de tu respuesta un bloque de código JSON EXACTO con la siguiente estructura delimitada por \`\`\`json ... \`\`\`:
+- Extraé con precisión: Nombre del evento, Fecha (AAAA-MM-DD), Salón, Asistentes, Entradas preventa y general, costos de técnica (0 si es propio), limpieza.
+- Agregá AL FINAL de tu respuesta un bloque de código JSON EXACTO delimitado por \`\`\`json ... \`\`\`:
 \`\`\`json
 {
   "isQuote": true,
   "quoteData": {
-    "name": "Nombre descriptivo del evento",
+    "name": "Nombre del evento",
     "event_date": "YYYY-MM-DD",
     "event_time": "19:00",
     "venue": "Salón 1923",
@@ -214,25 +372,14 @@ Cuando el usuario pegue un mensaje de WhatsApp o describa una solicitud de event
     "alquiler_espacio": 250000,
     "cost_tecnica": 0,
     "cost_limpieza": 45000,
-    "notes": "Resumen de requisitos o notas del cliente"
+    "notes": "Notas del cliente"
   }
 }
 \`\`\`
 
 2. 📊 **CONSULTOR ANALÍTICO Y DEL NEGOCIO**:
-Si el usuario hace preguntas sobre el calendario, disponibilidad, qué fechas están libres, eventos cargados, rentabilidad o finanzas del Barolo:
-- Utilizá el contexto provisto abajo para dar respuestas certeras con números reales.
-- Sé conciso, claro y destacá insights comerciales (márgenes, costos, puntos de equilibrio).
-- No inventes eventos que no estén en el contexto.
-
----
-### 🏛️ CONTEXTO DEL PALACIO BAROLO:
-- **Salones y Aforos**:
-  * Salón 1923 (Piso 14, estilo belle époque, vistas panorámicas, aforo típico 80-120 personas).
-  * Espacio Barolo (Planta baja y subsuelo histórico, capacidad hasta 150 personas).
-  * Cúpula / Mirador (Piso 22, exclusivo para recepciones VIP íntimas, 20-35 personas).
-- **Modelo de Ingresos**: Venta de tickets (Preventa + General), Canon locativo del salón, comisiones gastronómicas y servicios adicionales.
-- **Acuerdos habituales**: 50% - 50% con productor, o Alquiler Fijo + Comisión.
+Si el usuario hace preguntas sobre rentabilidad, calendario o eventos:
+- Utilizá el contexto para dar respuestas certeras con números reales.
 
 ---
 ### 📅 RESUMEN DE EVENTOS EN SISTEMA:
@@ -264,7 +411,7 @@ ${JSON.stringify(context, null, 2)}`;
         generationConfig: { temperature: 0.2, topP: 0.95, maxOutputTokens: 1500 }
       };
 
-      const modelsToTry = ['gemini-2.5-flash', 'gemini-2.5-pro'];
+      const modelsToTry = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'];
       let res = null;
 
       for (const model of modelsToTry) {
@@ -296,23 +443,28 @@ ${JSON.stringify(context, null, 2)}`;
 
       let quoteData = null;
       let isQuote = false;
-      let cleanText = candidateText;
+      let cleanText = (candidateText || '').trim();
 
-      const jsonMatch = candidateText.match(/```json\s*([\s\S]*?)\s*```/);
+      const jsonMatch = cleanText.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
       if (jsonMatch) {
         try {
           const parsed = JSON.parse(jsonMatch[1]);
-          if (parsed && parsed.isQuote && parsed.quoteData) {
+          const d = parsed.quoteData || (parsed.venue ? parsed : null);
+          if (d) {
             isQuote = true;
-            quoteData = parsed.quoteData;
-            cleanText = candidateText.replace(/```json\s*[\s\S]*?\s*```/, '').trim();
+            quoteData = d;
+            cleanText = cleanText.replace(/```(?:json)?\s*[\s\S]*?\s*```/i, '').trim();
           }
         } catch (e) {}
       }
 
+      if (!cleanText && isQuote) {
+        cleanText = '¡Excelente! He preparado la propuesta de cotización para este evento:';
+      }
+
       return {
         success: true,
-        text: cleanText,
+        text: cleanText || 'Consulta procesada correctamente.',
         isQuote,
         quoteData
       };

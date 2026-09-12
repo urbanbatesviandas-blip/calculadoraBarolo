@@ -89,20 +89,54 @@ function formatGeminiContents(messages = []) {
 function extractQuoteData(rawText = '') {
   let isQuote = false;
   let quoteData = null;
-  let cleanText = rawText;
+  let cleanText = (rawText || '').trim();
 
-  const jsonMatch = rawText.match(/```json\s*([\s\S]*?)\s*```/);
-  if (jsonMatch) {
+  // 1. Buscar bloque markdown ```json ... ``` o ``` ... ```
+  let jsonString = null;
+  const mdMatch = cleanText.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+  if (mdMatch) {
+    jsonString = mdMatch[1].trim();
+    cleanText = cleanText.replace(/```(?:json)?\s*[\s\S]*?\s*```/i, '').trim();
+  } else {
+    // 2. Buscar bloque JSON bare que empiece con { y termine con }
+    const bareMatch = cleanText.match(/(\{[\s\S]*"venue"[\s\S]*\})/i) || cleanText.match(/(\{[\s\S]*"isQuote"[\s\S]*\})/i);
+    if (bareMatch) {
+      jsonString = bareMatch[1].trim();
+      cleanText = cleanText.replace(bareMatch[1], '').trim();
+    }
+  }
+
+  if (jsonString) {
     try {
-      const parsed = JSON.parse(jsonMatch[1]);
-      if (parsed?.isQuote && parsed?.quoteData) {
+      const parsed = JSON.parse(jsonString);
+      const data = parsed.quoteData || (parsed.venue || parsed.attendees ? parsed : null);
+      if (data) {
         isQuote = true;
-        quoteData = parsed.quoteData;
-        cleanText = rawText.replace(/```json\s*[\s\S]*?\s*```/, '').trim();
+        quoteData = {
+          name: data.name || 'Propuesta de Evento Barolo',
+          event_date: data.event_date || '',
+          event_time: data.event_time || '19:00',
+          venue: data.venue || 'Salón 1923',
+          event_type: data.event_type || 'Cultural',
+          attendees: Number(data.attendees) || 80,
+          preventa_qty: Number(data.preventa_qty) || Math.round((Number(data.attendees) || 80) * 0.4),
+          preventa_price: Number(data.preventa_price) || 0,
+          general_qty: Number(data.general_qty) || Math.round((Number(data.attendees) || 80) * 0.6),
+          general_price: Number(data.general_price) || 0,
+          alquiler_espacio: Number(data.alquiler_espacio) || 0,
+          cost_tecnica: Number(data.cost_tecnica) || 0,
+          cost_limpieza: Number(data.cost_limpieza) || 45000,
+          notes: data.notes || ''
+        };
       }
     } catch (e) {
-      // Ignorar error si el bloque no era json de cotización
+      console.warn('Failed to parse quote JSON block:', e);
     }
+  }
+
+  // Si cleanText quedó vacío pero tenemos una cotización detectada, proveer texto natural elegante
+  if (!cleanText && isQuote) {
+    cleanText = '¡Excelente! He procesado los datos del mensaje y preparé la propuesta de cotización para este evento:';
   }
 
   return { isQuote, quoteData, cleanText };
@@ -180,8 +214,8 @@ export default async function handler(req, res) {
       }
     };
 
-    // 1. Probar directamente los modelos modernos oficiales (Gemini 2.5 Flash / Pro)
-    const primaryModels = ['gemini-2.5-flash', 'gemini-2.5-pro'];
+    // 1. Probar directamente los modelos modernos oficiales (Gemini 2.0 Flash / 1.5 Flash / 1.5 Pro)
+    const primaryModels = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'];
     let geminiResponse = null;
 
     for (const model of primaryModels) {
@@ -229,11 +263,15 @@ export default async function handler(req, res) {
     }
 
     const data = await geminiResponse.json();
-    const rawCandidateText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    const candidate = data.candidates?.[0];
+    const rawCandidateText = candidate?.content?.parts?.[0]?.text || '';
     const { isQuote, quoteData, cleanText } = extractQuoteData(rawCandidateText);
 
+    const finalText = cleanText || (isQuote ? '¡Excelente! He preparado la propuesta de cotización para este evento:' : (candidate?.finishReason === 'SAFETY' ? '⚠️ La consulta no pudo ser completada por los filtros de seguridad de IA.' : 'He recibido tu consulta pero no pude generar un resumen detallado. ¿Podrías reformularla?'));
+
     return res.status(200).json({
-      text: cleanText,
+      success: true,
+      text: finalText,
       isQuote,
       quoteData,
       raw: rawCandidateText
