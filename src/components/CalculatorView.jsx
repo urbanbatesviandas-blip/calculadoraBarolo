@@ -3,7 +3,7 @@ import {
   Calculator, Plus, Trash2, Save, CheckCircle2, RotateCcw, 
   Sparkles, DollarSign, Users, Calendar, MapPin, AlertCircle, FileText, 
   ArrowRight, Eye, EyeOff, TrendingUp, Info, Scale, Check, 
-  FileSpreadsheet, MonitorPlay, Layers
+  FileSpreadsheet, MonitorPlay, Layers, Building, Lock, Award, Percent, ShieldAlert, Search
 } from 'lucide-react'
 import confetti from 'canvas-confetti'
 import { canCreateEvent, canEditEvent, canChangeStatus, isAdmin, canViewSensitiveData } from '../services/authService'
