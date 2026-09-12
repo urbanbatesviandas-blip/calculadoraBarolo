@@ -11,6 +11,7 @@ import CalculatorConfigView from './components/CalculatorConfigView'
 import UserManagementView from './components/UserManagementView'
 import LoginView from './components/LoginView'
 import AdminSidebar from './components/AdminSidebar'
+import AiAssistantDrawer from './components/AiAssistantDrawer'
 import { eventService } from './services/eventService'
 import { supabase, isSupabaseConfigured } from './services/supabaseClient'
 import { authService, canCreateEvent, canDeleteEvent } from './services/authService'
@@ -30,6 +31,7 @@ export default function App() {
   const [comparisonEventIds, setComparisonEventIds] = useState([])
   const [currentUser, setCurrentUser] = useState(() => authService.getCurrentUser())
   const [isAdminSidebarOpen, setIsAdminSidebarOpen] = useState(false)
+  const [isAiDrawerOpen, setIsAiDrawerOpen] = useState(false)
   const [toastMessage, setToastMessage] = useState(null)
   const [isSyncing, setIsSyncing] = useState(false)
 
@@ -220,6 +222,21 @@ export default function App() {
   const handleNewEventAtDate = (dateStr) => {
     setCalculatorEvent({ event_date: dateStr, isBlank: true, _ts: Date.now() })
     setCurrentView('calculator')
+  }
+
+  // Cargar cotización procesada por el Copiloto IA (WhatsApp/Texto)
+  const handleAiFillCalculator = (quoteData) => {
+    const draft = {
+      ...quoteData,
+      isAiDraft: true,
+      _ts: Date.now()
+    }
+    setCalculatorEvent(draft)
+    setCurrentView('calculator')
+    setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('barolo-ai-fill-calculator', { detail: draft }))
+    }, 60)
+    showToast('✨ ¡Cotización cargada en el Cotizador desde el Copilot IA!')
   }
 
   const quotesCount = events.filter(e => e.status === 'cotizado').length
@@ -455,6 +472,18 @@ export default function App() {
             loadEvents()
             showToast('Datos restablecidos a los 81 eventos originales')
           }}
+        />
+      )}
+
+      {/* 🪄 Copiloto IA del Palacio Barolo (Gemini Assistant Drawer) */}
+      {currentUser && (
+        <AiAssistantDrawer
+          isOpen={isAiDrawerOpen}
+          onClose={() => setIsAiDrawerOpen(false)}
+          onToggle={() => setIsAiDrawerOpen(prev => !prev)}
+          events={events}
+          currentView={currentView}
+          onFillCalculator={handleAiFillCalculator}
         />
       )}
 

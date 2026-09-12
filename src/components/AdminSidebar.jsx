@@ -35,6 +35,18 @@ export default function AdminSidebar({
       subtitle: 'Gastos predeterminados, salones y acuerdos',
       icon: Sliders,
       badge: 'Cotizador'
+    },
+    {
+      id: 'cloud_settings',
+      title: 'Conexión Supabase (Nube)',
+      subtitle: 'Base de datos, sincronización y credenciales',
+      icon: Cloud,
+      badge: 'Nube',
+      isAction: true,
+      onClick: () => {
+        onClose()
+        if (onOpenSettings) onOpenSettings()
+      }
     }
   ]
 

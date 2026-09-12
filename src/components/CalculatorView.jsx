@@ -530,6 +530,9 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
     if (initialEventData && initialEventData.id && !initialEventData.isBlank) {
       // El usuario abrió un evento en particular para analizar/editar
       loadEventDataIntoState(initialEventData)
+    } else if (initialEventData?.isAiDraft) {
+      // El usuario cargó una cotización interpretada por el Copiloto IA (WhatsApp/Texto)
+      loadEventDataIntoState(initialEventData)
     } else if (initialEventData?.event_date && !initialEventData.id) {
       // El usuario hizo clic en una fecha específica del calendario para cotizar
       loadCleanBlankState(initialEventData.event_date)
@@ -538,6 +541,17 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
       loadCleanBlankState()
     }
   }, [initialEventData])
+
+  // Listener para actualización en vivo desde el Copilot IA si la calculadora ya está abierta
+  useEffect(() => {
+    const handleAiFill = (e) => {
+      if (e.detail) {
+        loadEventDataIntoState(e.detail)
+      }
+    }
+    window.addEventListener('barolo-ai-fill-calculator', handleAiFill)
+    return () => window.removeEventListener('barolo-ai-fill-calculator', handleAiFill)
+  }, [])
 
   // ==========================================
   // GESTIÓN DE FILAS DINÁMICAS EXTRAS
