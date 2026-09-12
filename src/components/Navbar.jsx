@@ -4,7 +4,6 @@ import {
   FileSpreadsheet, Scale, ChevronDown, Settings, LogOut, Sliders, Users, Cloud 
 } from 'lucide-react'
 import { canCreateEvent, isAdmin } from '../services/authService'
-import { isSupabaseConfigured } from '../services/supabaseClient'
 
 export default function Navbar({ 
   currentView, 
@@ -77,20 +76,6 @@ export default function Navbar({
                 <p className="text-[11px] sm:text-xs text-slate-300 tracking-wider hidden xs:block">Sistema de Eventos & Rentabilidad</p>
               </div>
             </div>
-
-            {/* Indicador de Estado de Conexión Nube */}
-            <button
-              onClick={onOpenSettings}
-              className={`hidden lg:flex items-center space-x-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
-                isSupabaseConfigured()
-                  ? 'bg-emerald-950/60 border-emerald-500/40 text-emerald-300 hover:bg-emerald-900/60'
-                  : 'bg-amber-950/60 border-amber-500/40 text-amber-300 hover:bg-amber-900/60'
-              }`}
-              title={isSupabaseConfigured() ? "Conectado a Supabase en la Nube (Clic para configurar)" : "Modo Local / Demo Activo (Clic para conectar a Supabase)"}
-            >
-              <span className={`w-2 h-2 rounded-full ${isSupabaseConfigured() ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`}></span>
-              <span>{isSupabaseConfigured() ? 'Nube Conectada' : 'Modo Local'}</span>
-            </button>
 
           </div>
 
