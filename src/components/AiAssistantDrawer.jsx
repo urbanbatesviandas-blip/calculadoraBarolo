@@ -6,6 +6,13 @@ import {
 } from 'lucide-react'
 import { aiAssistantService } from '../services/aiAssistantService'
 
+const CHAT_STORAGE_KEY = 'barolo_copilot_chat_history'
+
+const INITIAL_MESSAGE = {
+  role: 'assistant',
+  text: '¡Hola! Soy el **Copiloto Inteligente del Palacio Barolo** 🏛️✨\n\nPodés **pegarme un mensaje de WhatsApp** de un cliente o productor y te armo la cotización en 1 clic, o hacerme preguntas sobre eventos, salones y rentabilidad de la app.'
+}
+
 export default function AiAssistantDrawer({
   isOpen,
   onClose,
@@ -15,12 +22,21 @@ export default function AiAssistantDrawer({
   onFillCalculator,
   calculatorState = null
 }) {
-  const [messages, setMessages] = useState([
-    {
-      role: 'assistant',
-      text: '¡Hola! Soy el **Copiloto Inteligente del Palacio Barolo** 🏛️✨\n\nPodés **pegarme un mensaje de WhatsApp** de un cliente o productor y te armo la cotización en 1 clic, o hacerme preguntas sobre eventos, salones y rentabilidad de la app.'
+  const [messages, setMessages] = useState(() => {
+    try {
+      const saved = localStorage.getItem(CHAT_STORAGE_KEY)
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed
+        }
+      }
+    } catch (e) {
+      console.warn('Error recuperando historial del chat', e)
     }
-  ])
+    return [INITIAL_MESSAGE]
+  })
+
   const [inputText, setInputText] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [showKeyModal, setShowKeyModal] = useState(false)
@@ -29,6 +45,15 @@ export default function AiAssistantDrawer({
 
   const messagesEndRef = useRef(null)
   const textareaRef = useRef(null)
+
+  // Persistir automáticamente el historial del chat en localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(messages))
+    } catch (e) {
+      console.warn('Error guardando historial del chat', e)
+    }
+  }, [messages])
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -110,12 +135,16 @@ export default function AiAssistantDrawer({
   }
 
   const handleResetChat = () => {
-    setMessages([
+    const resetList = [
       {
         role: 'assistant',
         text: '¡Conversación reiniciada! ¿En qué te puedo ayudar hoy? Podés pegarme un WhatsApp o consultar datos del sistema.'
       }
-    ])
+    ]
+    setMessages(resetList)
+    try {
+      localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(resetList))
+    } catch (e) {}
   }
 
   const handleSaveKey = (e) => {

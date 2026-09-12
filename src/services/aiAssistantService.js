@@ -223,6 +223,24 @@ export const aiAssistantService = {
   answerContextualQuestionLocal(text = '', context = {}) {
     const t = (text || '').toLowerCase();
     
+    // Consulta sobre años futuros o fechas sin eventos (ej: 2027)
+    if (t.includes('2027') || t.includes('futuro') || t.includes('proximo año') || t.includes('próximo año')) {
+      const fin = context.financialSummary || {};
+      return {
+        success: true,
+        text: `📅 Actualmente en el sistema no hay eventos ni ventas registradas para el año **2027**.\n\nLa agenda activa contempla eventos de la temporada **2026** (con facturación acumulada registrada de **${fin.totalGrossIncome || '$0'}** y ganancia neta para el Barolo de **${fin.totalBaroloProfit || '$0'}**).\n\nSi querés cotizar un evento para 2027, podés pegarme los datos del mensaje y te armo la propuesta comercial al instante.`
+      };
+    }
+
+    // Consulta sobre ventas generales o facturación
+    if (t.includes('ventas') || t.includes('facturación') || t.includes('facturacion') || t.includes('ingresos totales')) {
+      const fin = context.financialSummary || {};
+      return {
+        success: true,
+        text: `💰 **Resumen Económico General del Palacio Barolo**:\n\n* **Facturación Bruta Total**: ${fin.totalGrossIncome || '$0'}\n* **Ganancia Neta Barolo**: ${fin.totalBaroloProfit || '$0'}\n* **Facturación Mes Corriente**: ${fin.currentMonthGross || '$0'}\n* **Ganancia Neta Mes Corriente**: ${fin.currentMonthProfit || '$0'}\n\nPodés consultar el detalle de cada evento en la pestaña *Dashboard* o *Registro*.`
+      };
+    }
+
     if (t.includes('rentable') || t.includes('ganancia') || t.includes('margen')) {
       const top = context.topProfitableEvents?.[0];
       if (top) {
@@ -258,6 +276,47 @@ export const aiAssistantService = {
     }
 
     return null;
+  },
+
+  /**
+   * Limpia y sanitiza la salida de la IA para eliminar cualquier residuo de razonamiento o scratchpad
+   */
+  sanitizeAssistantOutput(text = '') {
+    if (!text) return '';
+
+    let cleaned = text.trim();
+
+    // 1. Quitar bloques <thought>...</thought>
+    cleaned = cleaned.replace(/<thought>[\s\S]*?<\/thought>/gi, '').trim();
+
+    // 2. Si detecta fuga de scratchpad / cadena de pensamiento
+    const isScratchpadLeak = 
+      /(?:\*|\-)?\s*(?:User Input|Role:\s*Copiloto|Task:\s*Consultor|Context Check|Concise\?\s*Yes|Professional tone\?\s*Yes)/i.test(cleaned);
+
+    if (isScratchpadLeak) {
+      const lines = cleaned.split('\n');
+      const validLines = [];
+
+      for (let line of lines) {
+        const tr = line.trim();
+        if (!tr) continue;
+
+        const isMeta = /^(?:\*|\-)?\s*(?:User Input|Role|Task|Context Check|`?(?:financialSummary|totalGrossIncome|totalBaroloProfit|currentMonthGross|currentMonthProfit|upcomingEvents|currentView)`?|The user is asking|Looking at|The context provided|I must be|I cannot|I should|I can mention|Concise\?|Clear\?|No invented|Professional tone)/i.test(tr);
+
+        if (!isMeta) {
+          let cleanLine = tr.replace(/^(?:\*|\-)?\s*["“]?\s*/, '').replace(/["”]?$/, '').trim();
+          if (cleanLine) {
+            validLines.push(cleanLine);
+          }
+        }
+      }
+
+      if (validLines.length > 0) {
+        cleaned = validLines.join('\n\n');
+      }
+    }
+
+    return cleaned;
   },
 
   /**
@@ -457,6 +516,8 @@ ${JSON.stringify(context, null, 2)}`;
           }
         } catch (e) {}
       }
+
+      cleanText = this.sanitizeAssistantOutput(cleanText);
 
       if (!cleanText && isQuote) {
         cleanText = '¡Excelente! He preparado la propuesta de cotización para este evento:';

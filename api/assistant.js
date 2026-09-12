@@ -48,6 +48,13 @@ Si el usuario hace preguntas sobre el calendario, disponibilidad, qué fechas es
 - No inventes eventos que no estén en el contexto.
 
 ---
+### ⚠️ REGLAS OBLIGATORIAS DE RESPUESTA:
+- Hablá SIEMPRE y DIRECTAMENTE al usuario en primera persona, como el Copiloto Comercial del Palacio Barolo.
+- ESTÁ TERMINANTEMENTE PROHIBIDO incluir pensamientos internos, notas técnicas, análisis en inglés, borradores o checklists (como "User Input:", "Role:", "Task:", "Context Check:", "Concise? Yes", "Clear? Yes", etc.).
+- Tu respuesta debe ser EXCLUSIVAMENTE el mensaje final conversacional en español para el usuario.
+- Si el usuario consulta por fechas o períodos sin eventos registrados (por ejemplo un mes o año futuro como 2027), aclará con amabilidad en 2 oraciones que en el sistema actual solo hay registros para la temporada 2026, y mencioná el estado general de ingresos o agenda.
+
+---
 ### 🏛️ CONTEXTO DEL PALACIO BAROLO:
 - **Salones y Aforos**:
   * Salón 1923 (Piso 14, estilo belle époque, vistas panorámicas, aforo típico 80-120 personas).
@@ -55,6 +62,47 @@ Si el usuario hace preguntas sobre el calendario, disponibilidad, qué fechas es
   * Cúpula / Mirador (Piso 22, exclusivo para recepciones VIP íntimas, 20-35 personas).
 - **Modelo de Ingresos**: Venta de tickets (Preventa + General), Canon locativo del salón, comisiones gastronómicas y servicios adicionales.
 - **Acuerdos habituales**: 50% - 50% con productor, o Alquiler Fijo + Comisión.`;
+
+/**
+ * Limpia y sanitiza la salida de la IA para eliminar cualquier residuo de razonamiento o scratchpad
+ */
+function sanitizeAssistantOutput(text = '') {
+  if (!text) return '';
+
+  let cleaned = text.trim();
+
+  // 1. Quitar bloques <thought>...</thought>
+  cleaned = cleaned.replace(/<thought>[\s\S]*?<\/thought>/gi, '').trim();
+
+  // 2. Si detecta fuga de scratchpad / cadena de pensamiento
+  const isScratchpadLeak = 
+    /(?:\*|\-)?\s*(?:User Input|Role:\s*Copiloto|Task:\s*Consultor|Context Check|Concise\?\s*Yes|Professional tone\?\s*Yes)/i.test(cleaned);
+
+  if (isScratchpadLeak) {
+    const lines = cleaned.split('\n');
+    const validLines = [];
+
+    for (let line of lines) {
+      const tr = line.trim();
+      if (!tr) continue;
+
+      const isMeta = /^(?:\*|\-)?\s*(?:User Input|Role|Task|Context Check|`?(?:financialSummary|totalGrossIncome|totalBaroloProfit|currentMonthGross|currentMonthProfit|upcomingEvents|currentView)`?|The user is asking|Looking at|The context provided|I must be|I cannot|I should|I can mention|Concise\?|Clear\?|No invented|Professional tone)/i.test(tr);
+
+      if (!isMeta) {
+        let cleanLine = tr.replace(/^(?:\*|\-)?\s*["“]?\s*/, '').replace(/["”]?$/, '').trim();
+        if (cleanLine) {
+          validLines.push(cleanLine);
+        }
+      }
+    }
+
+    if (validLines.length > 0) {
+      cleaned = validLines.join('\n\n');
+    }
+  }
+
+  return cleaned;
+}
 
 /**
  * Convierte el historial de mensajes de la app al formato esperado por Gemini
@@ -105,6 +153,9 @@ function extractQuoteData(rawText = '') {
       cleanText = cleanText.replace(bareMatch[1], '').trim();
     }
   }
+
+  // Sanitizar el texto limpio para remover cualquier residuo de pensamiento
+  cleanText = sanitizeAssistantOutput(cleanText);
 
   if (jsonString) {
     try {
