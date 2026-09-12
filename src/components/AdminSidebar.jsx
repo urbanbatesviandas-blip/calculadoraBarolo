@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react'
-import { X, Users, Sliders, ShieldCheck, ChevronRight, Settings, Sparkles, LogOut } from 'lucide-react'
+import { X, Users, Sliders, ShieldCheck, ChevronRight, Settings, Sparkles, LogOut, Cloud } from 'lucide-react'
 
 export default function AdminSidebar({ 
   isOpen, 

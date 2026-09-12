@@ -442,15 +442,17 @@ export default function EventComparisonModal({ events = [], onClose, onSelectEve
                   </tr>
 
                   {/* SECCIÓN DESGLOSE DE COSTOS ASOCIADOS */}
-                  <tr className="bg-rose-100/50 text-rose-950 font-bold border-t-2 border-rose-300">
-                    <td colSpan={events.length + 1} className="p-2.5 text-[11px] uppercase tracking-wider flex items-center justify-between">
-                      <span className="flex items-center space-x-1.5">
-                        <span>📦</span>
-                        <span>Desglose Detallado de Costos Asociados (Rubro por Rubro)</span>
-                      </span>
-                      <span className="text-[10px] font-normal text-rose-800 lowercase">
-                        especificación completa de gastos operativos
-                      </span>
+                  <tr className="bg-rose-100/60 text-rose-950 font-bold border-t-2 border-rose-300">
+                    <td colSpan={events.length + 1} className="p-2.5 text-[11px] uppercase tracking-wider">
+                      <div className="flex items-center justify-between w-full">
+                        <span className="flex items-center space-x-1.5">
+                          <span>📦</span>
+                          <span>Desglose Detallado de Costos Asociados (Rubro por Rubro)</span>
+                        </span>
+                        <span className="text-[10px] font-normal text-rose-800 lowercase">
+                          especificación completa de gastos operativos
+                        </span>
+                      </div>
                     </td>
                   </tr>
 
