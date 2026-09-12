@@ -21,7 +21,11 @@
   ],
   "rewrites": [
     {
-      "source": "/((?!api/).*)",
+      "source": "/manual-usuario.html",
+      "destination": "/manual-usuario.html"
+    },
+    {
+      "source": "/((?!api/|manual-usuario\\.html).*)",
       "destination": "/index.html"
     }
   ]

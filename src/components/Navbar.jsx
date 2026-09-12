@@ -263,16 +263,16 @@ export default function Navbar({
                     </div>
 
                     <div className="pt-1 border-t border-slate-100">
-                      <a
-                        href="/manual-usuario.html"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={() => setShowUserMenu(false)}
-                        className="w-full text-left px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-amber-50/60 hover:text-amber-900 flex items-center space-x-2 transition-colors"
+                      <button
+                        onClick={() => {
+                          setShowUserMenu(false)
+                          setCurrentView('manual')
+                        }}
+                        className="w-full text-left px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-amber-50/60 hover:text-amber-900 flex items-center space-x-2 transition-colors cursor-pointer"
                       >
                         <BookOpen className="w-3.5 h-3.5 text-amber-500" />
                         <span>Manual de Usuario</span>
-                      </a>
+                      </button>
                       <button
                         onClick={() => {
                           setShowUserMenu(false)

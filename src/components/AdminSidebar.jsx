@@ -36,15 +36,11 @@ export default function AdminSidebar({
       badge: 'Cotizador'
     },
     {
-      id: 'manual_usuario',
+      id: 'manual',
       title: 'Manual de Usuario',
       subtitle: 'Guía oficial de procedimientos y uso en HTML/PDF',
       icon: BookOpen,
-      badge: 'Guía',
-      isAction: true,
-      onClick: () => {
-        window.open('/manual-usuario.html', '_blank')
-      }
+      badge: 'Guía'
     }
   ]
 

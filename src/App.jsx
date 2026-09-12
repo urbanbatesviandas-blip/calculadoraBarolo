@@ -8,6 +8,7 @@ import EventDrilldownModal from './components/EventDrilldownModal'
 import EventComparisonModal from './components/EventComparisonModal'
 import CalculatorConfigView from './components/CalculatorConfigView'
 import UserManagementView from './components/UserManagementView'
+import UserManualView from './components/UserManualView'
 import LoginView from './components/LoginView'
 import AdminSidebar from './components/AdminSidebar'
 import AiAssistantDrawer from './components/AiAssistantDrawer'
@@ -344,6 +345,13 @@ export default function App() {
 
             {currentView === 'users' && (
               <UserManagementView
+                currentUser={currentUser}
+                onBack={() => setCurrentView('calendar')}
+              />
+            )}
+
+            {currentView === 'manual' && (
+              <UserManualView
                 currentUser={currentUser}
                 onBack={() => setCurrentView('calendar')}
               />
