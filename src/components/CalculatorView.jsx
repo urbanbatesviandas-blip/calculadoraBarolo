@@ -2091,12 +2091,21 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
                     </div>
                   )}
 
-                  {totalEntradasCalculadas > 0 && (
+                  {totalTicketing > 0 && (
                     <div className="flex justify-between items-center text-slate-700 py-1.5 border-b border-slate-200/60">
-                      <span>Localidades / Tickets ({ticketQty || 0} pax a {formatARS(ticketPrice)})</span>
-                      <span className="font-mono font-bold text-slate-900">{formatARSWithDecimals(totalEntradasCalculadas)}</span>
+                      <span>Localidades / Tickets ({totalTicketsVendidos || 0} pax a {formatARS(ticketAvgPrice)})</span>
+                      <span className="font-mono font-bold text-slate-900">{formatARSWithDecimals(totalTicketing)}</span>
                     </div>
                   )}
+
+                  {selectedIncomes.map((inc, i) => (
+                    Number(inc.amount) > 0 ? (
+                      <div key={inc.key || i} className="flex justify-between items-center text-slate-700 py-1.5 border-b border-slate-200/60">
+                        <span>{inc.name || inc.label || 'Rubro adicional'}</span>
+                        <span className="font-mono font-bold text-slate-900">{formatARSWithDecimals(inc.amount)}</span>
+                      </div>
+                    ) : null
+                  ))}
 
                   {totalExtraIncomes > 0 && (
                     <div className="flex justify-between items-center text-slate-700 py-1.5 border-b border-slate-200/60">
