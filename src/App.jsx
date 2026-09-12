@@ -46,25 +46,33 @@ export default function App() {
     }
   }
 
-  // Forzar sincronización manual desde la Nube (limpiando caché local)
+  // Sincronización manual de eventos (limpiando caché local)
   const handleForceSync = async () => {
     setIsSyncing(true)
     try {
       const res = await eventService.forceSyncFromSupabase()
       if (res.success) {
         setEvents(res.events)
-        showToast(`☁️ ¡Sincronizado con Supabase! (${res.count} eventos al día)`)
+        showToast(`☁️ ¡Eventos sincronizados! (${res.count} eventos al día)`)
       } else {
         await loadEvents()
-        showToast('☁️ Datos actualizados desde la Nube.')
+        showToast('☁️ Datos actualizados.')
       }
     } catch (err) {
       console.error('Sync failed:', err)
-      showToast('⚠️ Error al sincronizar con la nube')
+      showToast('⚠️ Error al actualizar datos')
     } finally {
       setIsSyncing(false)
     }
   }
+
+  // Acceso técnico exclusivo para programadores desde la consola
+  useEffect(() => {
+    window.openDevSettings = () => setIsSettingsOpen(true)
+    return () => {
+      delete window.openDevSettings
+    }
+  }, [])
 
   useEffect(() => {
     if (currentUser) {
@@ -440,7 +448,7 @@ export default function App() {
           onClose={() => setIsSettingsOpen(false)}
           onConfigSaved={() => {
             loadEvents()
-            showToast('Conexión con Supabase actualizada')
+            showToast('Conexión actualizada')
           }}
           onResetData={() => {
             eventService.resetToInitial()
