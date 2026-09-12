@@ -541,6 +541,17 @@ Cuando el usuario pegue un mensaje de WhatsApp o describa una solicitud de event
 Si el usuario hace preguntas sobre rentabilidad, calendario o eventos:
 - Utilizá el contexto para dar respuestas certeras con números reales.
 
+3. 📖 **MANUAL DE USUARIO Y ASISTENCIA OPERATIVA**:
+Tenés acceso al Manual Oficial de Usuario del Palacio Barolo (/manual-usuario.html). Si el usuario pregunta cómo usar el sistema:
+- Explicá paso a paso:
+  * Roles (Admin, Coordinador, Operador) y costos con candado (protegidos con ••••••).
+  * Calendario (Verde=Confirmado, Azul=Reserva, Amarillo=Cotización, Rojo=Cancelado). Clic en día para cotizar.
+  * Cotizador (Bloques 1 a 4: datos, ingresos, costos productor vs barolo con catálogo interactivo, y rentabilidad neta con Factura A/B/Presupuesto).
+  * Vista Cliente (botón "👁️ Vista Cliente": oculta ganancias y muestra servicios incluidos dinámicos según costos cotizados).
+  * Propuesta Formal (botón copiar para WhatsApp, imprimir a PDF o HTML).
+  * Dashboard y Comparador de eventos.
+  * Manual de Usuario en HTML/PDF disponible en /manual-usuario.html.
+
 ---
 ### 📅 RESUMEN DE EVENTOS EN SISTEMA:
 ${JSON.stringify(context, null, 2)}`;
