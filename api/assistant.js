@@ -158,9 +158,25 @@ ${JSON.stringify(context, null, 2)}
 
     if (!response || !response.ok) {
       console.error('Gemini API Error:', lastErrorBody);
+      let diagInfo = '';
+      try {
+        const diagRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`, {
+          headers: { 'x-goog-api-key': apiKey }
+        });
+        const diagData = await diagRes.json();
+        if (diagData.models && diagData.models.length > 0) {
+          const names = diagData.models.map(m => m.name.replace('models/', ''));
+          diagInfo = `Modelos activos en tu clave: ${names.slice(0, 6).join(', ')}`;
+        } else if (diagData.error) {
+          diagInfo = `Diagnóstico de Google: ${diagData.error.message}`;
+        }
+      } catch (diagErr) {
+        diagInfo = `Error de diagnóstico: ${diagErr.message}`;
+      }
+
       return res.status(response ? response.status : 500).json({
         error: 'GEMINI_ERROR',
-        message: `Error de Google Gemini (${response ? response.status : 500}): ${lastErrorBody}`
+        message: `Error de Google Gemini (${response ? response.status : 500}): ${lastErrorBody}${diagInfo ? `\n\n📌 ${diagInfo}` : ''}`
       });
     }
 
