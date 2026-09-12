@@ -233,12 +233,14 @@ ${JSON.stringify(context, null, 2)}
         parts: [{ text: msg.text || msg.content }]
       }));
 
-      const candidateModels = [
-        'gemini-1.5-flash',
-        'gemini-2.0-flash',
-        'gemini-1.5-flash-latest',
-        'gemini-1.5-pro',
-        'gemini-pro'
+      // Endpoints candidatos en cascada para máxima resiliencia
+      const candidates = [
+        { version: 'v1beta', model: 'gemini-1.5-flash' },
+        { version: 'v1', model: 'gemini-1.5-flash' },
+        { version: 'v1beta', model: 'gemini-2.0-flash' },
+        { version: 'v1beta', model: 'gemini-1.5-flash-latest' },
+        { version: 'v1beta', model: 'gemini-1.5-pro' },
+        { version: 'v1', model: 'gemini-pro' }
       ];
 
       const payload = {
@@ -254,8 +256,8 @@ ${JSON.stringify(context, null, 2)}
       let res = null;
       let lastErrText = '';
 
-      for (const model of candidateModels) {
-        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${effectiveKey}`;
+      for (const item of candidates) {
+        const geminiUrl = `https://generativelanguage.googleapis.com/${item.version}/models/${item.model}:generateContent?key=${effectiveKey}`;
         try {
           const fetchRes = await fetch(geminiUrl, {
             method: 'POST',
@@ -272,7 +274,7 @@ ${JSON.stringify(context, null, 2)}
           } else {
             lastErrText = await fetchRes.text();
             if (fetchRes.status === 404) {
-              console.warn(`Modelo ${model} no encontrado (404), reintentando con alternativo...`);
+              console.warn(`[Gemini client] ${item.version}/${item.model} devolvió 404, probando siguiente candidato...`);
               continue;
             } else {
               res = fetchRes;

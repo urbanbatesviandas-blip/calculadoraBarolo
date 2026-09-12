@@ -1,6 +1,6 @@
 /**
  * 🏛️ PALACIO BAROLO - VERCEL SERVERLESS FUNCTION
- * Endpoint seguro para el Asistente Inteligente (Gemini 1.5 Flash).
+ * Endpoint seguro para el Asistente Inteligente (Gemini).
  * Mantiene la clave API protegida en el backend sin exponerla al cliente.
  */
 
@@ -94,22 +94,12 @@ ${JSON.stringify(context, null, 2)}
 
     // Mapeo del historial al formato de Gemini
     const contents = [];
-    
-    // Mensajes previos
     for (const msg of messages) {
       contents.push({
         role: msg.role === 'assistant' || msg.role === 'model' ? 'model' : 'user',
         parts: [{ text: msg.text || msg.content }]
       });
     }
-
-    const candidateModels = [
-      'gemini-1.5-flash',
-      'gemini-2.0-flash',
-      'gemini-1.5-flash-latest',
-      'gemini-1.5-pro',
-      'gemini-pro'
-    ];
 
     const payload = {
       systemInstruction: {
@@ -123,11 +113,21 @@ ${JSON.stringify(context, null, 2)}
       }
     };
 
+    // Endpoints candidatos en cascada para máxima resiliencia
+    const candidates = [
+      { version: 'v1beta', model: 'gemini-1.5-flash' },
+      { version: 'v1', model: 'gemini-1.5-flash' },
+      { version: 'v1beta', model: 'gemini-2.0-flash' },
+      { version: 'v1beta', model: 'gemini-1.5-flash-latest' },
+      { version: 'v1beta', model: 'gemini-1.5-pro' },
+      { version: 'v1', model: 'gemini-pro' }
+    ];
+
     let response = null;
     let lastErrorBody = '';
 
-    for (const model of candidateModels) {
-      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+    for (const item of candidates) {
+      const geminiUrl = `https://generativelanguage.googleapis.com/${item.version}/models/${item.model}:generateContent?key=${apiKey}`;
       try {
         const res = await fetch(geminiUrl, {
           method: 'POST',
@@ -143,17 +143,16 @@ ${JSON.stringify(context, null, 2)}
           break;
         } else {
           lastErrorBody = await res.text();
-          // Si es 404, probamos el siguiente modelo
           if (res.status === 404) {
-            console.warn(`Modelo ${model} retornó 404, probando siguiente...`);
+            console.warn(`[Gemini] ${item.version}/${item.model} devolvió 404, probando siguiente candidato...`);
             continue;
           } else {
             response = res;
             break;
           }
         }
-      } catch (netErr) {
-        lastErrorBody = netErr.message;
+      } catch (err) {
+        lastErrorBody = err.message;
       }
     }
 
@@ -180,7 +179,6 @@ ${JSON.stringify(context, null, 2)}
         if (parsed && parsed.isQuote && parsed.quoteData) {
           isQuote = true;
           quoteData = parsed.quoteData;
-          // Dejar el texto natural sin el bloque JSON para que se lea limpio
           cleanText = candidateText.replace(/```json\s*[\s\S]*?\s*```/, '').trim();
         }
       } catch (e) {
