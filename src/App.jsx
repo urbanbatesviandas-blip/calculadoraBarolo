@@ -5,7 +5,6 @@ import CalculatorView from './components/CalculatorView'
 import DashboardView from './components/DashboardView'
 import EventsListView from './components/EventsListView'
 import EventDrilldownModal from './components/EventDrilldownModal'
-import SettingsModal from './components/SettingsModal'
 import EventComparisonModal from './components/EventComparisonModal'
 import CalculatorConfigView from './components/CalculatorConfigView'
 import UserManagementView from './components/UserManagementView'
@@ -26,7 +25,6 @@ export default function App() {
   const [selectedEvent, setSelectedEvent] = useState(null)
   const [calculatorEvent, setCalculatorEvent] = useState(null)
   const [calendarTargetDate, setCalendarTargetDate] = useState(null)
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [isComparisonOpen, setIsComparisonOpen] = useState(false)
   const [comparisonEventIds, setComparisonEventIds] = useState([])
   const [currentUser, setCurrentUser] = useState(() => authService.getCurrentUser())
@@ -71,14 +69,6 @@ export default function App() {
       setIsSyncing(false)
     }
   }
-
-  // Acceso técnico exclusivo para programadores desde la consola
-  useEffect(() => {
-    window.openDevSettings = () => setIsSettingsOpen(true)
-    return () => {
-      delete window.openDevSettings
-    }
-  }, [])
 
   useEffect(() => {
     if (currentUser) {
@@ -268,7 +258,6 @@ export default function App() {
       <Navbar
         currentView={currentView}
         setCurrentView={setCurrentView}
-        onOpenSettings={() => setIsSettingsOpen(true)}
         onOpenComparison={() => setIsComparisonOpen(true)}
         comparisonCount={comparisonEventIds.length}
         currentUser={currentUser}
@@ -460,24 +449,7 @@ export default function App() {
         onNavigate={(view) => setCurrentView(view)}
         currentUser={currentUser}
         onLogout={handleLogout}
-        onOpenSettings={() => setIsSettingsOpen(true)}
       />
-
-      {/* Settings Modal (Supabase Cloud Config) */}
-      {isSettingsOpen && (
-        <SettingsModal
-          onClose={() => setIsSettingsOpen(false)}
-          onConfigSaved={() => {
-            loadEvents()
-            showToast('Conexión actualizada')
-          }}
-          onResetData={() => {
-            eventService.resetToInitial()
-            loadEvents()
-            showToast('Datos restablecidos a los 27 eventos demo del Palacio Barolo')
-          }}
-        />
-      )}
 
       {/* 🪄 Copiloto IA del Palacio Barolo (Gemini Assistant Drawer) */}
       {currentUser && (

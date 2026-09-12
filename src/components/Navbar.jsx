@@ -1,14 +1,13 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { 
   Calendar, Calculator, LayoutDashboard, ListFilter, PlusCircle, 
-  FileSpreadsheet, Scale, ChevronDown, Settings, LogOut, Sliders, Users, Cloud, Wand2
+  FileSpreadsheet, Scale, ChevronDown, Settings, LogOut, Sliders, Users, Wand2
 } from 'lucide-react'
 import { canCreateEvent, isAdmin } from '../services/authService'
 
 export default function Navbar({ 
   currentView, 
   setCurrentView, 
-  onOpenSettings,
   onOpenComparison,
   comparisonCount = 0,
   currentUser,
