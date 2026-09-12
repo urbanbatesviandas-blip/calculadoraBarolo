@@ -66,19 +66,24 @@ export const aiAssistantService = {
       }
     });
 
-    // Próximos 12 eventos agendados (ordenados cronológicamente)
-    const upcoming = list
-      .filter(e => e.event_date && e.status !== 'cancelado')
+    // Todos los eventos en el sistema (ordenados cronológicamente)
+    const allEventsSchedule = list
+      .filter(e => e.event_date)
       .sort((a, b) => (a.event_date || '').localeCompare(b.event_date || ''))
-      .slice(0, 12)
       .map(e => ({
-        name: e.name,
         date: e.event_date,
+        name: e.name,
         venue: e.venue || 'Salón 1923',
         attendees: e.attendees,
-        status: e.status,
-        profit: e.barolo_profit ? `$${Math.round(e.barolo_profit).toLocaleString('es-AR')}` : 'N/D'
+        status: e.status || 'cotizado',
+        profit: e.barolo_profit ? `$${Math.round(e.barolo_profit).toLocaleString('es-AR')}` : 'N/D',
+        gross: e.gross_income ? `$${Math.round(e.gross_income).toLocaleString('es-AR')}` : 'N/D'
       }));
+
+    // Próximos eventos agendados activos
+    const upcoming = allEventsSchedule
+      .filter(e => e.status !== 'cancelado')
+      .slice(0, 15);
 
     // Top 5 eventos con mayor ganancia para el Barolo
     const topProfitable = [...list]
@@ -104,6 +109,7 @@ export const aiAssistantService = {
         currentMonthGross: `$${Math.round(monthGrossIncome).toLocaleString('es-AR')}`,
         currentMonthProfit: `$${Math.round(monthBaroloProfit).toLocaleString('es-AR')}`
       },
+      eventsInSystem: allEventsSchedule,
       upcomingEvents: upcoming,
       topProfitableEvents: topProfitable,
       calculatorDraft: calculatorState ? {
@@ -222,17 +228,76 @@ export const aiAssistantService = {
    */
   answerContextualQuestionLocal(text = '', context = {}) {
     const t = (text || '').toLowerCase();
-    
-    // Consulta sobre años futuros o fechas sin eventos (ej: 2027)
-    if (t.includes('2027') || t.includes('futuro') || t.includes('proximo año') || t.includes('próximo año')) {
-      const fin = context.financialSummary || {};
-      return {
-        success: true,
-        text: `📅 Actualmente en el sistema no hay eventos ni ventas registradas para el año **2027**.\n\nLa agenda activa contempla eventos de la temporada **2026** (con facturación acumulada registrada de **${fin.totalGrossIncome || '$0'}** y ganancia neta para el Barolo de **${fin.totalBaroloProfit || '$0'}**).\n\nSi querés cotizar un evento para 2027, podés pegarme los datos del mensaje y te armo la propuesta comercial al instante.`
-      };
+    const eventsList = context.eventsInSystem || context.upcomingEvents || [];
+
+    // 1. Detección de mes y año para búsqueda de eventos
+    const monthMap = [
+      { name: 'enero', num: '01' },
+      { name: 'febrero', num: '02' },
+      { name: 'marzo', num: '03' },
+      { name: 'abril', num: '04' },
+      { name: 'mayo', num: '05' },
+      { name: 'junio', num: '06' },
+      { name: 'julio', num: '07' },
+      { name: 'agosto', num: '08' },
+      { name: 'septiembre', num: '09' },
+      { name: 'setiembre', num: '09' },
+      { name: 'octubre', num: '10' },
+      { name: 'noviembre', num: '11' },
+      { name: 'diciembre', num: '12' }
+    ];
+
+    const matchedMonth = monthMap.find(m => t.includes(m.name));
+    const yearMatch = t.match(/\b(202\d)\b/);
+    const targetYear = yearMatch ? yearMatch[1] : (matchedMonth && matchedMonth.num === '01' ? '2027' : null);
+
+    const wantsConfirmed = t.includes('confirmad') || t.includes('contratad');
+    const wantsReserved = t.includes('reservad');
+    const wantsQuoted = t.includes('cotizad');
+    const wantsCanceled = t.includes('cancelad');
+    const isAskingEventsOrAgenda = 
+      t.includes('evento') || t.includes('agenda') || t.includes('calendario') || 
+      t.includes('fecha') || t.includes('hay') || t.includes('tenemos') || 
+      t.includes('programad') || t.includes('disponib') || wantsConfirmed || wantsReserved || wantsQuoted;
+
+    if ((matchedMonth || yearMatch) && isAskingEventsOrAgenda) {
+      let filtered = [...eventsList];
+      if (targetYear) {
+        filtered = filtered.filter(e => e.date && e.date.startsWith(targetYear));
+      }
+      if (matchedMonth) {
+        filtered = filtered.filter(e => e.date && e.date.substring(5, 7) === matchedMonth.num);
+      }
+      if (wantsConfirmed) {
+        filtered = filtered.filter(e => e.status === 'contratado');
+      } else if (wantsReserved) {
+        filtered = filtered.filter(e => e.status === 'reservado');
+      } else if (wantsQuoted) {
+        filtered = filtered.filter(e => e.status === 'cotizado');
+      } else if (wantsCanceled) {
+        filtered = filtered.filter(e => e.status === 'cancelado');
+      }
+
+      const periodLabel = (matchedMonth ? matchedMonth.name.charAt(0).toUpperCase() + matchedMonth.name.slice(1) : '') + (targetYear ? ' ' + targetYear : '');
+      const statusLabel = wantsConfirmed ? 'confirmados ' : (wantsReserved ? 'en reserva ' : (wantsQuoted ? 'cotizados ' : ''));
+
+      if (filtered.length === 0) {
+        return {
+          success: true,
+          text: `📅 No se registran eventos ${statusLabel}para **${periodLabel.trim()}** en el sistema actual del Palacio Barolo.\n\n¿Te gustaría cotizar una nueva propuesta para esa fecha? Podés pegarme los datos y te armo la cotización comercial.`
+        };
+      }
+
+      let msg = `📅 **Eventos ${statusLabel}para ${periodLabel.trim()}** (${filtered.length} en sistema):\n\n`;
+      filtered.forEach(e => {
+        const parts = (e.date || '').split('-');
+        const formattedDate = parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : e.date;
+        msg += `* **${formattedDate}** — **${e.name}** (${e.venue}, ${e.attendees} pax) — [${(e.status || '').toUpperCase()}]\n`;
+      });
+      return { success: true, text: msg };
     }
 
-    // Consulta sobre ventas generales o facturación
+    // 2. Consulta sobre ventas generales o facturación
     if (t.includes('ventas') || t.includes('facturación') || t.includes('facturacion') || t.includes('ingresos totales')) {
       const fin = context.financialSummary || {};
       return {
@@ -241,6 +306,7 @@ export const aiAssistantService = {
       };
     }
 
+    // 3. Evento más rentable
     if (t.includes('rentable') || t.includes('ganancia') || t.includes('margen')) {
       const top = context.topProfitableEvents?.[0];
       if (top) {
@@ -251,6 +317,7 @@ export const aiAssistantService = {
       }
     }
 
+    // 4. Disponibilidad y resumen general de agenda
     if (t.includes('disponibilidad') || t.includes('cuántos eventos') || t.includes('contratados') || t.includes('agendados') || t.includes('calendario')) {
       const counts = context.statusCounts || {};
       const upcoming = context.upcomingEvents || [];
@@ -264,7 +331,7 @@ export const aiAssistantService = {
 
       if (upcoming.length > 0) {
         msg += `**Próximos eventos en calendario**:\n`;
-        upcoming.slice(0, 4).forEach(e => {
+        upcoming.slice(0, 5).forEach(e => {
           msg += `* **${e.date}** — ${e.name} (${e.venue}, ${e.attendees} pax) [${(e.status || '').toUpperCase()}]\n`;
         });
       }
@@ -276,6 +343,33 @@ export const aiAssistantService = {
     }
 
     return null;
+  },
+
+  /**
+   * Extrae el texto conversacional real de un candidato de Gemini,
+   * descartando partes de pensamiento interno (thought: true en Gemini 2.0 Flash).
+   */
+  extractCandidateText(candidate) {
+    if (!candidate || !candidate.content || !Array.isArray(candidate.content.parts)) {
+      return '';
+    }
+
+    // Filtrar partes que no sean de pensamiento (en Gemini 2.0 vienen con thought: true)
+    const nonThoughtParts = candidate.content.parts.filter(p => !p.thought);
+    const targetParts = nonThoughtParts.length > 0 ? nonThoughtParts : candidate.content.parts;
+
+    let text = targetParts
+      .map(p => (p && typeof p.text === 'string' ? p.text : ''))
+      .join('\n')
+      .trim();
+
+    // Limpiar etiquetas <thought>...</thought> si las hubiera
+    text = text.replace(/<thought>[\s\S]*?<\/thought>/gi, '').trim();
+
+    // Limpiar prefijos de tipo thought o thinking
+    text = text.replace(/^(?:thought|thinking)\s*[\:\-]?\s*/i, '').trim();
+
+    return text;
   },
 
   /**
@@ -363,7 +457,14 @@ export const aiAssistantService = {
           };
         }
 
-        const resText = (data.text || '').trim();
+        let resText = (data.text || '').trim();
+        if (!resText || resText.includes('no pude generar un resumen detallado') || resText.toLowerCase() === 'though') {
+          const localAnswer = this.answerContextualQuestionLocal(lastUserMsg, context);
+          if (localAnswer) {
+            return localAnswer;
+          }
+        }
+
         const fallbackText = data.isQuote 
           ? '¡Excelente! He preparado la propuesta de cotización para este evento:' 
           : 'He procesado tu consulta sobre el Palacio Barolo.';
@@ -498,7 +599,8 @@ ${JSON.stringify(context, null, 2)}`;
       }
 
       const data = await res.json();
-      const candidateText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      const candidate = data.candidates?.[0];
+      const candidateText = this.extractCandidateText(candidate);
 
       let quoteData = null;
       let isQuote = false;

@@ -51,8 +51,7 @@ Si el usuario hace preguntas sobre el calendario, disponibilidad, qué fechas es
 ### ⚠️ REGLAS OBLIGATORIAS DE RESPUESTA:
 - Hablá SIEMPRE y DIRECTAMENTE al usuario en primera persona, como el Copiloto Comercial del Palacio Barolo.
 - ESTÁ TERMINANTEMENTE PROHIBIDO incluir pensamientos internos, notas técnicas, análisis en inglés, borradores o checklists (como "User Input:", "Role:", "Task:", "Context Check:", "Concise? Yes", "Clear? Yes", etc.).
-- Tu respuesta debe ser EXCLUSIVAMENTE el mensaje final conversacional en español para el usuario.
-- Si el usuario consulta por fechas o períodos sin eventos registrados (por ejemplo un mes o año futuro como 2027), aclará con amabilidad en 2 oraciones que en el sistema actual solo hay registros para la temporada 2026, y mencioná el estado general de ingresos o agenda.
+- Si el usuario consulta por eventos de una fecha, mes, año o estado específico (por ejemplo "septiembre 2026", "enero 2027", "eventos confirmados", etc.), revisá minuciosamente el calendario y la lista de eventos en el contexto del sistema y respondé de manera ordenada con el nombre, fecha, salón, estado y asistentes de cada uno. Si para un período realmente no hay registros, informalo amablemente y ofrecé cotizar una nueva propuesta.
 
 ---
 ### 🏛️ CONTEXTO DEL PALACIO BAROLO:
@@ -129,6 +128,33 @@ function formatGeminiContents(messages = []) {
   }
 
   return contents.length > 0 ? contents : [{ role: 'user', parts: [{ text: 'Hola' }] }];
+}
+
+/**
+ * Extrae el texto conversacional real de un candidato de Gemini,
+ * descartando partes de pensamiento interno (thought: true en Gemini 2.0 Flash).
+ */
+function extractCandidateText(candidate) {
+  if (!candidate || !candidate.content || !Array.isArray(candidate.content.parts)) {
+    return '';
+  }
+
+  // Filtrar partes que no sean de pensamiento (en Gemini 2.0 vienen con thought: true)
+  const nonThoughtParts = candidate.content.parts.filter(p => !p.thought);
+  const targetParts = nonThoughtParts.length > 0 ? nonThoughtParts : candidate.content.parts;
+
+  let text = targetParts
+    .map(p => (p && typeof p.text === 'string' ? p.text : ''))
+    .join('\n')
+    .trim();
+
+  // Limpiar etiquetas <thought>...</thought> si las hubiera
+  text = text.replace(/<thought>[\s\S]*?<\/thought>/gi, '').trim();
+
+  // Limpiar prefijos de tipo thought o thinking
+  text = text.replace(/^(?:thought|thinking)\s*[\:\-]?\s*/i, '').trim();
+
+  return text;
 }
 
 /**
@@ -315,7 +341,7 @@ export default async function handler(req, res) {
 
     const data = await geminiResponse.json();
     const candidate = data.candidates?.[0];
-    const rawCandidateText = candidate?.content?.parts?.[0]?.text || '';
+    const rawCandidateText = extractCandidateText(candidate);
     const { isQuote, quoteData, cleanText } = extractQuoteData(rawCandidateText);
 
     const finalText = cleanText || (isQuote ? '¡Excelente! He preparado la propuesta de cotización para este evento:' : (candidate?.finishReason === 'SAFETY' ? '⚠️ La consulta no pudo ser completada por los filtros de seguridad de IA.' : 'He recibido tu consulta pero no pude generar un resumen detallado. ¿Podrías reformularla?'));
