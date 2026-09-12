@@ -18,19 +18,35 @@ export default async function handler(req, res) {
     return res.status(200).end();
   }
 
+  if (req.method === 'GET') {
+    const hasEnvKey = !!(process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY);
+    return res.status(200).json({
+      status: 'online',
+      service: 'Palacio Barolo Copilot IA API',
+      hasServerApiKey: hasEnvKey,
+      message: 'El endpoint de IA del Palacio Barolo está activo. Para consultar al copiloto, la aplicación realiza peticiones vía POST.'
+    });
+  }
+
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Método no permitido. Solo se acepta POST.' });
   }
 
   try {
-    const { messages = [], context = {}, clientApiKey } = req.body || {};
+    let body = req.body;
+    if (typeof body === 'string') {
+      try { body = JSON.parse(body); } catch (e) {}
+    }
+    const { messages = [], context = {}, clientApiKey } = body || {};
 
     const apiKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY || clientApiKey;
 
     if (!apiKey) {
-      return res.status(400).json({
+      return res.status(200).json({
+        success: false,
+        needsApiKey: true,
         error: 'NO_API_KEY',
-        message: 'No se encontró la clave de API de Gemini. Configurala en las variables de entorno de Vercel (GEMINI_API_KEY) o ingresala mediante el icono 🔑 del chat.'
+        message: '🔑 Para activar el Copiloto IA se requiere una clave de Google Gemini. Podés configurarla en Vercel como `GEMINI_API_KEY` o ingresarla haciendo clic en el icono de llave 🔑 arriba.'
       });
     }
 
@@ -92,13 +108,27 @@ Si el usuario hace preguntas sobre el calendario, disponibilidad, qué fechas es
 ${JSON.stringify(context, null, 2)}
 `;
 
-    // Mapeo del historial al formato de Gemini
+    // Filtrar y formatear historial según las especificaciones de Google Gemini:
+    // - Debe comenzar con el primer turno de 'user' (omitir bienvenida del asistente)
+    // - No debe incluir mensajes de error
+    // - Debe alternar estrictamente 'user' y 'model' (si son consecutivos, se concatenan)
+    const validMessages = (messages || [])
+      .filter(m => !m.isError && (m.text || m.content || '').trim().length > 0);
+
+    const firstUserIndex = validMessages.findIndex(m => m.role === 'user');
+    const conversationFromFirstUser = firstUserIndex >= 0 ? validMessages.slice(firstUserIndex) : [];
+
     const contents = [];
-    for (const msg of messages) {
-      contents.push({
-        role: msg.role === 'assistant' || msg.role === 'model' ? 'model' : 'user',
-        parts: [{ text: msg.text || msg.content }]
-      });
+    for (const msg of conversationFromFirstUser) {
+      const role = (msg.role === 'assistant' || msg.role === 'model') ? 'model' : 'user';
+      if (contents.length > 0 && contents[contents.length - 1].role === role) {
+        contents[contents.length - 1].parts[0].text += `\n\n${msg.text || msg.content}`;
+      } else {
+        contents.push({
+          role,
+          parts: [{ text: msg.text || msg.content }]
+        });
+      }
     }
 
     const payload = {
@@ -119,7 +149,6 @@ ${JSON.stringify(context, null, 2)}
       { version: 'v1beta', model: 'gemini-2.0-flash-lite' },
       { version: 'v1beta', model: 'gemini-1.5-flash-8b' },
       { version: 'v1beta', model: 'gemini-1.5-flash' },
-      { version: 'v1', model: 'gemini-1.5-flash' },
       { version: 'v1beta', model: 'gemini-1.5-pro' }
     ];
 
@@ -166,7 +195,7 @@ ${JSON.stringify(context, null, 2)}
         const diagData = await diagRes.json();
         if (diagData.models && diagData.models.length > 0) {
           const names = diagData.models.map(m => m.name.replace('models/', ''));
-          diagInfo = `Modelos activos en tu clave: ${names.slice(0, 6).join(', ')}`;
+          diagInfo = `Modelos disponibles para tu clave: ${names.slice(0, 6).join(', ')}`;
         } else if (diagData.error) {
           diagInfo = `Diagnóstico de Google: ${diagData.error.message}`;
         }
@@ -174,9 +203,16 @@ ${JSON.stringify(context, null, 2)}
         diagInfo = `Error de diagnóstico: ${diagErr.message}`;
       }
 
-      return res.status(response ? response.status : 500).json({
+      let cleanMessage = lastErrorBody;
+      try {
+        const parsed = JSON.parse(lastErrorBody);
+        if (parsed?.error?.message) cleanMessage = parsed.error.message;
+      } catch (e) {}
+
+      return res.status(200).json({
+        success: false,
         error: 'GEMINI_ERROR',
-        message: `Error de Google Gemini (${response ? response.status : 500}): ${lastErrorBody}${diagInfo ? `\n\n📌 ${diagInfo}` : ''}`
+        message: `⚠️ Error de Google Gemini (${response ? response.status : 500}): ${cleanMessage}${diagInfo ? `\n\n📌 ${diagInfo}` : ''}`
       });
     }
 

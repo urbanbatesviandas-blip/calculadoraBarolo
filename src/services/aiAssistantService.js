@@ -136,6 +136,13 @@ export const aiAssistantService = {
 
       if (response.ok) {
         const data = await response.json();
+        if (data.success === false) {
+          return {
+            success: false,
+            needsApiKey: !!data.needsApiKey || data.error === 'NO_API_KEY',
+            text: data.message || 'Hubo un inconveniente al comunicarse con Gemini.'
+          };
+        }
         return {
           success: true,
           text: data.text,
@@ -232,10 +239,25 @@ Si el usuario hace preguntas sobre el calendario, disponibilidad, qué fechas es
 ${JSON.stringify(context, null, 2)}
 `;
 
-      const contents = messages.map(msg => ({
-        role: msg.role === 'assistant' || msg.role === 'model' ? 'model' : 'user',
-        parts: [{ text: msg.text || msg.content }]
-      }));
+      // Filtrar y formatear historial según las especificaciones de Google Gemini:
+      const validMessages = (messages || [])
+        .filter(m => !m.isError && (m.text || m.content || '').trim().length > 0);
+
+      const firstUserIndex = validMessages.findIndex(m => m.role === 'user');
+      const conversationFromFirstUser = firstUserIndex >= 0 ? validMessages.slice(firstUserIndex) : [];
+
+      const contents = [];
+      for (const msg of conversationFromFirstUser) {
+        const role = (msg.role === 'assistant' || msg.role === 'model') ? 'model' : 'user';
+        if (contents.length > 0 && contents[contents.length - 1].role === role) {
+          contents[contents.length - 1].parts[0].text += `\n\n${msg.text || msg.content}`;
+        } else {
+          contents.push({
+            role,
+            parts: [{ text: msg.text || msg.content }]
+          });
+        }
+      }
 
       // Endpoints candidatos en cascada para máxima resiliencia (Gemini 2.0 Flash prioritario)
       const candidates = [
