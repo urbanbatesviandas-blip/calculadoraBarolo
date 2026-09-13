@@ -11,6 +11,7 @@ import { calculatorConfigService, DEFAULT_MASTER_COST_CATALOG, DEFAULT_MASTER_IN
 import { excelExportService } from '../services/excelExportService'
 import { htmlPresentationService } from '../services/htmlPresentationService'
 import CommercialProposalModal from './CommercialProposalModal'
+import DocumentPreviewModal from './DocumentPreviewModal'
 import { ClientViewServicesCard, ClientViewInvestmentCard } from './ClientViewCards'
 
 // Helper formatters
@@ -61,6 +62,7 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
   const isUserAdmin = isAdmin(currentUser)
 
   const [isProposalModalOpen, setIsProposalModalOpen] = useState(false)
+  const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false)
   const [isClientViewMode, setIsClientViewMode] = useState(false)
 
   // Configuración de plantilla maestra del Administrador
@@ -835,7 +837,7 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
   }
 
   const handleExportHtmlPresentation = () => {
-    htmlPresentationService.downloadPresentationHtml(buildPayload())
+    setIsPreviewModalOpen(true)
   }
 
   // Detección de solapamiento de salón en la misma fecha
@@ -2778,6 +2780,28 @@ export default function CalculatorView({ initialEventData, onSaveEvent, onSwitch
 
           </div>
         </div>
+      )}
+
+      {/* Modal de Propuesta Comercial Formal */}
+      {isProposalModalOpen && (
+        <CommercialProposalModal
+          event={buildPayload()}
+          currentUser={currentUser}
+          onClose={() => setIsProposalModalOpen(false)}
+        />
+      )}
+
+      {/* Modal de Vista Previa Interactiva */}
+      {isPreviewModalOpen && (
+        <DocumentPreviewModal
+          isOpen={isPreviewModalOpen}
+          onClose={() => setIsPreviewModalOpen(false)}
+          title={`Presentación — ${eventName || 'Cotización en Proceso'}`}
+          subtitle={`Cotización ${calcCode || 'CALC'} para ${clientName || 'Cliente'} (${venue || 'Salón Barolo'})`}
+          htmlContent={htmlPresentationService.generatePresentationHtml(buildPayload())}
+          filename={`Presentacion_${(calcCode || 'COTIZACION').replace(/[^a-zA-Z0-9_-]/g, '_')}_${(eventName || 'Evento').replace(/[^a-zA-Z0-9_-]/g, '_')}.html`}
+          badge="Presentación Comercial"
+        />
       )}
     </div>
   )

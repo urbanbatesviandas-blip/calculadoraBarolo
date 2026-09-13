@@ -11,6 +11,7 @@ import { htmlPresentationService } from '../services/htmlPresentationService'
 import { canEditEvent, canChangeStatus, canViewSensitiveData, isAdmin } from '../services/authService'
 import { eventService, parseNotesAndComments } from '../services/eventService'
 import CommercialProposalModal from './CommercialProposalModal'
+import DocumentPreviewModal from './DocumentPreviewModal'
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -27,6 +28,7 @@ export default function EventDrilldownModal({ event, onClose, onUpdateStatus, on
   if (!event) return null
 
   const [isProposalOpen, setIsProposalOpen] = useState(false)
+  const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false)
 
   const userCanEdit = canEditEvent(currentUser)
   const userCanChange = canChangeStatus(currentUser)
@@ -736,12 +738,12 @@ export default function EventDrilldownModal({ event, onClose, onUpdateStatus, on
             </button>
 
             <button
-              onClick={() => htmlPresentationService.downloadPresentationHtml(event)}
+              onClick={() => setIsPreviewModalOpen(true)}
               className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold bg-indigo-50 text-indigo-900 border border-indigo-300 hover:bg-indigo-100 transition-colors cursor-pointer"
-              title="Descargar Presentación Interactiva (.html) para compartir pantalla o enviar"
+              title="Vista previa de la presentación interactiva antes de descargar"
             >
               <MonitorPlay className="w-4 h-4 text-indigo-600" />
-              <span>Presentación HTML</span>
+              <span>Ver Presentación HTML</span>
             </button>
 
             <button
@@ -832,6 +834,19 @@ export default function EventDrilldownModal({ event, onClose, onUpdateStatus, on
           event={event}
           currentUser={currentUser}
           onClose={() => setIsProposalOpen(false)}
+        />
+      )}
+
+      {/* Modal de Vista Previa Interactiva */}
+      {isPreviewModalOpen && (
+        <DocumentPreviewModal
+          isOpen={isPreviewModalOpen}
+          onClose={() => setIsPreviewModalOpen(false)}
+          title={`Presentación — ${event.name || 'Evento'}`}
+          subtitle={`Presentación interactiva para ${event.client_name || 'Cliente'} (${event.calc_code || 'CALC'})`}
+          htmlContent={htmlPresentationService.generatePresentationHtml(event)}
+          filename={`Presentacion_${(event.calc_code || 'PROPOSAL').replace(/[^a-zA-Z0-9_-]/g, '_')}_${(event.name || 'Evento').replace(/[^a-zA-Z0-9_-]/g, '_')}.html`}
+          badge="Presentación Interactiva"
         />
       )}
     </div>

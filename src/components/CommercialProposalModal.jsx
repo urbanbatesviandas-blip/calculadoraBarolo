@@ -1,8 +1,9 @@
-import React from 'react'
-import { X, Printer, Download, Building, Calendar, Users, DollarSign, Clock, ShieldCheck, Mail, Phone, FileText, MonitorPlay } from 'lucide-react'
+import React, { useState } from 'react'
+import { X, Printer, Download, Building, Calendar, Users, DollarSign, Clock, ShieldCheck, Mail, Phone, FileText, MonitorPlay, Eye } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { htmlPresentationService } from '../services/htmlPresentationService'
+import DocumentPreviewModal from './DocumentPreviewModal'
 
 const formatARS = (val) => {
   const num = Number(val) || 0
@@ -15,6 +16,7 @@ const formatARS = (val) => {
 }
 
 export default function CommercialProposalModal({ event, onClose, currentUser }) {
+  const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false)
   if (!event) return null
 
   const handlePrint = () => {
@@ -65,12 +67,12 @@ export default function CommercialProposalModal({ event, onClose, currentUser })
 
           <div className="flex items-center space-x-2">
             <button
-              onClick={() => htmlPresentationService.downloadPresentationHtml(event)}
+              onClick={() => setIsPreviewModalOpen(true)}
               className="flex items-center space-x-1.5 bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-400/40 px-3.5 py-2 rounded-xl text-xs font-bold transition-all active:scale-95 cursor-pointer shadow"
-              title="Descargar archivo HTML interactivo para proyectar o presentar"
+              title="Vista previa interactiva antes de descargar"
             >
-              <MonitorPlay className="w-4 h-4 text-amber-300" />
-              <span>Presentación HTML</span>
+              <Eye className="w-4 h-4 text-amber-300" />
+              <span>Ver Presentación HTML</span>
             </button>
 
             <button
@@ -280,9 +282,20 @@ export default function CommercialProposalModal({ event, onClose, currentUser })
           </div>
 
         </div>
-
       </div>
 
+      {/* Modal de Vista Previa Interactiva */}
+      {isPreviewModalOpen && (
+        <DocumentPreviewModal
+          isOpen={isPreviewModalOpen}
+          onClose={() => setIsPreviewModalOpen(false)}
+          title={`Presentación — ${event.name || 'Evento'}`}
+          subtitle={`Propuesta interactiva para ${event.client_name || 'Cliente'} (${event.calc_code || 'PROPOSAL'})`}
+          htmlContent={htmlPresentationService.generatePresentationHtml(event)}
+          filename={`Presentacion_${(event.calc_code || 'PROPOSAL').replace(/[^a-zA-Z0-9_-]/g, '_')}_${(event.name || 'Evento').replace(/[^a-zA-Z0-9_-]/g, '_')}.html`}
+          badge="Presentación Comercial"
+        />
+      )}
     </div>
   )
 }

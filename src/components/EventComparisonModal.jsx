@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react'
+import React, { useState, useMemo } from 'react'
 import { X, FileSpreadsheet, Trophy, DollarSign, TrendingUp, Users, Calendar, MapPin, CheckCircle2, Clock, Eye, Trash2, ArrowRight, MonitorPlay } from 'lucide-react'
 import { Bar } from 'react-chartjs-2'
 import {
@@ -12,6 +12,7 @@ import {
 } from 'chart.js'
 import { excelExportService } from '../services/excelExportService'
 import { htmlComparisonService } from '../services/htmlComparisonService'
+import DocumentPreviewModal from './DocumentPreviewModal'
 
 ChartJS.register(
   CategoryScale,
@@ -23,6 +24,8 @@ ChartJS.register(
 )
 
 export default function EventComparisonModal({ events = [], onClose, onSelectEvent, onRemoveEvent, isOpen }) {
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false)
+
   if (isOpen !== undefined && !isOpen) return null
   if (!events || events.length < 2) return null
 
@@ -38,21 +41,40 @@ export default function EventComparisonModal({ events = [], onClose, onSelectEve
       const gross = Number(e.gross_income) || 0
       const profit = Number(e.barolo_profit) || 0
       const margin = Number(e.margin_pct) || 0
-      const costPerPax = e.attendees > 0 ? (Number(e.total_costs) || 0) / e.attendees : Infinity
+      const pax = Number(e.attendees) || 0
+      const costs = Number(e.total_costs) || 0
 
       if (gross > (Number(maxIncome.gross_income) || 0)) maxIncome = e
       if (profit > (Number(maxProfit.barolo_profit) || 0)) maxProfit = e
       if (margin > (Number(maxMargin.margin_pct) || 0)) maxMargin = e
-      if (costPerPax < lowestCostVal) {
-        lowestCostVal = costPerPax
-        minCostPerPax = e
+
+      if (pax > 0) {
+        const costPerPax = costs / pax
+        if (costPerPax < lowestCostVal) {
+          lowestCostVal = costPerPax
+          minCostPerPax = e
+        }
       }
     })
 
-    return { maxIncome, maxProfit, maxMargin, minCostPerPax }
+    return { maxIncome, maxProfit, maxMargin, minCostPerPax, lowestCostVal }
   }, [events])
 
-  // 2. Datos para el Gráfico Comparativo de Barras
+  // 2. Formatear y preparar datos
+  const formattedEvents = useMemo(() => {
+    return events.map(e => ({
+      ...e,
+      gross_income_num: Number(e.gross_income) || 0,
+      total_costs_num: Number(e.total_costs) || 0,
+      barolo_profit_num: Number(e.barolo_profit) || 0,
+      producer_profit_num: Number(e.producer_profit) || 0,
+      margin_pct_num: Number(e.margin_pct) || 0,
+      cost_per_pax: (e.attendees > 0 ? (Number(e.total_costs) || 0) / e.attendees : 0),
+      income_per_pax: (e.attendees > 0 ? (Number(e.gross_income) || 0) / e.attendees : 0)
+    }))
+  }, [events])
+
+  // 3. Datos para el Gráfico Comparativo de Barras
   const chartData = useMemo(() => {
     const labels = events.map(e => {
       const client = e.client_name && e.client_name !== 'Particular' && e.client_name !== 'Cliente Barolo' ? ` (${e.client_name})` : ''
@@ -131,7 +153,7 @@ export default function EventComparisonModal({ events = [], onClose, onSelectEve
   }
 
   const handleExportHtml = () => {
-    htmlComparisonService.downloadComparisonHtml(events)
+    setIsPreviewOpen(true)
   }
 
   return (
@@ -728,8 +750,20 @@ export default function EventComparisonModal({ events = [], onClose, onSelectEve
             </button>
           </div>
         </div>
-
       </div>
+
+      {/* Modal de Vista Previa Interactiva */}
+      {isPreviewOpen && (
+        <DocumentPreviewModal
+          isOpen={isPreviewOpen}
+          onClose={() => setIsPreviewOpen(false)}
+          title={`Comparativa de ${events.length} Eventos`}
+          subtitle="Matriz interactiva de facturación, estructura de costos y rentabilidad"
+          htmlContent={htmlComparisonService.generateComparisonHtml(events)}
+          filename={`Comparativa_Palacio_Barolo_${events.length}_Eventos_${new Date().toISOString().slice(0, 10)}.html`}
+          badge="Comparativa Interactiva"
+        />
+      )}
     </div>
   )
 }

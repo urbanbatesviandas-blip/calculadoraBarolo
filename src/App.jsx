@@ -9,6 +9,7 @@ import EventComparisonModal from './components/EventComparisonModal'
 import CalculatorConfigView from './components/CalculatorConfigView'
 import UserManagementView from './components/UserManagementView'
 import UserManualView from './components/UserManualView'
+import DocumentPreviewModal from './components/DocumentPreviewModal'
 import LoginView from './components/LoginView'
 import AdminSidebar from './components/AdminSidebar'
 import AiAssistantDrawer from './components/AiAssistantDrawer'
@@ -32,6 +33,7 @@ export default function App() {
   const [calculatorEvent, setCalculatorEvent] = useState(null)
   const [calendarTargetDate, setCalendarTargetDate] = useState(null)
   const [isComparisonOpen, setIsComparisonOpen] = useState(false)
+  const [isComparisonPreviewOpen, setIsComparisonPreviewOpen] = useState(false)
   const [comparisonEventIds, setComparisonEventIds] = useState([])
   const [currentUser, setCurrentUser] = useState(() => authService.getCurrentUser())
   const [isAdminSidebarOpen, setIsAdminSidebarOpen] = useState(false)
@@ -405,10 +407,10 @@ export default function App() {
             </button>
 
             <button
-              onClick={() => htmlComparisonService.downloadComparisonHtml(comparisonEvents)}
+              onClick={() => setIsComparisonPreviewOpen(true)}
               disabled={comparisonEvents.length < 2}
               className="flex items-center space-x-1 bg-barolo-gold hover:bg-barolo-gold-light text-barolo-navy px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shadow-sm border border-barolo-gold-dark/30"
-              title="Descargar comparativa interactiva en HTML"
+              title="Vista previa interactiva de la comparativa en HTML"
             >
               <MonitorPlay className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">HTML</span>
@@ -473,6 +475,19 @@ export default function App() {
           events={events}
           currentView={currentView}
           onFillCalculator={handleAiFillCalculator}
+        />
+      )}
+
+      {/* Modal de Vista Previa de Comparativa */}
+      {isComparisonPreviewOpen && comparisonEvents.length >= 2 && (
+        <DocumentPreviewModal
+          isOpen={isComparisonPreviewOpen}
+          onClose={() => setIsComparisonPreviewOpen(false)}
+          title={`Comparativa de ${comparisonEvents.length} Eventos`}
+          subtitle="Matriz interactiva de facturación, estructura de costos y rentabilidad"
+          htmlContent={htmlComparisonService.generateComparisonHtml(comparisonEvents)}
+          filename={`Comparativa_Palacio_Barolo_${comparisonEvents.length}_Eventos_${new Date().toISOString().slice(0, 10)}.html`}
+          badge="Comparativa Interactiva"
         />
       )}
 
