@@ -2,8 +2,74 @@ import { supabase, isSupabaseConfigured } from './supabaseClient'
 import initialEvents from '../data/historicalEvents.json'
 
 const LOCAL_STORAGE_KEY = 'barolo_events_v3'
+const VAULT_STORAGE_KEY = 'barolo_recovery_vault_v1'
+const SNAPSHOT_STORAGE_KEY = 'barolo_auto_snapshots_v1'
 
 const isUuidString = (str) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str)
+
+// Helper para filtrar datos válidos activos (excluye registros de sistema y eventos con soft-delete)
+const isNotDeleted = (e) => {
+  if (!e) return false
+  if (e.calc_code?.startsWith('SYS-')) return false
+  if (e.cancellation_reason === 'CONFIG_STORAGE') return false
+  if (e.cancellation_reason === 'SOFT_DELETED') return false
+  if (e.is_deleted === true) return false
+  return true
+}
+
+// Bóveda de eventos eliminados para recuperación por programadores / administradores
+const saveToDeletedVault = (deletedEvent) => {
+  try {
+    const raw = localStorage.getItem(VAULT_STORAGE_KEY)
+    const list = raw ? JSON.parse(raw) : []
+    const updated = [deletedEvent, ...list.filter(item => (item.id !== deletedEvent.id && item.calc_code !== deletedEvent.calc_code))].slice(0, 100)
+    localStorage.setItem(VAULT_STORAGE_KEY, JSON.stringify(updated))
+  } catch (err) {
+    console.warn('Silent vault save warning:', err)
+  }
+}
+
+const getDeletedVault = () => {
+  try {
+    const raw = localStorage.getItem(VAULT_STORAGE_KEY)
+    return raw ? JSON.parse(raw) : []
+  } catch (e) {
+    return []
+  }
+}
+
+// Bóveda de Snapshots automáticos en segundo plano
+const updateSilentSnapshot = (currentEvents) => {
+  try {
+    const active = currentEvents.filter(isNotDeleted)
+    const snapshot = {
+      id: `snap-${Date.now()}`,
+      timestamp: new Date().toISOString(),
+      count: active.length,
+      events: active
+    }
+    const raw = localStorage.getItem(SNAPSHOT_STORAGE_KEY)
+    const list = raw ? JSON.parse(raw) : []
+    const updated = [snapshot, ...list].slice(0, 20)
+    localStorage.setItem(SNAPSHOT_STORAGE_KEY, JSON.stringify(updated))
+
+    if (isSupabaseConfigured() && supabase) {
+      supabase.from('events').upsert({
+        calc_code: 'SYS-BACKUP-SNAPSHOT',
+        name: 'Sistema - Snapshot Automático de Seguridad',
+        notes: JSON.stringify({
+          updatedAt: snapshot.timestamp,
+          count: snapshot.count,
+          data: snapshot.events
+        }),
+        event_date: new Date().toISOString().slice(0, 10),
+        status: 'sistema'
+      }, { onConflict: 'calc_code' }).then(() => {}).catch(() => {})
+    }
+  } catch (err) {
+    console.warn('Silent snapshot warning:', err)
+  }
+}
 
 // Inicializar eventos locales si no existen
 const getLocalEvents = () => {
@@ -15,7 +81,7 @@ const getLocalEvents = () => {
       const parsed = JSON.parse(saved)
       if (Array.isArray(parsed) && parsed.length > 0) {
         const seen = new Map()
-        parsed.filter(e => !e.calc_code?.startsWith('SYS-') && e.cancellation_reason !== 'CONFIG_STORAGE').forEach(item => {
+        parsed.filter(isNotDeleted).forEach(item => {
           const key = item.calc_code || item.id
           if (!seen.has(key) || isUuidString(item.id)) {
             seen.set(key, item)
@@ -23,7 +89,7 @@ const getLocalEvents = () => {
         })
         // Incorporar automáticamente nuevos eventos históricos oficiales (ej: LC-076) si no existían
         if (Array.isArray(initialEvents)) {
-          initialEvents.filter(e => !e.calc_code?.startsWith('SYS-') && e.cancellation_reason !== 'CONFIG_STORAGE').forEach(item => {
+          initialEvents.filter(isNotDeleted).forEach(item => {
             const key = item.calc_code || item.id
             if (!seen.has(key)) {
               seen.set(key, item)
@@ -42,7 +108,7 @@ const getLocalEvents = () => {
   // Si no hay datos guardados previamente, inicializar con los eventos históricos base
   try {
     if (Array.isArray(initialEvents) && initialEvents.length > 0) {
-      const cleanInitial = initialEvents.filter(e => !e.calc_code?.startsWith('SYS-') && e.cancellation_reason !== 'CONFIG_STORAGE')
+      const cleanInitial = initialEvents.filter(isNotDeleted)
       saveLocalEvents(cleanInitial)
       return cleanInitial.map(unpackEventMeta)
     }
@@ -55,8 +121,9 @@ const getLocalEvents = () => {
 
 const saveLocalEvents = (events) => {
   try {
-    const cleanEvents = events.filter(e => !e.calc_code?.startsWith('SYS-') && e.cancellation_reason !== 'CONFIG_STORAGE')
+    const cleanEvents = events.filter(isNotDeleted)
     localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(cleanEvents))
+    updateSilentSnapshot(cleanEvents)
   } catch (e) {
     console.error('Error saving to localStorage', e)
   }
@@ -86,6 +153,7 @@ export const eventService = {
         if (data) {
           const eventsOnly = data
             .filter(e => !e.calc_code?.startsWith('SYS-') && e.cancellation_reason !== 'CONFIG_STORAGE')
+            .filter(isNotDeleted)
             .map(unpackEventMeta)
           const sorted = eventsOnly.sort((a, b) => 
             (b.event_date || '').localeCompare(a.event_date || '')
@@ -117,6 +185,7 @@ export const eventService = {
       if (data && data.length > 0) {
         const cleanEvents = data
           .filter(e => !e.calc_code?.startsWith('SYS-') && e.cancellation_reason !== 'CONFIG_STORAGE')
+          .filter(isNotDeleted)
           .map(unpackEventMeta)
         saveLocalEvents(cleanEvents)
         return { success: true, count: cleanEvents.length, events: cleanEvents }
@@ -302,20 +371,33 @@ export const eventService = {
   },
 
   // Eliminar evento
+  // Eliminar evento (SOFT DELETE seguro: nunca destruye datos, resguarda en bóveda de recuperación)
   async deleteEvent(eventId) {
+    const locals = getLocalEvents()
+    const target = locals.find(e => e.id === eventId || e.calc_code === eventId)
+
+    // Resguardar copia completa en la bóveda silenciosa de recuperación
+    if (target) {
+      saveToDeletedVault({
+        ...target,
+        deleted_at: new Date().toISOString()
+      })
+    }
+
     if (isSupabaseConfigured() && supabase) {
       try {
-        const locals = getLocalEvents()
-        const localEv = locals.find(e => e.id === eventId || e.calc_code === eventId)
         const isUuid = isUuidString(eventId)
+        let query = supabase.from('events').update({
+          cancellation_reason: 'SOFT_DELETED',
+          updated_at: new Date().toISOString()
+        })
 
-        let query = supabase.from('events').delete()
         if (isUuid) {
           query = query.eq('id', eventId)
-        } else if (String(eventId).startsWith('CALC-')) {
+        } else if (String(eventId).startsWith('CALC-') || String(eventId).startsWith('LC-')) {
           query = query.eq('calc_code', eventId)
-        } else if (localEv?.calc_code) {
-          query = query.eq('calc_code', localEv.calc_code)
+        } else if (target?.calc_code) {
+          query = query.eq('calc_code', target.calc_code)
         } else {
           const match = String(eventId).match(/evt-0*(\d+)/)
           if (match) {
@@ -326,12 +408,102 @@ export const eventService = {
         }
         await query
       } catch (err) {
-        console.warn('Supabase delete failed', err)
+        console.warn('Supabase soft-delete fallback to vault:', err)
       }
     }
-    const locals = getLocalEvents().filter(e => e.id !== eventId && e.calc_code !== eventId)
-    saveLocalEvents(locals)
+
+    const localsRemaining = locals.filter(e => e.id !== eventId && e.calc_code !== eventId)
+    saveLocalEvents(localsRemaining)
     return { success: true }
+  },
+
+  // Restaurar un evento eliminado desde la bóveda o Supabase
+  async restoreDeletedEvent(identifier) {
+    const vault = getDeletedVault()
+    const target = vault.find(e => e.id === identifier || e.calc_code === identifier)
+
+    if (isSupabaseConfigured() && supabase) {
+      try {
+        const isUuid = isUuidString(identifier)
+        let query = supabase.from('events').update({
+          cancellation_reason: null,
+          updated_at: new Date().toISOString()
+        })
+        if (isUuid) {
+          query = query.eq('id', identifier)
+        } else {
+          query = query.eq('calc_code', identifier)
+        }
+        await query
+      } catch (err) {
+        console.warn('Supabase restore warning:', err)
+      }
+    }
+
+    if (target) {
+      const restored = {
+        ...target,
+        cancellation_reason: null,
+        updated_at: new Date().toISOString()
+      }
+      delete restored.deleted_at
+
+      const updatedVault = vault.filter(e => e.id !== identifier && e.calc_code !== identifier)
+      localStorage.setItem(VAULT_STORAGE_KEY, JSON.stringify(updatedVault))
+
+      await this.saveEvent(restored)
+      return { success: true, restored }
+    }
+
+    if (isSupabaseConfigured() && supabase) {
+      try {
+        const isUuid = isUuidString(identifier)
+        let query = supabase.from('events').select('*')
+        if (isUuid) query = query.eq('id', identifier)
+        else query = query.eq('calc_code', identifier)
+        const { data } = await query.single()
+        if (data) {
+          const restored = unpackEventMeta({ ...data, cancellation_reason: null })
+          await this.saveEvent(restored)
+          return { success: true, restored }
+        }
+      } catch (e) {}
+    }
+
+    return { success: false, error: `Evento ${identifier} no encontrado en la bóveda de recuperación` }
+  },
+
+  // Obtener copias de seguridad automáticas
+  getSnapshots() {
+    try {
+      const raw = localStorage.getItem(SNAPSHOT_STORAGE_KEY)
+      return raw ? JSON.parse(raw) : []
+    } catch (e) {
+      return []
+    }
+  },
+
+  // Restaurar un snapshot de seguridad completo
+  async restoreSnapshot(snapshotId) {
+    try {
+      const snaps = this.getSnapshots()
+      const target = snapshotId ? snaps.find(s => s.id === snapshotId) : snaps[0]
+      if (!target || !Array.isArray(target.events) || target.events.length === 0) {
+        return { success: false, error: 'Snapshot no encontrado o sin eventos válidos' }
+      }
+
+      saveLocalEvents(target.events)
+
+      if (isSupabaseConfigured() && supabase) {
+        for (const ev of target.events) {
+          await this.saveEvent(ev).catch(() => {})
+        }
+      }
+
+      return { success: true, count: target.events.length, snapshot: target }
+    } catch (err) {
+      return { success: false, error: err.message }
+    }
   },
 
   // Reset a los datos originales
@@ -427,4 +599,96 @@ export function serializeNotesAndComments(notes, comments) {
   if (!comments || comments.length === 0) return cleanNotes
   return `${cleanNotes}\n\n<!-- PB_COMMENTS_START -->\n${JSON.stringify(comments)}\n<!-- PB_COMMENTS_END -->`
 }
+
+// =========================================================================
+// BÓVEDA SILENCIOSA DE RESCATE PARA DESARROLLADORES / ADMINISTRADORES
+// =========================================================================
+if (typeof window !== 'undefined') {
+  window.baroloRescue = {
+    help: () => {
+      console.log(`%c
+======================================================
+🛡️  PALACIO BAROLO - CONSOLA DE RESCATE (ADMIN/DEV)
+======================================================
+Comandos disponibles para recuperar datos:
+
+1. baroloRescue.listDeleted()
+   Muestra la tabla de todos los eventos eliminados (Soft-Delete)
+   con sus códigos (ej: CALC-005), fechas y nombre del cliente.
+
+2. baroloRescue.restoreEvent('CALC-005')
+   Restaura de inmediato el evento indicado a la grilla activa.
+
+3. baroloRescue.listSnapshots()
+   Muestra el historial de puntos de restauración automáticos (Snapshots).
+
+4. baroloRescue.restoreSnapshot('id_snapshot')
+   Restaura la base de datos completa al estado de dicho snapshot.
+   (Si se omite el ID, restaura el último snapshot guardado).
+======================================================`, 'color: #38bdf8; font-family: monospace; font-size: 12px;')
+      return 'Consola de rescate activa. Ejecute baroloRescue.listDeleted() para comenzar.'
+    },
+
+    listDeleted: () => {
+      const vault = getDeletedVault()
+      console.log(`%c[Barolo Rescue] ${vault.length} evento(s) en la bóveda de recuperación:`, 'color: #10b981; font-weight: bold;')
+      if (vault.length === 0) {
+        console.info('La bóveda está limpia. No hay eventos eliminados recientemente.')
+        return []
+      }
+      console.table(vault.map(e => ({
+        Codigo: e.calc_code || e.id,
+        Cliente_o_Evento: e.name || e.client_name,
+        Fecha_Evento: e.event_date,
+        Estado_Original: e.status,
+        Eliminado_El: e.deleted_at || 'Reciente'
+      })))
+      return vault
+    },
+
+    restoreEvent: async (identifier) => {
+      if (!identifier) {
+        console.warn('Debe indicar el código o ID del evento. Ejemplo: baroloRescue.restoreEvent("CALC-005")')
+        return null
+      }
+      console.log(`%c[Barolo Rescue] Restaurando ${identifier}...`, 'color: #3b82f6; font-weight: bold;')
+      const res = await eventService.restoreDeletedEvent(identifier)
+      if (res.success) {
+        console.log(`%c[Barolo Rescue] Evento ${res.restored?.calc_code || identifier} restaurado exitosamente! Recargue la página para actualizar las vistas.`, 'color: #10b981; font-weight: bold;')
+        return res.restored
+      } else {
+        console.error('[Barolo Rescue] Error:', res.error)
+        return null
+      }
+    },
+
+    listSnapshots: () => {
+      const snaps = eventService.getSnapshots()
+      console.log(`%c[Barolo Rescue] ${snaps.length} puntos de restauración automáticos disponibles:`, 'color: #10b981; font-weight: bold;')
+      if (snaps.length === 0) {
+        console.info('No hay snapshots registrados todavía.')
+        return []
+      }
+      console.table(snaps.map(s => ({
+        ID: s.id,
+        Fecha_Hora: s.timestamp,
+        Cantidad_Eventos: s.count
+      })))
+      return snaps
+    },
+
+    restoreSnapshot: async (snapshotId) => {
+      console.log(`%c[Barolo Rescue] Restaurando punto de guardado ${snapshotId || '(último disponible)'}...`, 'color: #f59e0b; font-weight: bold;')
+      const res = await eventService.restoreSnapshot(snapshotId)
+      if (res.success) {
+        console.log(`%c[Barolo Rescue] ¡Restauración exitosa! Se recuperaron ${res.count} eventos. Recargue la página para aplicar los cambios.`, 'color: #10b981; font-weight: bold;')
+        return res
+      } else {
+        console.error('[Barolo Rescue] Error al restaurar snapshot:', res.error)
+        return null
+      }
+    }
+  }
+}
+
 
