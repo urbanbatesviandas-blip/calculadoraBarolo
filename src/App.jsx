@@ -20,7 +20,12 @@ import { htmlComparisonService } from './services/htmlComparisonService'
 import { Scale, X, FileSpreadsheet, ArrowRight, MonitorPlay } from 'lucide-react'
 
 export default function App() {
-  const [currentView, setCurrentView] = useState('calendar') // 'calendar', 'calculator', 'dashboard', 'list', 'calculator_config', 'users'
+  const [currentView, setCurrentView] = useState(() => {
+    if (typeof window !== 'undefined' && window.location.pathname.toLowerCase().includes('manual')) {
+      return 'manual'
+    }
+    return 'calendar'
+  }) // 'calendar', 'calculator', 'dashboard', 'list', 'calculator_config', 'users', 'manual'
   const [events, setEvents] = useState([])
   const [loading, setLoading] = useState(true)
   const [selectedEvent, setSelectedEvent] = useState(null)
