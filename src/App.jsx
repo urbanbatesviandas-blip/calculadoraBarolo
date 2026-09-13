@@ -9,6 +9,7 @@ import EventComparisonModal from './components/EventComparisonModal'
 import CalculatorConfigView from './components/CalculatorConfigView'
 import UserManagementView from './components/UserManagementView'
 import UserManualView from './components/UserManualView'
+import RescueConsoleView from './components/RescueConsoleView'
 import DocumentPreviewModal from './components/DocumentPreviewModal'
 import LoginView from './components/LoginView'
 import AdminSidebar from './components/AdminSidebar'
@@ -22,11 +23,18 @@ import { Scale, X, FileSpreadsheet, ArrowRight, MonitorPlay } from 'lucide-react
 
 export default function App() {
   const [currentView, setCurrentView] = useState(() => {
-    if (typeof window !== 'undefined' && window.location.pathname.toLowerCase().includes('manual')) {
-      return 'manual'
+    if (typeof window !== 'undefined') {
+      const path = window.location.pathname.toLowerCase()
+      const hash = window.location.hash.toLowerCase()
+      if (path.includes('rescue') || path.includes('rescute') || hash.includes('rescue') || hash.includes('rescute')) {
+        return 'rescue'
+      }
+      if (path.includes('manual')) {
+        return 'manual'
+      }
     }
     return 'calendar'
-  }) // 'calendar', 'calculator', 'dashboard', 'list', 'calculator_config', 'users', 'manual'
+  }) // 'calendar', 'calculator', 'dashboard', 'list', 'calculator_config', 'users', 'manual', 'rescue'
   const [events, setEvents] = useState([])
   const [loading, setLoading] = useState(true)
   const [selectedEvent, setSelectedEvent] = useState(null)
@@ -118,6 +126,25 @@ export default function App() {
       }
     }
   }, [currentUser])
+
+  // Listener de cambios de URL para soportar rutas directas como /rescue
+  useEffect(() => {
+    const handleLocationCheck = () => {
+      if (typeof window !== 'undefined') {
+        const path = window.location.pathname.toLowerCase()
+        const hash = window.location.hash.toLowerCase()
+        if (path.includes('rescue') || path.includes('rescute') || hash.includes('rescue') || hash.includes('rescute')) {
+          setCurrentView('rescue')
+        }
+      }
+    }
+    window.addEventListener('popstate', handleLocationCheck)
+    window.addEventListener('hashchange', handleLocationCheck)
+    return () => {
+      window.removeEventListener('popstate', handleLocationCheck)
+      window.removeEventListener('hashchange', handleLocationCheck)
+    }
+  }, [])
 
   const showToast = (msg) => {
     setToastMessage(msg)
@@ -239,6 +266,20 @@ export default function App() {
   }
 
   const quotesCount = events.filter(e => e.status === 'cotizado').length
+
+  // Si estamos en la consola secreta de rescate del programador (/rescue)
+  if (currentView === 'rescue') {
+    return (
+      <RescueConsoleView
+        onExitToApp={() => {
+          if (typeof window !== 'undefined') {
+            window.history.pushState({}, '', '/')
+          }
+          setCurrentView('calendar')
+        }}
+      />
+    )
+  }
 
   // Si no hay usuario autenticado, mostrar pantalla de ingreso directo
   if (!currentUser) {

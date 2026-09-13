@@ -152,7 +152,6 @@ export const eventService = {
         
         if (data) {
           const eventsOnly = data
-            .filter(e => !e.calc_code?.startsWith('SYS-') && e.cancellation_reason !== 'CONFIG_STORAGE')
             .filter(isNotDeleted)
             .map(unpackEventMeta)
           const sorted = eventsOnly.sort((a, b) => 
@@ -184,7 +183,6 @@ export const eventService = {
       if (error) throw error
       if (data && data.length > 0) {
         const cleanEvents = data
-          .filter(e => !e.calc_code?.startsWith('SYS-') && e.cancellation_reason !== 'CONFIG_STORAGE')
           .filter(isNotDeleted)
           .map(unpackEventMeta)
         saveLocalEvents(cleanEvents)
@@ -370,13 +368,12 @@ export const eventService = {
     return { success: false, error: 'Evento no encontrado' }
   },
 
-  // Eliminar evento
   // Eliminar evento (SOFT DELETE seguro: nunca destruye datos, resguarda en bóveda de recuperación)
   async deleteEvent(eventId) {
     const locals = getLocalEvents()
     const target = locals.find(e => e.id === eventId || e.calc_code === eventId)
 
-    // Resguardar copia completa en la bóveda silenciosa de recuperación
+    // Resguardar en la bóveda de recuperación
     if (target) {
       saveToDeletedVault({
         ...target,
@@ -471,6 +468,45 @@ export const eventService = {
     }
 
     return { success: false, error: `Evento ${identifier} no encontrado en la bóveda de recuperación` }
+  },
+
+  // Obtener lista completa de eventos en papelera (Bóveda local + Supabase)
+  async getDeletedEvents() {
+    const localVault = getDeletedVault()
+    const map = new Map()
+    localVault.forEach(e => {
+      const k = e.calc_code || e.id
+      map.set(k, e)
+    })
+
+    if (isSupabaseConfigured() && supabase) {
+      try {
+        const { data, error } = await supabase
+          .from('events')
+          .select('*')
+          .eq('cancellation_reason', 'SOFT_DELETED')
+          .order('updated_at', { ascending: false })
+
+        if (!error && Array.isArray(data)) {
+          data.forEach(item => {
+            const unpacked = unpackEventMeta(item)
+            const k = unpacked.calc_code || unpacked.id
+            if (!map.has(k)) {
+              map.set(k, {
+                ...unpacked,
+                deleted_at: unpacked.updated_at || new Date().toISOString()
+              })
+            }
+          })
+        }
+      } catch (err) {
+        console.warn('Supabase fetch deleted events fallback:', err)
+      }
+    }
+
+    return Array.from(map.values()).sort((a, b) => 
+      (b.deleted_at || b.updated_at || '').localeCompare(a.deleted_at || a.updated_at || '')
+    )
   },
 
   // Obtener copias de seguridad automáticas

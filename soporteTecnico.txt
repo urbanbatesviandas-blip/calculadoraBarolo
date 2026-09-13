@@ -1,0 +1,41 @@
+================================================================================
+🛡️ CREDENCIALES DE SOPORTE TÉCNICO Y CONSOLA DE RESCATE (PALACIO BAROLO)
+================================================================================
+ATENCIÓN: DOCUMENTO ESTRICTAMENTE CONFIDENCIAL PARA EL PROGRAMADOR / DESARROLLADOR.
+NINGÚN USUARIO, ADMINISTRADOR NI PERSONAL DEL CLIENTE (PALACIO BAROLO) DEBE TENER 
+ACCESO A ESTA URL NI A ESTAS CREDENCIALES.
+
+--------------------------------------------------------------------------------
+1. ACCESO A LA CONSOLA DE RESCATE
+--------------------------------------------------------------------------------
+URL de Acceso Directo:
+https://barolocalculadora.vercel.app/rescue
+
+(También disponible en https://calculadorabarolo.vercel.app/rescue y http://localhost:5173/rescue)
+
+--------------------------------------------------------------------------------
+2. CREDENCIALES DE DESARROLLADOR
+--------------------------------------------------------------------------------
+Usuario:      zencio
+Contraseña:   15Pato1981
+Rol:          Soporte Técnico / DevOps / Desarrollador Principal
+
+--------------------------------------------------------------------------------
+3. FUNCIONES DE LA CONSOLA
+--------------------------------------------------------------------------------
+A) Papelera de Recuperación (Soft Delete):
+   - Muestra todos los eventos que hayan sido eliminados por error por los usuarios.
+   - Botón [Restaurar Evento]: Reincorpora el evento con todos sus costos, precios,
+     metadatos y notas intactas inmediatamente a la grilla y calendario.
+
+B) Puntos de Restauración en el Tiempo (Snapshots):
+   - Registra el historial de copias de seguridad automáticas generadas en segundo plano.
+   - Botón [Restaurar Sistema]: Permite rebobinar el sistema completo a un punto anterior.
+
+C) Herramientas de Emergencia:
+   - Descarga de base de datos completa en formato JSON y Excel.
+   - Forzar sincronización en la nube con Supabase.
+
+Fecha de Creación: 2026-09-12
+================================================================================
+
